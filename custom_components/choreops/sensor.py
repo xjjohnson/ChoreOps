@@ -3458,7 +3458,17 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     self._achievement_id
                 )
             )
-            attributes[const.ATTR_FAMILY_TOTAL] = sum(contributions.values())
+            attributes[const.ATTR_FAMILY_TOTAL] = (
+                self.coordinator.gamification_manager.get_family_achievement_total(
+                    self._achievement_id
+                )
+            )
+            if ach_type == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP:
+                attributes[const.ATTR_FAMILY_CAUGHT_UP_TODAY] = (
+                    self.coordinator.gamification_manager.get_family_caught_up_status(
+                        self._achievement_id
+                    )
+                )
             attributes[const.ATTR_FAMILY_CONTRIBUTIONS] = {
                 (get_assignee_name_by_id(self.coordinator, a_id) or a_id): value
                 for a_id, value in contributions.items()
@@ -4000,6 +4010,15 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
                     self._achievement_id
                 )
             )
+            if (
+                achievement.get(const.DATA_ACHIEVEMENT_TYPE)
+                == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+            ):
+                attributes[const.ATTR_FAMILY_CAUGHT_UP_TODAY] = (
+                    self.coordinator.gamification_manager.get_family_caught_up_status(
+                        self._achievement_id
+                    )
+                )
 
         return attributes
 

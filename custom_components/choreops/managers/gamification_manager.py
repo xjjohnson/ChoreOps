@@ -3067,6 +3067,68 @@ class GamificationManager(BaseManager):
             )
         return sum(self.get_family_contributions(achievement_id).values())
 
+    def _family_caught_up_snapshots(
+        self,
+        achievement_data: AchievementData,
+        last_day: str,
+        today_iso: str,
+    ) -> dict[str, dict[str, int | bool]]:
+        """Return each assigned person's due/done counts for today."""
+        stats = self.coordinator.statistics_manager
+        result: dict[str, dict[str, int | bool]] = {}
+        for assignee_id in self._get_family_assigned_ids(achievement_data):
+            chore_ids = [
+                str(chore_id)
+                for chore_id in self.coordinator.assignees_data[assignee_id].get(
+                    const.DATA_USER_CHORE_DATA, {}
+                )
+                if chore_id in self.coordinator.chores_data
+            ]
+            snapshot = stats.get_badge_scoped_today_completion(
+                assignee_id,
+                chore_ids,
+                today_iso=today_iso,
+                cycle_start_iso=today_iso,
+                only_due_today=True,
+                last_update_day_iso=last_day,
+            )
+            result[assignee_id] = {
+                "due": int(snapshot.get("due_count", 0)),
+                "done": int(snapshot.get("approved_due_today", 0)),
+                "overdue": bool(snapshot.get("has_overdue", False)),
+                "missed": bool(snapshot.get("missed_since_advance", False)),
+            }
+        return result
+
+    def get_family_caught_up_status(self, achievement_id: str) -> dict[str, str]:
+        """Return today's per-person caught-up progress as readable text.
+
+        Read-only helper for sensors, so a dashboard can show who is holding
+        the day up (for example "Lily: 2/3 due chores approved").
+        """
+        achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        if not achievement_data:
+            return {}
+        last_day = str(
+            achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY, "")
+        )
+        snapshots = self._family_caught_up_snapshots(
+            achievement_data, last_day, dt_today_iso()
+        )
+        names = {
+            assignee_id: str(
+                eh.get_assignee_name_by_id(self.coordinator, assignee_id) or assignee_id
+            )
+            for assignee_id in snapshots
+        }
+        return {
+            names[assignee_id]: (
+                f"{snap['done']}/{snap['due']} due chores approved"
+                + (", overdue" if snap["overdue"] else "")
+            )
+            for assignee_id, snap in snapshots.items()
+        }
+
     def _update_family_caught_up_streak(
         self,
         achievement_data: AchievementData,
@@ -3091,35 +3153,11 @@ class GamificationManager(BaseManager):
         if last_day == today_iso:
             return False
 
-        stats = self.coordinator.statistics_manager
-        owed_total = 0
-        all_done = True
-        any_overdue = False
-        any_missed = False
-        for assignee_id in self._get_family_assigned_ids(achievement_data):
-            chore_ids = [
-                str(chore_id)
-                for chore_id in self.coordinator.assignees_data[assignee_id].get(
-                    const.DATA_USER_CHORE_DATA, {}
-                )
-                if chore_id in self.coordinator.chores_data
-            ]
-            snapshot = stats.get_badge_scoped_today_completion(
-                assignee_id,
-                chore_ids,
-                today_iso=today_iso,
-                cycle_start_iso=today_iso,
-                only_due_today=True,
-                last_update_day_iso=last_day,
-            )
-            due = int(snapshot.get("due_count", 0))
-            owed_total += due
-            if int(snapshot.get("approved_due_today", 0)) < due:
-                all_done = False
-            if snapshot.get("has_overdue", False):
-                any_overdue = True
-            if count > 0 and snapshot.get("missed_since_advance", False):
-                any_missed = True
+        status = self._family_caught_up_snapshots(achievement_data, last_day, today_iso)
+        owed_total = sum(int(v["due"]) for v in status.values())
+        all_done = all(int(v["done"]) >= int(v["due"]) for v in status.values())
+        any_overdue = any(bool(v["overdue"]) for v in status.values())
+        any_missed = count > 0 and any(bool(v["missed"]) for v in status.values())
 
         changed = False
         if any_missed and count != 0:
