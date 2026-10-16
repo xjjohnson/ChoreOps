@@ -1268,13 +1268,19 @@ class GamificationManager(BaseManager):
             canonical_target.get("target_type", "unknown"),
         )
 
+        repeating = self._is_repeating_streak_badge(badge_data)
+
         if not already_earned:
             await self._apply_periodic_first_award(
                 assignee_id, badge_id, badge_data, result
             )
+            if repeating:
+                self._restart_streak_after_award(assignee_id, badge_id)
             return
 
-        if self._is_periodic_award_recorded_for_current_cycle(assignee_id, badge_id):
+        if not repeating and self._is_periodic_award_recorded_for_current_cycle(
+            assignee_id, badge_id
+        ):
             const.LOGGER.debug(
                 "Skipping periodic re-award for assignee %s badge %s "
                 "(already awarded in current cycle)",
@@ -1284,6 +1290,56 @@ class GamificationManager(BaseManager):
             return
 
         await self._apply_periodic_reaward(assignee_id, badge_id, badge_data)
+        if repeating:
+            self._restart_streak_after_award(assignee_id, badge_id)
+
+    def _is_repeating_streak_badge(self, badge_data: BadgeData) -> bool:
+        """Return True for streak badges with no reset schedule.
+
+        These repeat: hit the streak target, earn the badge, and the streak
+        starts over from zero so it can be earned again. Streak badges that
+        have a recurring reset schedule keep the once-per-cycle behavior.
+        """
+        target = cast("dict[str, Any]", badge_data.get(const.DATA_BADGE_TARGET, {}))
+        if (
+            str(target.get(const.DATA_BADGE_TARGET_TYPE, ""))
+            not in const.BADGE_TARGET_TYPES_STREAK
+        ):
+            return False
+        reset_schedule = cast(
+            "dict[str, Any]", badge_data.get(const.DATA_BADGE_RESET_SCHEDULE, {})
+        )
+        return (
+            str(
+                reset_schedule.get(
+                    const.DATA_BADGE_RESET_SCHEDULE_RECURRING_FREQUENCY,
+                    const.FREQUENCY_NONE,
+                )
+            )
+            == const.FREQUENCY_NONE
+        )
+
+    def _restart_streak_after_award(self, assignee_id: str, badge_id: str) -> None:
+        """Zero a streak badge's counter right after it is awarded.
+
+        Today stays marked as already counted so the same day is not credited
+        again; tomorrow becomes day one of the next streak.
+        """
+        assignee_info: UserData | dict[str, Any] = self.coordinator.assignees_data.get(
+            assignee_id, {}
+        )
+        badge_progress = cast(
+            "dict[str, Any]", assignee_info.get(const.DATA_USER_BADGE_PROGRESS, {})
+        )
+        progress = cast("dict[str, Any]", badge_progress.get(badge_id, {}))
+        if not progress:
+            return
+        progress[const.DATA_USER_BADGE_PROGRESS_STATUS] = const.BADGE_STATE_ACTIVE_CYCLE
+        progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] = 0
+        progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] = 0.0
+        progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] = False
+        progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = dt_today_iso()
+        self.coordinator._persist_and_update()
 
     def _is_periodic_award_recorded_for_current_cycle(
         self,
@@ -2885,6 +2941,19 @@ class GamificationManager(BaseManager):
         assignee_id: str,
         achievement_data: AchievementData,
     ) -> float:
+        """Return one person's contribution since the goal was last restarted.
+
+        All-time totals minus the baseline captured by `reset_family_goal`.
+        """
+        raw = self._get_family_raw_contribution(assignee_id, achievement_data)
+        baseline = achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_BASELINE, {})
+        return max(0.0, raw - float(baseline.get(assignee_id, 0.0)))
+
+    def _get_family_raw_contribution(
+        self,
+        assignee_id: str,
+        achievement_data: AchievementData,
+    ) -> float:
         """Return one person's all-time contribution to a family goal.
 
         Args:
@@ -2956,14 +3025,26 @@ class GamificationManager(BaseManager):
         achievement_data = self.coordinator.achievements_data.get(achievement_id)
         if not achievement_data:
             return {}
-        assigned_ids = achievement_data.get(
-            const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
-        )
+        if (
+            achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+        ):
+            # The caught-up goal is a shared streak, not a sum of shares.
+            return {}
         return {
             assignee_id: self._get_family_contribution(assignee_id, achievement_data)
-            for assignee_id in assigned_ids
-            if assignee_id in self.coordinator.assignees_data
+            for assignee_id in self._get_family_assigned_ids(achievement_data)
         }
+
+    def _get_family_assigned_ids(self, achievement_data: AchievementData) -> list[str]:
+        """Return assigned people who still exist."""
+        return [
+            assignee_id
+            for assignee_id in achievement_data.get(
+                const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
+            )
+            if assignee_id in self.coordinator.assignees_data
+        ]
 
     def get_family_achievement_total(self, achievement_id: str) -> float:
         """Return the pooled total toward a family goal.
@@ -2972,9 +3053,142 @@ class GamificationManager(BaseManager):
             achievement_id: The internal UUID of the family goal achievement
 
         Returns:
-            Sum of every assigned person's contribution.
+            Points or chores pooled since the last restart, or the current
+            caught-up streak in days for the caught-up goal.
         """
+        achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        if (
+            achievement_data
+            and achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+        ):
+            return float(
+                achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT, 0)
+            )
         return sum(self.get_family_contributions(achievement_id).values())
+
+    def _update_family_caught_up_streak(
+        self,
+        achievement_data: AchievementData,
+    ) -> bool:
+        """Advance or break the pooled "everyone caught up" streak.
+
+        A day counts once every assigned person has finished everything that is
+        due today and nobody has anything overdue. Days where nothing is owed
+        are neutral, and a day still in progress changes nothing. A scheduled
+        chore that passed unmet since the streak last advanced breaks it, the
+        same rule badge streaks use. Safe to call repeatedly: a day is only
+        counted once.
+
+        Returns:
+            True when stored streak state changed.
+        """
+        today_iso = dt_today_iso()
+        last_day = str(
+            achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY, "")
+        )
+        count = int(achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT, 0))
+        if last_day == today_iso:
+            return False
+
+        stats = self.coordinator.statistics_manager
+        owed_total = 0
+        all_done = True
+        any_overdue = False
+        any_missed = False
+        for assignee_id in self._get_family_assigned_ids(achievement_data):
+            chore_ids = [
+                str(chore_id)
+                for chore_id in self.coordinator.assignees_data[assignee_id].get(
+                    const.DATA_USER_CHORE_DATA, {}
+                )
+                if chore_id in self.coordinator.chores_data
+            ]
+            snapshot = stats.get_badge_scoped_today_completion(
+                assignee_id,
+                chore_ids,
+                today_iso=today_iso,
+                cycle_start_iso=today_iso,
+                only_due_today=True,
+                last_update_day_iso=last_day,
+            )
+            due = int(snapshot.get("due_count", 0))
+            owed_total += due
+            if int(snapshot.get("approved_due_today", 0)) < due:
+                all_done = False
+            if snapshot.get("has_overdue", False):
+                any_overdue = True
+            if count > 0 and snapshot.get("missed_since_advance", False):
+                any_missed = True
+
+        changed = False
+        if any_missed and count != 0:
+            count = 0
+            changed = True
+        satisfied = owed_total > 0 and all_done and not any_overdue
+        if satisfied:
+            count += 1
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = today_iso
+            changed = True
+        if changed:
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT] = count
+        return changed
+
+    def reset_family_goal(self, achievement_id: str) -> None:
+        """Restart a family goal from zero.
+
+        Points and chores goals remember each person's current all-time total
+        as a baseline, so only future activity counts. The caught-up goal
+        clears its streak (today is not counted, tomorrow is day one). Everyone's
+        award is cleared so the goal can be earned again; history already
+        paid out (reward points, notifications) is untouched.
+
+        Args:
+            achievement_id: The internal UUID of the family goal achievement
+
+        Raises:
+            HomeAssistantError: Achievement missing or not a family goal.
+        """
+        achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        if (
+            not achievement_data
+            or achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+            not in const.FAMILY_ACHIEVEMENT_TYPES
+        ):
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=const.TRANS_KEY_ERROR_NOT_FOUND,
+                translation_placeholders={
+                    "entity_type": const.LABEL_ACHIEVEMENT,
+                    "name": achievement_id,
+                },
+            )
+
+        if (
+            achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+        ):
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT] = 0
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = (
+                dt_today_iso()
+            )
+        else:
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_BASELINE] = {
+                assignee_id: self._get_family_raw_contribution(
+                    assignee_id, achievement_data
+                )
+                for assignee_id in self._get_family_assigned_ids(achievement_data)
+            }
+
+        progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
+        for entry in progress.values():
+            if isinstance(entry, dict):
+                entry_dict = cast("dict[str, Any]", entry)
+                entry_dict[const.DATA_ACHIEVEMENT_AWARDED] = False
+                entry_dict[const.DATA_ACHIEVEMENT_CURRENT_VALUE] = const.DEFAULT_ZERO
+
+        const.LOGGER.info("Family goal %s restarted", achievement_id)
+        self.coordinator._persist_and_update()
 
     async def _evaluate_family_achievement(
         self,
@@ -2994,12 +3208,20 @@ class GamificationManager(BaseManager):
         if target <= 0:
             return
 
-        contributions = self.get_family_contributions(achievement_id)
-        if not contributions or sum(contributions.values()) < target:
+        if (
+            achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+        ):
+            if self._update_family_caught_up_streak(achievement_data):
+                self.coordinator._persist_and_update()
+        elif self.get_family_achievement_total(achievement_id) < target:
+            return
+
+        if self.get_family_achievement_total(achievement_id) < target:
             return
 
         progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
-        for assignee_id in contributions:
+        for assignee_id in self._get_family_assigned_ids(achievement_data):
             entry = progress.get(assignee_id)
             if isinstance(entry, dict) and entry.get(const.DATA_ACHIEVEMENT_AWARDED):
                 continue

@@ -755,6 +755,10 @@ class AchievementData(TypedDict):
     target_value: int
     baseline: NotRequired[int]
     selected_chore_id: NotRequired[str]  # Chore UUID for chore-specific
+    # Family goals only (see GamificationManager family goal section)
+    family_baseline: NotRequired[dict[str, float]]  # assignee_id -> amount at restart
+    family_streak_count: NotRequired[int]  # pooled caught-up streak (days)
+    family_streak_last_day: NotRequired[str]  # ISO date the streak last advanced
 
     # Assignment
     assigned_assignees: list[str]  # Assignee UUIDs

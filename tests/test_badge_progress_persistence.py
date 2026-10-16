@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from custom_components.choreops import const
+from custom_components.choreops.managers.gamification_manager import GamificationManager
 from custom_components.choreops.utils import dt_utils
 from tests.helpers.setup import SetupResult, setup_from_yaml
 from tests.test_badge_streak_midnight_reset import (
@@ -34,6 +35,18 @@ from tests.test_badge_streak_midnight_reset import (
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+
+
+@pytest.fixture(autouse=True)
+def _non_repeating_streak_badges(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the streak-counting mechanics under test, independent of restart-on-award.
+
+    Open-ended streak badges now restart after each award (see
+    tests/test_repeating_streak_badge.py); these tests assert the raw count.
+    """
+    monkeypatch.setattr(
+        GamificationManager, "_is_repeating_streak_badge", lambda self, badge: False
+    )
 
 
 CHORE_WITH_A_SCHEDULE = "Organize closet"
@@ -114,11 +127,13 @@ class TestNeutralDayWritesNothing:
         and silently hide an occurrence that was actually missed.
         """
         replay, _badge_id = await _neutral_replay(hass, persistence_scenario)
-        replay.seed_streak(days=4, last_update_day=day_key(-1))
+        # Below the badge's 3-day target: reaching it would award the badge and
+        # (by design, for open-ended streak badges) restart the count.
+        replay.seed_streak(days=2, last_update_day=day_key(-1))
 
         await replay.start_day(day_key(0))
 
-        assert replay.days_cycle_count == 4
+        assert replay.days_cycle_count == 2
         assert replay.last_update_day == day_key(-1)
 
     async def test_neutral_day_does_not_re_award_an_earned_badge(

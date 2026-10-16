@@ -520,6 +520,17 @@ REPAIR_BADGE_STREAK_SCHEMA = vol.All(
     _validate_repair_badge_streak_payload,
 )
 
+RESET_FAMILY_GOAL_SCHEMA = vol.Schema(
+    _with_service_target_fields(
+        {
+            vol.Required(const.SERVICE_FIELD_ACHIEVEMENT_NAME): vol.All(
+                cv.string,
+                vol.Length(min=1),
+            ),
+        }
+    )
+)
+
 # Optional filter base patterns for reset operations
 _OPTIONAL_ASSIGNEE_FILTER = {vol.Optional(const.SERVICE_FIELD_USER_NAME): cv.string}
 
@@ -3446,6 +3457,46 @@ def async_setup_services(hass: HomeAssistant):
         handle_repair_badge_streak,
         schema=REPAIR_BADGE_STREAK_SCHEMA,
         supports_response=SupportsResponse.OPTIONAL,
+    )
+
+    async def handle_reset_family_goal(call: ServiceCall) -> None:
+        """Handle restarting a family goal from zero."""
+        entry_id = _resolve_target_entry_id(hass, dict(call.data))
+        if not entry_id:
+            const.LOGGER.warning(
+                "Reset Family Goal: %s", const.TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND
+            )
+            return
+
+        coordinator = _get_coordinator_by_entry_id(hass, entry_id)
+
+        user_id = call.context.user_id
+        if user_id and not await is_user_authorized_for_action(
+            hass,
+            user_id,
+            AUTH_ACTION_MANAGEMENT,
+        ):
+            const.LOGGER.warning("Reset Family Goal: User not authorized")
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=const.TRANS_KEY_ERROR_NOT_AUTHORIZED_ACTION,
+                translation_placeholders={
+                    "action": const.ERROR_ACTION_RESET_FAMILY_GOAL
+                },
+            )
+
+        achievement_name = str(call.data[const.SERVICE_FIELD_ACHIEVEMENT_NAME])
+        achievement_id = get_item_id_or_raise(
+            coordinator, const.ITEM_TYPE_ACHIEVEMENT, achievement_name
+        )
+        coordinator.gamification_manager.reset_family_goal(achievement_id)
+        await coordinator.async_request_refresh()
+
+    hass.services.async_register(
+        const.DOMAIN,
+        const.SERVICE_RESET_FAMILY_GOAL,
+        handle_reset_family_goal,
+        schema=RESET_FAMILY_GOAL_SCHEMA,
     )
 
     # ==========================================================================

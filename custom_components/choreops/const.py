@@ -998,9 +998,22 @@ ACHIEVEMENT_TYPE_TOTAL: Final = "chore_total"
 # total reaches the target, everyone assigned is awarded together.
 ACHIEVEMENT_TYPE_FAMILY_POINTS: Final = "family_points_total"
 ACHIEVEMENT_TYPE_FAMILY_CHORES: Final = "family_chore_total"
+# Pooled streak: consecutive days on which EVERY assigned person finished all
+# the chores that were due. The target value is the number of days.
+ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP: Final = "family_caught_up_days"
 FAMILY_ACHIEVEMENT_TYPES: Final = frozenset(
-    {ACHIEVEMENT_TYPE_FAMILY_POINTS, ACHIEVEMENT_TYPE_FAMILY_CHORES}
+    {
+        ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        ACHIEVEMENT_TYPE_FAMILY_CHORES,
+        ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
+    }
 )
+# Stored on the achievement itself (not per person): the amount each person had
+# already contributed when the goal was last restarted, and the pooled
+# caught-up streak state.
+DATA_ACHIEVEMENT_FAMILY_BASELINE: Final = "family_baseline"
+DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT: Final = "family_streak_count"
+DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY: Final = "family_streak_last_day"
 
 # Challenge Types
 CHALLENGE_TYPE_DAILY_MIN: Final = "daily_minimum"
@@ -3066,6 +3079,7 @@ SERVICE_DISAPPROVE_REWARD: Final = "disapprove_reward"
 SERVICE_REDEEM_REWARD: Final = "redeem_reward"
 SERVICE_REMOVE_AWARDED_BADGES: Final = "remove_awarded_badges"
 SERVICE_REPAIR_BADGE_STREAK: Final = "repair_badge_streak"
+SERVICE_RESET_FAMILY_GOAL: Final = "reset_family_goal"
 SERVICE_RESET_CHORES_TO_PENDING_STATE: Final = (
     "reset_chores_to_pending_state"  # Renamed from reset_all_chores
 )
@@ -3265,6 +3279,7 @@ SERVICE_FIELD_PENALTY_NAME: Final = "penalty_name"
 SERVICE_FIELD_BONUS_NAME: Final = "bonus_name"
 
 # Badge service fields
+SERVICE_FIELD_ACHIEVEMENT_NAME: Final = "achievement_name"
 SERVICE_FIELD_BADGE_NAME: Final = "badge_name"
 # Target streak count to restore. See the repair_badge_streak service.
 SERVICE_FIELD_BADGE_STREAK_COUNT: Final = "badge_streak_count"
@@ -3592,6 +3607,7 @@ ERROR_ACTION_APPLY_BONUSES: Final = "apply_bonuses"
 ERROR_ACTION_ADJUST_POINTS: Final = "adjust_points"
 ERROR_ACTION_REMOVE_BADGES: Final = "remove_badges"
 ERROR_ACTION_REPAIR_BADGE_STREAK: Final = "repair_badge_streak"
+ERROR_ACTION_RESET_FAMILY_GOAL: Final = "reset_family_goal"
 
 TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND: Final = "error_msg_no_entry_found"
 TRANS_KEY_ERROR_SERVICE_TARGET_AMBIGUOUS: Final = "service_target_ambiguous"
@@ -4489,6 +4505,10 @@ ACHIEVEMENT_TYPE_OPTIONS = [
     {
         "value": ACHIEVEMENT_TYPE_FAMILY_CHORES,
         "label": "Family Goal: Total Chores Completed",
+    },
+    {
+        "value": ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
+        "label": "Family Goal: Everyone Caught Up for X Days",
     },
 ]
 

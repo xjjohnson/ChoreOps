@@ -233,3 +233,137 @@ async def test_goal_sensors_show_pooled_progress(
     assert contributions[zoe] == pytest.approx(60.0)
     assert contributions[max_] == pytest.approx(40.0)
     assert gm.get_family_achievement_total(goal_id) == pytest.approx(100.0)
+
+
+async def test_reset_restarts_points_goal_from_zero(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Reset zeroes the pooled total, clears awards, and the goal can be earned again."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        target=50.0,
+        reward=10.0,
+        assigned=[zoe, max_],
+    )
+    await _earn_points(scenario_full, zoe, 30.0)
+    await _earn_points(scenario_full, max_, 30.0)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert _awarded(scenario_full, goal_id, zoe)
+
+    gm.reset_family_goal(goal_id)
+
+    assert gm.get_family_achievement_total(goal_id) == pytest.approx(0.0)
+    assert not _awarded(scenario_full, goal_id, zoe)
+    assert not _awarded(scenario_full, goal_id, max_)
+
+    # Only NEW points count now; the old 60 does not instantly re-award.
+    await gm._evaluate_assignee(zoe)
+    assert not _awarded(scenario_full, goal_id, zoe)
+    await _earn_points(scenario_full, zoe, 25.0)
+    await _earn_points(scenario_full, max_, 25.0)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    # 50 new points + the 10-point award each person got when the goal re-fires.
+    assert gm.get_family_achievement_total(goal_id) >= 50.0
+    assert _awarded(scenario_full, goal_id, zoe)
+    assert _awarded(scenario_full, goal_id, max_)
+
+
+async def test_reset_service_restarts_goal_by_name(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """The reset_family_goal service looks the goal up by name and restarts it."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        target=1000.0,
+        reward=0.0,
+        assigned=[zoe],
+    )
+    await _earn_points(scenario_full, zoe, 40.0)
+    assert gm.get_family_achievement_total(goal_id) == pytest.approx(40.0)
+
+    name = scenario_full.coordinator.achievements_data[goal_id][
+        const.DATA_ACHIEVEMENT_NAME
+    ]
+    await hass.services.async_call(
+        const.DOMAIN,
+        const.SERVICE_RESET_FAMILY_GOAL,
+        {const.SERVICE_FIELD_ACHIEVEMENT_NAME: name},
+        blocking=True,
+    )
+    assert gm.get_family_achievement_total(goal_id) == pytest.approx(0.0)
+
+
+def _fake_snapshot(
+    gm: Any, due: int, approved: int, *, overdue: bool = False, missed: bool = False
+) -> None:
+    """Force the per-person completion snapshot used by the caught-up streak."""
+    snapshot = {
+        "due_count": due,
+        "approved_due_today": approved,
+        "has_overdue": overdue,
+        "missed_since_advance": missed,
+    }
+    gm.coordinator.statistics_manager.get_badge_scoped_today_completion = (
+        lambda *a, **k: snapshot
+    )
+
+
+async def test_caught_up_streak_counts_breaks_and_awards(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Caught-up days accumulate once per day, a miss breaks it, target awards all."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
+        target=2.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+    achievement = scenario_full.coordinator.achievements_data[goal_id]
+
+    # Chores still outstanding: day does not count.
+    _fake_snapshot(gm, due=3, approved=2)
+    await gm._evaluate_assignee(zoe)
+    assert gm.get_family_achievement_total(goal_id) == 0
+
+    # Everyone done: day 1, and re-evaluating the same day is idempotent.
+    _fake_snapshot(gm, due=3, approved=3)
+    await gm._evaluate_assignee(zoe)
+    await gm._evaluate_assignee(max_)
+    assert gm.get_family_achievement_total(goal_id) == 1
+
+    # Pretend that was yesterday, then a missed chore breaks the streak.
+    achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = "2000-01-01"
+    _fake_snapshot(gm, due=3, approved=2, missed=True)
+    await gm._evaluate_assignee(zoe)
+    assert gm.get_family_achievement_total(goal_id) == 0
+
+    # Two good days in a row reach the target and award everyone.
+    _fake_snapshot(gm, due=3, approved=3)
+    await gm._evaluate_assignee(zoe)
+    achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = "2000-01-01"
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_family_achievement_total(goal_id) == 2
+    assert _awarded(scenario_full, goal_id, zoe)
+    assert _awarded(scenario_full, goal_id, max_)
+
+    # Reset starts the streak over.
+    gm.reset_family_goal(goal_id)
+    assert gm.get_family_achievement_total(goal_id) == 0
+    assert not _awarded(scenario_full, goal_id, zoe)
