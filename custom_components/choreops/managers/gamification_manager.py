@@ -2746,6 +2746,21 @@ class GamificationManager(BaseManager):
             # Achievements are permanent - no re-evaluation needed
             return
 
+        # Family goals pool every assigned person's contribution into one total
+        # and award everyone together, so they bypass the per-assignee engine.
+        if achievement_data.get(const.DATA_ACHIEVEMENT_TYPE) in (
+            const.FAMILY_ACHIEVEMENT_TYPES
+        ):
+            assigned_ids = achievement_data.get(
+                const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
+            )
+            # Only people assigned to the goal can move its total.
+            if assignee_id in assigned_ids:
+                await self._evaluate_family_achievement(
+                    achievement_id, achievement_data
+                )
+            return
+
         canonical_target = self._map_achievement_to_canonical_target(
             assignee_id,
             achievement_id,
@@ -2854,6 +2869,146 @@ class GamificationManager(BaseManager):
                 ),
                 result=result,
             )
+
+    # =========================================================================
+    # FAMILY GOAL ACHIEVEMENTS
+    # =========================================================================
+    # A family goal is an achievement whose progress is ONE pooled total across
+    # every assigned person (all-time points earned, or all-time chores
+    # approved). When the pooled total reaches the target, every assigned
+    # person is awarded together through the normal award_achievement() path,
+    # so reward points, notifications and the earned signal behave exactly as
+    # they do for individual achievements.
+
+    def _get_family_contribution(
+        self,
+        assignee_id: str,
+        achievement_data: AchievementData,
+    ) -> float:
+        """Return one person's all-time contribution to a family goal.
+
+        Args:
+            assignee_id: The internal UUID of the assignee
+            achievement_data: Family goal achievement definition
+
+        Returns:
+            All-time points earned (points goal) or chores approved (chores
+            goal, optionally limited to the selected chore).
+        """
+        assignee_data = self.coordinator.assignees_data.get(assignee_id)
+        if not assignee_data:
+            return 0.0
+
+        achievement_type = achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+
+        if achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_POINTS:
+            point_periods = assignee_data.get(const.DATA_USER_POINT_PERIODS, {})
+            return float(
+                self.coordinator.stats.get_period_total(
+                    point_periods,
+                    const.PERIOD_ALL_TIME,
+                    const.DATA_USER_POINT_PERIOD_POINTS_EARNED,
+                    period_key_mapping={
+                        const.PERIOD_ALL_TIME: const.DATA_USER_POINT_PERIODS_ALL_TIME
+                    },
+                )
+            )
+
+        # Chores goal: optionally scoped to one chore, otherwise all chores.
+        selected_chore_id = str(
+            achievement_data.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID, "")
+        )
+        if selected_chore_id and selected_chore_id not in (
+            const.SENTINEL_EMPTY,
+            const.SENTINEL_NONE_TEXT,
+            const.SENTINEL_NO_SELECTION,
+        ):
+            scoped = (
+                self.coordinator.statistics_manager.get_badge_scoped_all_time_stats(
+                    assignee_id,
+                    [selected_chore_id],
+                )
+            )
+            return float(scoped.get(const.DATA_USER_CHORE_DATA_PERIOD_APPROVED, 0))
+
+        chore_periods = assignee_data.get(const.DATA_USER_CHORE_PERIODS, {})
+        all_time_container = cast(
+            "dict[str, Any]",
+            chore_periods.get(const.DATA_USER_CHORE_DATA_PERIODS_ALL_TIME, {}),
+        )
+        all_time_bucket = cast(
+            "dict[str, Any]", all_time_container.get(const.PERIOD_ALL_TIME, {})
+        )
+        return float(all_time_bucket.get(const.DATA_USER_CHORE_DATA_PERIOD_APPROVED, 0))
+
+    def get_family_contributions(self, achievement_id: str) -> dict[str, float]:
+        """Return each assigned person's contribution to a family goal.
+
+        Read-only helper used by sensors and the evaluator.
+
+        Args:
+            achievement_id: The internal UUID of the family goal achievement
+
+        Returns:
+            Mapping of assignee_id to that person's all-time contribution.
+            Empty when the achievement is missing or has no assignees.
+        """
+        achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        if not achievement_data:
+            return {}
+        assigned_ids = achievement_data.get(
+            const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
+        )
+        return {
+            assignee_id: self._get_family_contribution(assignee_id, achievement_data)
+            for assignee_id in assigned_ids
+            if assignee_id in self.coordinator.assignees_data
+        }
+
+    def get_family_achievement_total(self, achievement_id: str) -> float:
+        """Return the pooled total toward a family goal.
+
+        Args:
+            achievement_id: The internal UUID of the family goal achievement
+
+        Returns:
+            Sum of every assigned person's contribution.
+        """
+        return sum(self.get_family_contributions(achievement_id).values())
+
+    async def _evaluate_family_achievement(
+        self,
+        achievement_id: str,
+        achievement_data: AchievementData,
+    ) -> None:
+        """Award a family goal to everyone assigned once the pooled total is met.
+
+        People who already hold the award are skipped, so this is safe to call
+        repeatedly (it runs whenever any assigned person is re-evaluated).
+
+        Args:
+            achievement_id: Achievement internal ID
+            achievement_data: Family goal achievement definition
+        """
+        target = float(achievement_data.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 0.0))
+        if target <= 0:
+            return
+
+        contributions = self.get_family_contributions(achievement_id)
+        if not contributions or sum(contributions.values()) < target:
+            return
+
+        progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
+        for assignee_id in contributions:
+            entry = progress.get(assignee_id)
+            if isinstance(entry, dict) and entry.get(const.DATA_ACHIEVEMENT_AWARDED):
+                continue
+            const.LOGGER.info(
+                "Family goal %s reached - awarding assignee %s",
+                achievement_id,
+                assignee_id,
+            )
+            await self.award_achievement(assignee_id, achievement_id)
 
     # =========================================================================
     # CHALLENGE EVALUATION

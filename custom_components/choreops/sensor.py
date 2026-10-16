@@ -3286,6 +3286,19 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                 else const.DEFAULT_ZERO
             )
 
+        elif ach_type in const.FAMILY_ACHIEVEMENT_TYPES:
+            # Family goal: ONE pooled total vs ONE target (not target x people).
+            family_total = (
+                self.coordinator.gamification_manager.get_family_achievement_total(
+                    self._achievement_id
+                )
+            )
+            percent = (
+                (family_total / target * 100)
+                if target > const.DEFAULT_ZERO
+                else const.DEFAULT_ZERO
+            )
+
         elif ach_type == const.ACHIEVEMENT_TYPE_STREAK:
             total_current = const.DEFAULT_ZERO
 
@@ -3416,7 +3429,7 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             for label in cast("list", stored_labels)
         ]
 
-        return {
+        attributes: dict[str, Any] = {
             const.ATTR_PURPOSE: const.TRANS_KEY_PURPOSE_ACHIEVEMENT,
             const.ATTR_ACHIEVEMENT_NAME: self._achievement_name,
             const.ATTR_DESCRIPTION: achievement.get(
@@ -3437,6 +3450,21 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             const.ATTR_USERS_EARNED: earned_by,
             const.ATTR_LABELS: friendly_labels,
         }
+
+        if ach_type in const.FAMILY_ACHIEVEMENT_TYPES:
+            # Pooled total plus each person's share, keyed by display name.
+            contributions = (
+                self.coordinator.gamification_manager.get_family_contributions(
+                    self._achievement_id
+                )
+            )
+            attributes[const.ATTR_FAMILY_TOTAL] = sum(contributions.values())
+            attributes[const.ATTR_FAMILY_CONTRIBUTIONS] = {
+                (get_assignee_name_by_id(self.coordinator, a_id) or a_id): value
+                for a_id, value in contributions.items()
+            }
+
+        return attributes
 
     @property
     def icon(self) -> str | None:
@@ -3779,6 +3807,20 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
                 else const.DEFAULT_ZERO
             )
 
+        elif ach_type in const.FAMILY_ACHIEVEMENT_TYPES:
+            # Family goal: every person's progress sensor shows the shared
+            # pooled progress, so the whole family watches the same bar.
+            family_total = (
+                self.coordinator.gamification_manager.get_family_achievement_total(
+                    self._achievement_id
+                )
+            )
+            percent = (
+                (family_total / target * 100)
+                if target > const.DEFAULT_ZERO
+                else const.DEFAULT_ZERO
+            )
+
         elif ach_type == const.ACHIEVEMENT_TYPE_STREAK:
             progress_data_elif: AchievementProgress = achievement.get(
                 const.DATA_ACHIEVEMENT_PROGRESS, {}
@@ -3829,7 +3871,7 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
         progress_data: AchievementProgress = achievement.get(
             const.DATA_ACHIEVEMENT_PROGRESS, {}
         ).get(self._assignee_id, {})
-        raw_progress = const.DEFAULT_ZERO
+        raw_progress: float = const.DEFAULT_ZERO
 
         awarded = (
             progress_data.get(const.DATA_ACHIEVEMENT_AWARDED, False)
@@ -3875,6 +3917,16 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
                 const.PRES_USER_CHORES_APPROVED_TODAY, const.DEFAULT_ZERO
             )
 
+        elif achievement.get(const.DATA_ACHIEVEMENT_TYPE) in (
+            const.FAMILY_ACHIEVEMENT_TYPES
+        ):
+            # This person's own share of the family total.
+            raw_progress = (
+                self.coordinator.gamification_manager.get_family_contributions(
+                    self._achievement_id
+                ).get(self._assignee_id, const.DEFAULT_ZERO)
+            )
+
         associated_chore = const.SENTINEL_EMPTY
         selected_chore_id = achievement.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID)
         if selected_chore_id:
@@ -3907,7 +3959,7 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
             for label in cast("list", stored_labels)
         ]
 
-        return {
+        attributes: dict[str, Any] = {
             const.ATTR_PURPOSE: const.TRANS_KEY_PURPOSE_ACHIEVEMENT_PROGRESS,
             const.ATTR_USER_NAME: self._assignee_name,
             const.ATTR_ACHIEVEMENT_NAME: self._achievement_name,
@@ -3928,6 +3980,17 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
             const.ATTR_AWARDED: awarded,
             const.ATTR_LABELS: friendly_labels,
         }
+
+        if achievement.get(const.DATA_ACHIEVEMENT_TYPE) in (
+            const.FAMILY_ACHIEVEMENT_TYPES
+        ):
+            attributes[const.ATTR_FAMILY_TOTAL] = (
+                self.coordinator.gamification_manager.get_family_achievement_total(
+                    self._achievement_id
+                )
+            )
+
+        return attributes
 
     @property
     def icon(self) -> str | None:
