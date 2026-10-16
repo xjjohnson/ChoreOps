@@ -3920,12 +3920,23 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
         elif achievement.get(const.DATA_ACHIEVEMENT_TYPE) in (
             const.FAMILY_ACHIEVEMENT_TYPES
         ):
-            # This person's own share of the family total.
-            raw_progress = (
-                self.coordinator.gamification_manager.get_family_contributions(
-                    self._achievement_id
-                ).get(self._assignee_id, const.DEFAULT_ZERO)
-            )
+            if (
+                achievement.get(const.DATA_ACHIEVEMENT_TYPE)
+                == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+            ):
+                # Shared streak: everyone sees the same day count.
+                raw_progress = (
+                    self.coordinator.gamification_manager.get_family_achievement_total(
+                        self._achievement_id
+                    )
+                )
+            else:
+                # This person's own share of the family total.
+                raw_progress = (
+                    self.coordinator.gamification_manager.get_family_contributions(
+                        self._achievement_id
+                    ).get(self._assignee_id, const.DEFAULT_ZERO)
+                )
 
         associated_chore = const.SENTINEL_EMPTY
         selected_chore_id = achievement.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID)
