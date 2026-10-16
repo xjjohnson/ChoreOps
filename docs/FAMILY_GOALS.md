@@ -48,3 +48,27 @@ exposes `family_total`; its `raw_progress` attribute is that person's own share.
 - A person added to a goal that is already complete is awarded on the next
   evaluation.
 - Existing achievement types are unchanged.
+
+## Restarting a goal
+
+Call the `choreops.reset_family_goal` service with the goal's name
+(`achievement_name`). Points and chores goals remember what each person had
+already contributed and count only new activity from then on; the caught-up goal
+clears its streak (tomorrow is day one). Everyone's award is cleared so the goal
+can be earned again. Reward points already paid out are kept.
+
+## "Everyone caught up for X days"
+
+Type **Family Goal: Everyone Caught Up for X Days**; the target value is the
+number of days. A day counts once every assigned person has finished everything
+due that day and nobody has anything overdue. Days where nothing is owed are
+neutral; a scheduled chore that passes unmet breaks the streak (same rule as
+badge streaks). When the streak reaches the target, everyone assigned is awarded.
+
+## Repeating streak badges
+
+A streak-type badge whose reset schedule is **None** now repeats: when the
+streak target is hit the badge is awarded and the streak restarts from zero
+(tomorrow is day one of the next streak), so e.g. "7 days in a row" earns the
+badge again after each further 7-day run. Streak badges with a weekly/monthly
+reset schedule keep the once-per-cycle behavior.

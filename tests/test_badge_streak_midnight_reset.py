@@ -29,6 +29,7 @@ import pytest
 from custom_components.choreops import const
 from custom_components.choreops.engines.chore_engine import ChoreEngine
 from custom_components.choreops.engines.schedule_engine import RecurrenceEngine
+from custom_components.choreops.managers.gamification_manager import GamificationManager
 from custom_components.choreops.utils import dt_utils
 from custom_components.choreops.utils.dt_utils import as_utc, get_default_timezone
 from tests.helpers import (
@@ -57,6 +58,18 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
     from homeassistant.core import HomeAssistant
+
+
+@pytest.fixture(autouse=True)
+def _non_repeating_streak_badges(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the streak-counting mechanics under test, independent of restart-on-award.
+
+    Open-ended streak badges now restart after each award (see
+    tests/test_repeating_streak_badge.py); these tests assert the raw count.
+    """
+    monkeypatch.setattr(
+        GamificationManager, "_is_repeating_streak_badge", lambda self, badge: False
+    )
 
 
 ASSIGNEE_NAME = "Zoë"

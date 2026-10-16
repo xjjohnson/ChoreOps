@@ -1031,6 +1031,36 @@ remove_awarded_badges:
       selector:
         text:
 
+reset_family_goal:
+  name: "Reset Family Goal"
+  description: >
+    Restart a family goal from zero. Points and chores goals count only what
+    is earned from now on; the "everyone caught up" goal starts a fresh streak
+    tomorrow. Everyone's award is cleared so the goal can be earned again.
+    Reward points already paid out are not taken back.
+  fields:
+    config_entry_id:
+      name: "Config Entry ID (Optional)"
+      description: "Use this if you have more than one ChoreOps setup. It targets one specific setup."
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+    config_entry_title:
+      name: "Config Entry Name (Optional)"
+      description: "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID."
+      required: false
+      example: "Family Chores"
+      selector:
+        text:
+    achievement_name:
+      name: "Achievement Name"
+      description: "The name of the family goal to restart."
+      example: "Total Chores"
+      required: true
+      selector:
+        text:
+
 repair_badge_streak:
   name: "Repair Badge Streak"
   description: >
