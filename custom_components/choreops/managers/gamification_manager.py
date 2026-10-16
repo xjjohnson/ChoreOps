@@ -3073,8 +3073,14 @@ class GamificationManager(BaseManager):
         last_day: str,
         today_iso: str,
     ) -> dict[str, dict[str, int | bool]]:
-        """Return each assigned person's due/done counts for today."""
+        """Return each assigned person's open/done chore counts for today.
+
+        "Open" matches what the dashboard's "All Caught Up!" banner uses: chores
+        actionable for the person today (the due-today summary) plus anything
+        claimed but not yet approved. Overdue chores also block the day.
+        """
         stats = self.coordinator.statistics_manager
+        chore_manager = self.coordinator.chore_manager
         result: dict[str, dict[str, int | bool]] = {}
         for assignee_id in self._get_family_assigned_ids(achievement_data):
             chore_ids = [
@@ -3084,19 +3090,34 @@ class GamificationManager(BaseManager):
                 )
                 if chore_id in self.coordinator.chores_data
             ]
-            snapshot = stats.get_badge_scoped_today_completion(
-                assignee_id,
-                chore_ids,
-                today_iso=today_iso,
-                cycle_start_iso=today_iso,
-                only_due_today=True,
-                last_update_day_iso=last_day,
+            open_count = 0
+            overdue_count = 0
+            for chore_id in chore_ids:
+                context = chore_manager.get_chore_status_context(assignee_id, chore_id)
+                state = context.get(const.CHORE_CTX_STATE)
+                if state == const.CHORE_STATE_OVERDUE:
+                    overdue_count += 1
+                elif state == const.CHORE_STATE_CLAIMED or (
+                    chore_manager.chore_counts_toward_due_today_summary(
+                        assignee_id,
+                        chore_id,
+                        status_context=context,
+                        local_today_iso=today_iso,
+                    )
+                ):
+                    open_count += 1
+            today_stats = stats.get_badge_scoped_today_stats(
+                assignee_id, chore_ids, today_iso=today_iso
             )
             result[assignee_id] = {
-                "due": int(snapshot.get("due_count", 0)),
-                "done": int(snapshot.get("approved_due_today", 0)),
-                "overdue": bool(snapshot.get("has_overdue", False)),
-                "missed": bool(snapshot.get("missed_since_advance", False)),
+                "open": open_count,
+                "done": int(today_stats.get("today_approved", 0)),
+                "overdue": overdue_count > 0,
+                "missed": stats.has_missed_occurrence_since_advance(
+                    chore_ids,
+                    last_update_day_iso=last_day,
+                    today_iso=today_iso,
+                ),
             }
         return result
 
@@ -3123,7 +3144,7 @@ class GamificationManager(BaseManager):
         }
         return {
             names[assignee_id]: (
-                f"{snap['done']}/{snap['due']} due chores approved"
+                f"{snap['open']} still to do today, {snap['done']} done"
                 + (", overdue" if snap["overdue"] else "")
             )
             for assignee_id, snap in snapshots.items()
@@ -3154,8 +3175,8 @@ class GamificationManager(BaseManager):
             return False
 
         status = self._family_caught_up_snapshots(achievement_data, last_day, today_iso)
-        owed_total = sum(int(v["due"]) for v in status.values())
-        all_done = all(int(v["done"]) >= int(v["due"]) for v in status.values())
+        owed_total = sum(int(v["done"]) for v in status.values())
+        all_done = all(int(v["open"]) == 0 for v in status.values())
         any_overdue = any(bool(v["overdue"]) for v in status.values())
         any_missed = count > 0 and any(bool(v["missed"]) for v in status.values())
 

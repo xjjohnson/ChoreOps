@@ -305,18 +305,12 @@ async def test_reset_service_restarts_goal_by_name(
 
 
 def _fake_snapshot(
-    gm: Any, due: int, approved: int, *, overdue: bool = False, missed: bool = False
+    gm: Any, open_: int, done: int, *, overdue: bool = False, missed: bool = False
 ) -> None:
-    """Force the per-person completion snapshot used by the caught-up streak."""
-    snapshot = {
-        "due_count": due,
-        "approved_due_today": approved,
-        "has_overdue": overdue,
-        "missed_since_advance": missed,
+    """Force the per-person snapshot used by the caught-up streak."""
+    gm._family_caught_up_snapshots = lambda *a, **k: {
+        "p": {"open": open_, "done": done, "overdue": overdue, "missed": missed}
     }
-    gm.coordinator.statistics_manager.get_badge_scoped_today_completion = (
-        lambda *a, **k: snapshot
-    )
 
 
 async def test_caught_up_streak_counts_breaks_and_awards(
@@ -337,24 +331,24 @@ async def test_caught_up_streak_counts_breaks_and_awards(
     achievement = scenario_full.coordinator.achievements_data[goal_id]
 
     # Chores still outstanding: day does not count.
-    _fake_snapshot(gm, due=3, approved=2)
+    _fake_snapshot(gm, open_=1, done=2)
     await gm._evaluate_assignee(zoe)
     assert gm.get_family_achievement_total(goal_id) == 0
 
     # Everyone done: day 1, and re-evaluating the same day is idempotent.
-    _fake_snapshot(gm, due=3, approved=3)
+    _fake_snapshot(gm, open_=0, done=3)
     await gm._evaluate_assignee(zoe)
     await gm._evaluate_assignee(max_)
     assert gm.get_family_achievement_total(goal_id) == 1
 
     # Pretend that was yesterday, then a missed chore breaks the streak.
     achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = "2000-01-01"
-    _fake_snapshot(gm, due=3, approved=2, missed=True)
+    _fake_snapshot(gm, open_=1, done=2, missed=True)
     await gm._evaluate_assignee(zoe)
     assert gm.get_family_achievement_total(goal_id) == 0
 
     # Two good days in a row reach the target and award everyone.
-    _fake_snapshot(gm, due=3, approved=3)
+    _fake_snapshot(gm, open_=0, done=3)
     await gm._evaluate_assignee(zoe)
     achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = "2000-01-01"
     await gm._evaluate_assignee(zoe)
@@ -367,3 +361,24 @@ async def test_caught_up_streak_counts_breaks_and_awards(
     gm.reset_family_goal(goal_id)
     assert gm.get_family_achievement_total(goal_id) == 0
     assert not _awarded(scenario_full, goal_id, zoe)
+
+
+async def test_caught_up_status_reads_real_chore_state(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """The unmocked snapshot path runs and reports every assigned person."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
+        target=3.0,
+        reward=0.0,
+        assigned=[zoe, max_],
+    )
+    status = gm.get_family_caught_up_status(goal_id)
+    assert len(status) == 2
+    assert all("still to do today" in text for text in status.values())
+    await gm._evaluate_assignee(zoe)  # must not raise
