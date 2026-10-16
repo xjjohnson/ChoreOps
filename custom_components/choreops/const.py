@@ -994,6 +994,13 @@ BADGE_TYPE_SPECIAL_OCCASION: Final = "special_occasion"
 ACHIEVEMENT_TYPE_DAILY_MIN: Final = "daily_minimum"
 ACHIEVEMENT_TYPE_STREAK: Final = "chore_streak"
 ACHIEVEMENT_TYPE_TOTAL: Final = "chore_total"
+# Family goals: one pooled total across every assigned person. When the pooled
+# total reaches the target, everyone assigned is awarded together.
+ACHIEVEMENT_TYPE_FAMILY_POINTS: Final = "family_points_total"
+ACHIEVEMENT_TYPE_FAMILY_CHORES: Final = "family_chore_total"
+FAMILY_ACHIEVEMENT_TYPES: Final = frozenset(
+    {ACHIEVEMENT_TYPE_FAMILY_POINTS, ACHIEVEMENT_TYPE_FAMILY_CHORES}
+)
 
 # Challenge Types
 CHALLENGE_TYPE_DAILY_MIN: Final = "daily_minimum"
@@ -2790,6 +2797,8 @@ ATTR_PENALTY_POINTS: Final = "penalty_points"
 ATTR_POINTS_MULTIPLIER: Final = "points_multiplier"
 ATTR_POINTS_TO_NEXT_BADGE: Final = "points_to_next_badge"
 ATTR_RAW_PROGRESS: Final = "raw_progress"
+ATTR_FAMILY_TOTAL: Final = "family_total"
+ATTR_FAMILY_CONTRIBUTIONS: Final = "family_contributions"
 ATTR_RECURRING_FREQUENCY: Final = "recurring_frequency"
 ATTR_OVERDUE_HANDLING_TYPE: Final = "overdue_handling_type"
 ATTR_REQUIRED_CHORES: Final = "required_chores"
@@ -4473,6 +4482,14 @@ ACHIEVEMENT_TYPE_OPTIONS = [
     {"value": ACHIEVEMENT_TYPE_STREAK, "label": "Chore Streak"},
     {"value": ACHIEVEMENT_TYPE_TOTAL, "label": "Chore Total"},
     {"value": ACHIEVEMENT_TYPE_DAILY_MIN, "label": "Daily Minimum Chores"},
+    {
+        "value": ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        "label": "Family Goal: Total Points Earned",
+    },
+    {
+        "value": ACHIEVEMENT_TYPE_FAMILY_CHORES,
+        "label": "Family Goal: Total Chores Completed",
+    },
 ]
 
 # Challenge Type Options
