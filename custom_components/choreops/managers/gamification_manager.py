@@ -417,6 +417,7 @@ class GamificationManager(BaseManager):
         *,
         level: int | None = None,
         level_reward: float | None = None,
+        bonus_note: str = "",
         is_final: bool = True,
     ) -> None:
         """Award the achievement to the assignee.
@@ -431,6 +432,8 @@ class GamificationManager(BaseManager):
                 carries the level.
             level_reward: Reward points for that level, replacing the goal's
                 base reward.
+            bonus_note: Text appended to the award name, for example when the
+                reward was multiplied for the level's top contributor.
             is_final: False for a level that is not the last one, so the goal
                 stays open for the next level.
         """
@@ -493,6 +496,8 @@ class GamificationManager(BaseManager):
         achievement_name = str(achievement_info.get(const.DATA_ACHIEVEMENT_NAME, ""))
         if level is not None:
             achievement_name = f"{achievement_name} - Level {level}"
+        if bonus_note:
+            achievement_name = f"{achievement_name} {bonus_note}"
         if level_reward is not None:
             extra_points = level_reward
 
@@ -3080,6 +3085,23 @@ class GamificationManager(BaseManager):
         target = float(achievement_data.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 0.0))
         return [(target, base_reward)] if target > 0 else []
 
+    def get_family_level_contributions(self, achievement_id: str) -> dict[str, float]:
+        """Return each person's contribution during the CURRENT level only.
+
+        Total contribution minus what they had when the level began. This is
+        what decides the level's top contributor.
+        """
+        achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        if not achievement_data:
+            return {}
+        start = achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START, {})
+        return {
+            assignee_id: max(0.0, value - float(start.get(assignee_id, 0.0)))
+            for assignee_id, value in self.get_family_contributions(
+                achievement_id
+            ).items()
+        }
+
     def get_family_level_info(self, achievement_id: str) -> dict[str, Any]:
         """Return level progress for a family goal (read-only, for sensors).
 
@@ -3316,6 +3338,7 @@ class GamificationManager(BaseManager):
             }
 
         achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] = 0
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START] = {}
         progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
         for entry in progress.values():
             if isinstance(entry, dict):
@@ -3354,29 +3377,52 @@ class GamificationManager(BaseManager):
         reached = int(achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_LEVEL, 0))
         progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
 
+        multiplier = float(
+            achievement_data.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0)
+        )
+
         # More than one level can be crossed at once (for example after a
         # bulk point adjustment); each one is awarded in turn.
         while reached < len(levels) and total >= levels[reached][0]:
             reached += 1
             is_final = reached == len(levels)
+
+            # Top contributor(s) of the level just finished: the most added
+            # since the level began. Ties share the bonus; nobody wins it with
+            # zero contribution (and the caught-up goal has no shares at all).
+            level_shares = self.get_family_level_contributions(achievement_id)
+            best = max(level_shares.values(), default=0.0)
+            top_ids = (
+                {a for a, v in level_shares.items() if v == best}
+                if multiplier > 1 and best > 0
+                else set()
+            )
             achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] = reached
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START] = (
+                self.get_family_contributions(achievement_id)
+            )
+
             for assignee_id in self._get_family_assigned_ids(achievement_data):
                 entry = progress.get(assignee_id)
                 if isinstance(entry, dict) and entry.get(
                     const.DATA_ACHIEVEMENT_AWARDED
                 ):
                     continue
+                is_top = assignee_id in top_ids
+                reward = levels[reached - 1][1] * (multiplier if is_top else 1.0)
                 const.LOGGER.info(
-                    "Family goal %s level %s reached - awarding assignee %s",
+                    "Family goal %s level %s reached - awarding assignee %s%s",
                     achievement_id,
                     reached,
                     assignee_id,
+                    " (top contributor)" if is_top else "",
                 )
                 await self.award_achievement(
                     assignee_id,
                     achievement_id,
                     level=reached if len(levels) > 1 else None,
-                    level_reward=levels[reached - 1][1],
+                    level_reward=reward,
+                    bonus_note=(f"(Top contributor x{multiplier:g})" if is_top else ""),
                     is_final=is_final,
                 )
 

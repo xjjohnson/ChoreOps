@@ -3476,6 +3476,15 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
             attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
             attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
+            attributes[const.ATTR_FAMILY_TOP_MULTIPLIER] = float(
+                achievement.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0)
+            )
+            attributes[const.ATTR_FAMILY_LEVEL_CONTRIBUTIONS] = {
+                (get_assignee_name_by_id(self.coordinator, a_id) or a_id): value
+                for a_id, value in self.coordinator.gamification_manager.get_family_level_contributions(
+                    self._achievement_id
+                ).items()
+            }
             attributes[const.ATTR_FAMILY_LEVEL_REWARDS] = level_info["rewards"]
             if ach_type == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP:
                 attributes[const.ATTR_FAMILY_CAUGHT_UP_TODAY] = (
@@ -4037,6 +4046,15 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
             attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
             attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
             attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
+            attributes[const.ATTR_FAMILY_TOP_MULTIPLIER] = float(
+                achievement.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0)
+            )
+            attributes[const.ATTR_FAMILY_LEVEL_CONTRIBUTIONS] = {
+                (get_assignee_name_by_id(self.coordinator, a_id) or a_id): value
+                for a_id, value in self.coordinator.gamification_manager.get_family_level_contributions(
+                    self._achievement_id
+                ).items()
+            }
             attributes[const.ATTR_FAMILY_LEVEL_REWARDS] = level_info["rewards"]
             if (
                 achievement.get(const.DATA_ACHIEVEMENT_TYPE)

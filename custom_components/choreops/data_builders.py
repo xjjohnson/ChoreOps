@@ -2638,6 +2638,7 @@ _CFOF_TO_ACHIEVEMENT_DATA_MAPPING: dict[str, str] = {
     const.CFOF_ACHIEVEMENTS_INPUT_TARGET_VALUE: const.DATA_ACHIEVEMENT_TARGET_VALUE,
     const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS: const.DATA_ACHIEVEMENT_REWARD_POINTS,
     const.CFOF_ACHIEVEMENTS_INPUT_LEVELS: const.DATA_ACHIEVEMENT_LEVELS,
+    const.CFOF_ACHIEVEMENTS_INPUT_TOP_MULTIPLIER: const.DATA_ACHIEVEMENT_TOP_MULTIPLIER,
 }
 
 
@@ -2789,6 +2790,16 @@ def validate_achievement_data(
             )
             return errors
 
+    if data.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER) not in (None, ""):
+        try:
+            if float(data[const.DATA_ACHIEVEMENT_TOP_MULTIPLIER]) < 1:
+                raise ValueError("multiplier must be at least 1")
+        except (TypeError, ValueError):
+            errors[const.DATA_ACHIEVEMENT_TOP_MULTIPLIER] = (
+                const.TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_TOP_MULTIPLIER
+            )
+            return errors
+
     if const.DATA_ACHIEVEMENT_REWARD_POINTS in data:
         try:
             parse_points_value(
@@ -2897,6 +2908,9 @@ def build_achievement(
         const.DATA_ACHIEVEMENT_LEVELS: str(
             get_field(const.DATA_ACHIEVEMENT_LEVELS, const.SENTINEL_EMPTY)
         ).strip(),
+        const.DATA_ACHIEVEMENT_TOP_MULTIPLIER: float(
+            get_field(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0) or 1.0
+        ),
         const.DATA_ACHIEVEMENT_REWARD_POINTS: parse_points_value(
             get_field(
                 const.DATA_ACHIEVEMENT_REWARD_POINTS,
@@ -2918,6 +2932,7 @@ def build_achievement(
             const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT,
             const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY,
             const.DATA_ACHIEVEMENT_FAMILY_LEVEL,
+            const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START,
         ):
             if runtime_key in existing:
                 achievement[runtime_key] = existing[runtime_key]
@@ -2960,6 +2975,7 @@ _ACHIEVEMENT_DATA_RESET_PRESERVE_FIELDS: frozenset[str] = frozenset(
         const.DATA_ACHIEVEMENT_CRITERIA,
         const.DATA_ACHIEVEMENT_TARGET_VALUE,
         const.DATA_ACHIEVEMENT_LEVELS,
+        const.DATA_ACHIEVEMENT_TOP_MULTIPLIER,
         const.DATA_ACHIEVEMENT_REWARD_POINTS,
         # NOTE: PROGRESS is NOT preserved - it's the only runtime field
     }

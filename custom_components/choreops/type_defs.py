@@ -759,6 +759,8 @@ class AchievementData(TypedDict):
     family_baseline: NotRequired[dict[str, float]]  # assignee_id -> amount at restart
     family_level: NotRequired[int]  # levels completed so far
     levels: NotRequired[str]  # comma-separated level targets
+    top_multiplier: NotRequired[float]  # top contributor reward multiplier (1 = off)
+    family_level_start: NotRequired[dict[str, float]]  # contributions at level start
     family_streak_count: NotRequired[int]  # pooled caught-up streak (days)
     family_streak_last_day: NotRequired[str]  # ISO date the streak last advanced
 
