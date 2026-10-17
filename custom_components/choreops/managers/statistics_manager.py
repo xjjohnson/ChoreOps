@@ -2589,6 +2589,21 @@ class StatisticsManager(BaseManager):
             due_today = self._chore_counts_toward_today(
                 chore_id, chore_info, assignee_id, today_iso
             )
+            # The "all due chores" badges follow the dashboard: a chore only
+            # counts as owed today when the assignee can act on it today (the
+            # due-today summary) or it is already in motion (claimed, overdue
+            # or approved today). Chores sitting under "Later" are not owed yet
+            # and must not hold the day up. Badges that track selected chores
+            # keep the broader scope on purpose.
+            chore_entry = cast("dict[str, Any]", chore_data.get(chore_id, {}))
+            if (
+                only_due_today
+                and due_today
+                and not self._owed_on_dashboard_today(
+                    assignee_id, chore_id, chore_entry, today_iso
+                )
+            ):
+                due_today = False
             if only_due_today and not due_today:
                 continue
 
@@ -2706,6 +2721,42 @@ class StatisticsManager(BaseManager):
                 return True
 
         return False
+
+    def _owed_on_dashboard_today(
+        self,
+        assignee_id: str,
+        chore_id: str,
+        chore_entry: dict[str, Any],
+        today_iso: str,
+    ) -> bool:
+        """Return True when the dashboard treats the chore as owed today."""
+        periods = cast(
+            "dict[str, Any]",
+            chore_entry.get(const.DATA_USER_CHORE_DATA_PERIODS, {}),
+        )
+        approved_today = int(
+            self._stats_engine.get_period_total(
+                periods,
+                const.PERIOD_DAILY,
+                const.DATA_USER_CHORE_DATA_PERIOD_APPROVED,
+                period_key=today_iso,
+            )
+        )
+        if approved_today > 0:
+            return True
+        chore_manager = self.coordinator.chore_manager
+        context = chore_manager.get_chore_status_context(assignee_id, chore_id)
+        if context.get(const.CHORE_CTX_STATE) in (
+            const.CHORE_STATE_CLAIMED,
+            const.CHORE_STATE_OVERDUE,
+        ):
+            return True
+        return chore_manager.chore_counts_toward_due_today_summary(
+            assignee_id,
+            chore_id,
+            status_context=context,
+            local_today_iso=today_iso,
+        )
 
     def _chore_counts_toward_today(
         self,
