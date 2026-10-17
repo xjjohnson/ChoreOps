@@ -549,3 +549,113 @@ async def test_no_multiplier_when_off_or_nobody_contributed(
         pytest.approx(70.0)
     )
     assert _awarded(scenario_full, goal_id, max_)
+
+
+async def test_everyone_contributes_counts_the_smallest_share(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """The goal only advances as fast as the person who has done the least."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_EVERYONE,
+        target=5.0,
+        reward=7.0,
+        assigned=[zoe, max_],
+    )
+
+    _set_all_time_approved(scenario_full, zoe, 20)
+    _set_all_time_approved(scenario_full, max_, 2)
+    await gm._evaluate_assignee(zoe)
+    assert gm.get_family_achievement_total(goal_id) == 2
+    assert not _awarded(scenario_full, goal_id, zoe)
+
+    _set_all_time_approved(scenario_full, max_, 5)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert _awarded(scenario_full, goal_id, zoe)
+    assert _awarded(scenario_full, goal_id, max_)
+
+
+async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Today's family total decides the level; tomorrow's reset does not undo it."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_DAY,
+        target=6.0,
+        reward=3.0,
+        assigned=[zoe, max_],
+    )
+    today = {zoe: 2, max_: 3}
+    gm._family_approved_today = lambda assignee_id: today[assignee_id]
+
+    await gm._evaluate_assignee(zoe)
+    assert gm.get_family_achievement_total(goal_id) == 5
+    assert not _awarded(scenario_full, goal_id, zoe)
+
+    today[max_] = 4
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert _awarded(scenario_full, goal_id, zoe)
+    assert _awarded(scenario_full, goal_id, max_)
+
+    # A new day starts at zero but the earned level stays earned.
+    today.update({zoe: 0, max_: 0})
+    assert gm.get_family_achievement_total(goal_id) == 0
+    assert _awarded(scenario_full, goal_id, zoe)
+
+
+async def test_active_streak_needs_everyone_every_day(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A day counts when everyone did a chore; a skipped day voids the streak."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_ACTIVE,
+        target=2.0,
+        reward=4.0,
+        assigned=[zoe, max_],
+    )
+    achievement = scenario_full.coordinator.achievements_data[goal_id]
+    today = {zoe: 1, max_: 0}
+    gm._family_approved_today = lambda assignee_id: today[assignee_id]
+
+    # One person has not done a chore yet: no credit.
+    await gm._evaluate_assignee(zoe)
+    assert gm.get_family_achievement_total(goal_id) == 0
+
+    # Everyone did one: day 1, and the same day is not counted twice.
+    today[max_] = 2
+    await gm._evaluate_assignee(zoe)
+    await gm._evaluate_assignee(max_)
+    assert gm.get_family_achievement_total(goal_id) == 1
+
+    # Streak last advanced long ago: it is void, today starts a new streak.
+    achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = "2000-01-01"
+    await gm._evaluate_assignee(zoe)
+    assert gm.get_family_achievement_total(goal_id) == 1
+
+    # Yesterday counted, today counts: target reached, everyone awarded.
+    from datetime import date, timedelta
+
+    achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = (
+        date.today() - timedelta(days=1)
+    ).isoformat()
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_family_achievement_total(goal_id) == 2
+    assert _awarded(scenario_full, goal_id, zoe)
+    assert _awarded(scenario_full, goal_id, max_)

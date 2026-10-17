@@ -99,3 +99,20 @@ ties share the bonus, and someone with zero contribution never gets it. The
 multiplier applies to every level and is exposed as `family_top_multiplier`,
 with the per-level shares in `family_level_contributions`. Level 1 counts
 everything since the goal was created or restarted.
+
+## More family goal types
+
+- **Everyone Completes at Least X Chores** - counts the *smallest* share, so the
+  goal only advances as fast as the person who has done the least. Everyone
+  must reach the target before anyone is rewarded.
+- **X Chores Together in One Day** - the whole family's approved chores for
+  today. It starts at zero every day; levels already reached stay earned, so it
+  works as "beat your best day". Top contributor means most chores today.
+- **Everyone Completes a Chore for X Days** - a day counts once every assigned
+  person has had at least one chore approved. A day that ends without that
+  voids the streak (noticed on the next evaluation). Easier than "everyone
+  caught up" because it does not look at what was due.
+
+The single-person types (Chore Streak, Chore Total, Daily Minimum) are still
+accepted so existing achievements keep working, but are labelled "(Old)" and
+sit at the bottom of the list.

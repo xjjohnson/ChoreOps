@@ -2970,6 +2970,11 @@ class GamificationManager(BaseManager):
         All-time totals minus the baseline captured by `reset_family_goal`.
         """
         raw = self._get_family_raw_contribution(assignee_id, achievement_data)
+        if achievement_data.get(const.DATA_ACHIEVEMENT_TYPE) == (
+            const.ACHIEVEMENT_TYPE_FAMILY_DAY
+        ):
+            # Already scoped to today; a restart baseline would zero tomorrow.
+            return raw
         baseline = achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_BASELINE, {})
         return max(0.0, raw - float(baseline.get(assignee_id, 0.0)))
 
@@ -3006,6 +3011,9 @@ class GamificationManager(BaseManager):
                     },
                 )
             )
+
+        if achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_DAY:
+            return float(self._family_approved_today(assignee_id))
 
         # Chores goal: optionally scoped to one chore, otherwise all chores.
         selected_chore_id = str(
@@ -3051,9 +3059,9 @@ class GamificationManager(BaseManager):
             return {}
         if (
             achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
-            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+            in const.FAMILY_STREAK_ACHIEVEMENT_TYPES
         ):
-            # The caught-up goal is a shared streak, not a sum of shares.
+            # Streak goals are a shared day count, not a sum of shares.
             return {}
         return {
             assignee_id: self._get_family_contribution(assignee_id, achievement_data)
@@ -3094,6 +3102,11 @@ class GamificationManager(BaseManager):
         achievement_data = self.coordinator.achievements_data.get(achievement_id)
         if not achievement_data:
             return {}
+        if achievement_data.get(const.DATA_ACHIEVEMENT_TYPE) == (
+            const.ACHIEVEMENT_TYPE_FAMILY_DAY
+        ):
+            # One day's effort: today's counts are the level's shares.
+            return self.get_family_contributions(achievement_id)
         start = achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START, {})
         return {
             assignee_id: max(0.0, value - float(start.get(assignee_id, 0.0)))
@@ -3155,15 +3168,23 @@ class GamificationManager(BaseManager):
             caught-up streak in days for the caught-up goal.
         """
         achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        achievement_type = (
+            achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+            if achievement_data
+            else None
+        )
         if (
             achievement_data
-            and achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
-            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+            and achievement_type in const.FAMILY_STREAK_ACHIEVEMENT_TYPES
         ):
             return float(
                 achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT, 0)
             )
-        return sum(self.get_family_contributions(achievement_id).values())
+        shares = self.get_family_contributions(achievement_id)
+        if achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_EVERYONE:
+            # Only as strong as the smallest share.
+            return min(shares.values(), default=0.0)
+        return sum(shares.values())
 
     def _family_caught_up_snapshots(
         self,
@@ -3248,6 +3269,57 @@ class GamificationManager(BaseManager):
             for assignee_id, snap in snapshots.items()
         }
 
+    def _family_approved_today(self, assignee_id: str) -> int:
+        """Return how many chores this person had approved today."""
+        chore_ids = [
+            str(chore_id)
+            for chore_id in self.coordinator.assignees_data[assignee_id].get(
+                const.DATA_USER_CHORE_DATA, {}
+            )
+            if chore_id in self.coordinator.chores_data
+        ]
+        today_stats = self.coordinator.statistics_manager.get_badge_scoped_today_stats(
+            assignee_id, chore_ids, today_iso=dt_today_iso()
+        )
+        return int(today_stats.get("today_approved", 0))
+
+    def _update_family_active_streak(
+        self,
+        achievement_data: AchievementData,
+    ) -> bool:
+        """Advance or break the "everyone completes a chore" day streak.
+
+        A day counts once every assigned person has had at least one chore
+        approved. If a whole day passed without counting, the streak is void;
+        that is noticed lazily on the next evaluation. Safe to call repeatedly:
+        a day is only counted once.
+
+        Returns:
+            True when stored streak state changed.
+        """
+        today_iso = dt_today_iso()
+        last_day = str(
+            achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY, "")
+        )
+        count = int(achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT, 0))
+        if last_day == today_iso:
+            return False
+
+        changed = False
+        yesterday_iso = (date.fromisoformat(today_iso) - timedelta(days=1)).isoformat()
+        if count > 0 and last_day != yesterday_iso:
+            count = 0
+            changed = True
+
+        assigned = self._get_family_assigned_ids(achievement_data)
+        if assigned and all(self._family_approved_today(a) >= 1 for a in assigned):
+            count += 1
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = today_iso
+            changed = True
+        if changed:
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT] = count
+        return changed
+
     def _update_family_caught_up_streak(
         self,
         achievement_data: AchievementData,
@@ -3323,7 +3395,7 @@ class GamificationManager(BaseManager):
 
         if (
             achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
-            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+            in const.FAMILY_STREAK_ACHIEVEMENT_TYPES
         ):
             achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT] = 0
             achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = (
@@ -3367,10 +3439,14 @@ class GamificationManager(BaseManager):
         if not levels:
             return
 
+        achievement_type = achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
         if (
-            achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
-            == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
-        ) and self._update_family_caught_up_streak(achievement_data):
+            achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+            and self._update_family_caught_up_streak(achievement_data)
+        ) or (
+            achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_ACTIVE
+            and self._update_family_active_streak(achievement_data)
+        ):
             self.coordinator._persist_and_update()
 
         total = self.get_family_achievement_total(achievement_id)

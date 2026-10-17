@@ -3212,7 +3212,7 @@ def build_achievement_schema(assignees_dict, chores_dict, default=None):
             ),
             vol.Required(
                 const.CFOF_ACHIEVEMENTS_INPUT_TYPE,
-                default=const.ACHIEVEMENT_TYPE_STREAK,
+                default=const.ACHIEVEMENT_TYPE_FAMILY_CHORES,
             ): selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=cast(
