@@ -46,6 +46,7 @@ See Also:
 from __future__ import annotations
 
 import datetime
+import re
 from typing import Any, Literal, cast
 import uuid
 
@@ -2636,7 +2637,52 @@ _CFOF_TO_ACHIEVEMENT_DATA_MAPPING: dict[str, str] = {
     const.CFOF_ACHIEVEMENTS_INPUT_CRITERIA: const.DATA_ACHIEVEMENT_CRITERIA,
     const.CFOF_ACHIEVEMENTS_INPUT_TARGET_VALUE: const.DATA_ACHIEVEMENT_TARGET_VALUE,
     const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS: const.DATA_ACHIEVEMENT_REWARD_POINTS,
+    const.CFOF_ACHIEVEMENTS_INPUT_LEVELS: const.DATA_ACHIEVEMENT_LEVELS,
 }
+
+
+def parse_achievement_levels(raw: Any) -> list[tuple[float, float | None]]:
+    """Parse a family goal's levels into (target, reward) pairs.
+
+    Text looks like "100:10, 250:25, 500:50": each level is a target, optionally
+    followed by a colon and the reward paid at that level. A level with no reward
+    pays the goal's base reward (None here). Items can be separated by commas,
+    semicolons or new lines. An already-parsed list of pairs is also accepted.
+
+    Args:
+        raw: Level text as entered in the form, or a list.
+
+    Returns:
+        Levels in order. Empty when nothing was entered.
+
+    Raises:
+        ValueError: A target or reward is not a number, a target is not above
+            zero, a reward is negative, or the targets do not strictly increase.
+    """
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple)):
+        items = [
+            f"{item[0]}:{item[1]}" if isinstance(item, (list, tuple)) else str(item)
+            for item in raw
+        ]
+    else:
+        items = re.split(r"[,;\n]+", str(raw))
+
+    levels: list[tuple[float, float | None]] = []
+    previous = 0.0
+    for item in items:
+        text = item.strip()
+        if not text:
+            continue
+        target_text, _, reward_text = re.sub(r"\s*[:=]\s*", ":", text).partition(":")
+        target = float(target_text)
+        reward = float(reward_text) if reward_text.strip() else None
+        if target <= previous or (reward is not None and reward < 0):
+            raise ValueError("levels must increase from above zero, rewards >= 0")
+        previous = target
+        levels.append((target, reward))
+    return levels
 
 
 def map_cfof_to_achievement_data(user_input: dict[str, Any]) -> dict[str, Any]:
@@ -2734,6 +2780,15 @@ def validate_achievement_data(
             )
             return errors
 
+    if data.get(const.DATA_ACHIEVEMENT_LEVELS):
+        try:
+            parse_achievement_levels(data[const.DATA_ACHIEVEMENT_LEVELS])
+        except ValueError:
+            errors[const.DATA_ACHIEVEMENT_LEVELS] = (
+                const.TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_LEVELS
+            )
+            return errors
+
     if const.DATA_ACHIEVEMENT_REWARD_POINTS in data:
         try:
             parse_points_value(
@@ -2810,7 +2865,7 @@ def build_achievement(
         )
 
     # --- Build complete achievement structure ---
-    return {
+    achievement: dict[str, Any] = {
         const.DATA_ACHIEVEMENT_INTERNAL_ID: internal_id,
         const.DATA_ACHIEVEMENT_NAME: name,
         const.DATA_ACHIEVEMENT_DESCRIPTION: str(
@@ -2839,6 +2894,9 @@ def build_achievement(
                 const.DATA_ACHIEVEMENT_TARGET_VALUE, const.DEFAULT_ACHIEVEMENT_TARGET
             )
         ),
+        const.DATA_ACHIEVEMENT_LEVELS: str(
+            get_field(const.DATA_ACHIEVEMENT_LEVELS, const.SENTINEL_EMPTY)
+        ).strip(),
         const.DATA_ACHIEVEMENT_REWARD_POINTS: parse_points_value(
             get_field(
                 const.DATA_ACHIEVEMENT_REWARD_POINTS,
@@ -2852,6 +2910,30 @@ def build_achievement(
             get_field(const.DATA_ACHIEVEMENT_PROGRESS, {})
         ),
     }
+
+    # Family goal runtime state must survive an edit of the goal's settings.
+    if existing:
+        for runtime_key in (
+            const.DATA_ACHIEVEMENT_FAMILY_BASELINE,
+            const.DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT,
+            const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY,
+            const.DATA_ACHIEVEMENT_FAMILY_LEVEL,
+        ):
+            if runtime_key in existing:
+                achievement[runtime_key] = existing[runtime_key]
+
+    # With explicit levels, the first level is the goal's base target.
+    if achievement[const.DATA_ACHIEVEMENT_TYPE] in const.FAMILY_ACHIEVEMENT_TYPES:
+        try:
+            levels = parse_achievement_levels(
+                achievement[const.DATA_ACHIEVEMENT_LEVELS]
+            )
+        except ValueError:
+            levels = []
+        if levels:
+            achievement[const.DATA_ACHIEVEMENT_TARGET_VALUE] = levels[0][0]
+
+    return achievement
 
 
 # --- Achievement Data Reset Support ---
@@ -2877,6 +2959,7 @@ _ACHIEVEMENT_DATA_RESET_PRESERVE_FIELDS: frozenset[str] = frozenset(
         const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID,
         const.DATA_ACHIEVEMENT_CRITERIA,
         const.DATA_ACHIEVEMENT_TARGET_VALUE,
+        const.DATA_ACHIEVEMENT_LEVELS,
         const.DATA_ACHIEVEMENT_REWARD_POINTS,
         # NOTE: PROGRESS is NOT preserved - it's the only runtime field
     }

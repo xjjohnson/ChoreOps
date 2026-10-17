@@ -3293,9 +3293,15 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     self._achievement_id
                 )
             )
+            level_target = float(
+                self.coordinator.gamification_manager.get_family_level_info(
+                    self._achievement_id
+                )["next_target"]
+                or target
+            )
             percent = (
-                (family_total / target * 100)
-                if target > const.DEFAULT_ZERO
+                (family_total / level_target * 100)
+                if level_target > const.DEFAULT_ZERO
                 else const.DEFAULT_ZERO
             )
 
@@ -3463,6 +3469,14 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     self._achievement_id
                 )
             )
+            level_info = self.coordinator.gamification_manager.get_family_level_info(
+                self._achievement_id
+            )
+            attributes[const.ATTR_FAMILY_LEVEL] = level_info["level"]
+            attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
+            attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
+            attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
+            attributes[const.ATTR_FAMILY_LEVEL_REWARDS] = level_info["rewards"]
             if ach_type == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP:
                 attributes[const.ATTR_FAMILY_CAUGHT_UP_TODAY] = (
                     self.coordinator.gamification_manager.get_family_caught_up_status(
@@ -3825,9 +3839,15 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
                     self._achievement_id
                 )
             )
+            level_target = float(
+                self.coordinator.gamification_manager.get_family_level_info(
+                    self._achievement_id
+                )["next_target"]
+                or target
+            )
             percent = (
-                (family_total / target * 100)
-                if target > const.DEFAULT_ZERO
+                (family_total / level_target * 100)
+                if level_target > const.DEFAULT_ZERO
                 else const.DEFAULT_ZERO
             )
 
@@ -4010,6 +4030,14 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
                     self._achievement_id
                 )
             )
+            level_info = self.coordinator.gamification_manager.get_family_level_info(
+                self._achievement_id
+            )
+            attributes[const.ATTR_FAMILY_LEVEL] = level_info["level"]
+            attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
+            attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
+            attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
+            attributes[const.ATTR_FAMILY_LEVEL_REWARDS] = level_info["rewards"]
             if (
                 achievement.get(const.DATA_ACHIEVEMENT_TYPE)
                 == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP

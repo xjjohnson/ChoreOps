@@ -382,3 +382,98 @@ async def test_caught_up_status_reads_real_chore_state(
     assert len(status) == 2
     assert all("still to do today" in text for text in status.values())
     await gm._evaluate_assignee(zoe)  # must not raise
+
+
+def test_parse_achievement_levels() -> None:
+    """Levels are target[:reward] items; targets increase, rewards are optional."""
+    from custom_components.choreops import data_builders as db
+
+    assert db.parse_achievement_levels("100:10, 250, 500 : 50") == [
+        (100.0, 10.0),
+        (250.0, None),
+        (500.0, 50.0),
+    ]
+    assert db.parse_achievement_levels("") == []
+    for bad in ("abc", "0, 5", "100, 100", "200, 100", "100:-5", "100:x"):
+        with pytest.raises(ValueError):
+            db.parse_achievement_levels(bad)
+
+
+async def test_each_level_pays_its_own_reward_and_stays_open(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Each level pays its own reward (or the base one); only the last closes."""
+    coordinator = scenario_full.coordinator
+    gm = coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        target=1.0,
+        reward=10.0,
+        assigned=[zoe, max_],
+    )
+    # Level 1 pays its own 7, level 2 has no reward so pays the base 10.
+    coordinator.achievements_data[goal_id][const.DATA_ACHIEVEMENT_LEVELS] = "50:7, 150"
+
+    def balance(a: str) -> float:
+        return float(coordinator.assignees_data[a][const.DATA_USER_POINTS])
+
+    await _earn_points(scenario_full, zoe, 30.0)
+    await _earn_points(scenario_full, max_, 30.0)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    info = gm.get_family_level_info(goal_id)
+    assert info["level"] == 1
+    assert info["next_target"] == 150.0
+    assert info["next_reward"] == 10.0
+    assert not _awarded(scenario_full, goal_id, zoe)
+    assert balance(max_) == pytest.approx(30.0 + 7.0)
+
+    # Re-evaluating does not pay level 1 again.
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert balance(max_) == pytest.approx(37.0)
+
+    await _earn_points(scenario_full, zoe, 100.0)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_family_level_info(goal_id)["level"] == 2
+    assert _awarded(scenario_full, goal_id, zoe)
+    assert _awarded(scenario_full, goal_id, max_)
+    # Max: 30 earned + 7 (level 1) + 10 (level 2, base reward).
+    assert balance(max_) == pytest.approx(47.0)
+
+    gm.reset_family_goal(goal_id)
+    assert gm.get_family_level_info(goal_id)["level"] == 0
+    assert not _awarded(scenario_full, goal_id, zoe)
+
+
+async def test_editing_goal_keeps_family_runtime_state(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Saving the goal's settings must not wipe baseline, streak or level."""
+    from custom_components.choreops import data_builders as db
+
+    zoe = scenario_full.assignee_ids["Zoë"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        target=100.0,
+        reward=5.0,
+        assigned=[zoe],
+    )
+    existing = scenario_full.coordinator.achievements_data[goal_id]
+    existing[const.DATA_ACHIEVEMENT_FAMILY_BASELINE] = {zoe: 12.0}
+    existing[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] = 1
+
+    rebuilt = db.build_achievement(
+        {const.DATA_ACHIEVEMENT_LEVELS: "40:5, 90"}, existing=existing
+    )
+    assert rebuilt[const.DATA_ACHIEVEMENT_FAMILY_BASELINE] == {zoe: 12.0}
+    assert rebuilt[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] == 1
+    assert rebuilt[const.DATA_ACHIEVEMENT_TARGET_VALUE] == 40.0

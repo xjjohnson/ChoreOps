@@ -404,7 +404,11 @@
           "criteria": "Criteria (optional)",
           "target_value": "Achievement Target",
           "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID"
+          "internal_id": "Internal ID",
+          "levels": "Levels (family goals, optional)"
+        },
+        "data_description": {
+          "levels": "Family goals only. One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the Extra Points amount above. Leave blank for a single level at the target value."
         }
       },
       "challenge_count": {
@@ -533,7 +537,8 @@
       "invalid_calendar_show_period": "Invalid calendar show period. Must be a positive integer.",
       "invalid_default_chore_points": "Invalid default chore points. Must be a positive number greater than 0 with at most 2 decimal places.",
       "invalid_retention_period": "Invalid retention period. Must be a positive integer.",
-      "invalid_points_adjust_values": "Invalid points adjust values. Must be a list."
+      "invalid_points_adjust_values": "Invalid points adjust values. Must be a list.",
+      "invalid_achievement_levels": "Levels must look like 100:10, 250:25, 500:50 - targets above zero that increase, rewards zero or more"
     },
     "abort": {
       "single_instance_allowed": "Only a single ChoreOps instance can be configured.",
@@ -1027,7 +1032,11 @@
           "criteria": "Criteria (optional)",
           "target_value": "Achievement Target",
           "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID"
+          "internal_id": "Internal ID",
+          "levels": "Levels (family goals, optional)"
+        },
+        "data_description": {
+          "levels": "Family goals only. One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the Extra Points amount above. Leave blank for a single level at the target value."
         }
       },
       "add_challenge": {
@@ -1519,7 +1528,11 @@
           "criteria": "Criteria (optional)",
           "target_value": "Achievement Target",
           "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID"
+          "internal_id": "Internal ID",
+          "levels": "Levels (family goals, optional)"
+        },
+        "data_description": {
+          "levels": "Family goals only. One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the Extra Points amount above. Leave blank for a single level at the target value."
         }
       },
       "edit_challenge": {
@@ -1944,7 +1957,8 @@
       "dashboard_access_warning_ack_required": "Acknowledge the access-control warning to continue, or go back and link the affected users or enable kiosk mode.",
       "dashboard_nonselectable_templates": "One or more selected templates are unavailable for generation.",
       "dashboard_release_strict_pin_failed": "The selected dashboard release must be pinned exactly, but no effective release reference was available at execution time. Re-select the release in Step 1 and try again.",
-      "dashboard_release_asset_prep_failed": "Unable to prepare selected online dashboard assets. Choose a different release or use latest compatible/current local templates and try again."
+      "dashboard_release_asset_prep_failed": "Unable to prepare selected online dashboard assets. Choose a different release or use latest compatible/current local templates and try again.",
+      "invalid_achievement_levels": "Levels must look like 100:10, 250:25, 500:50 - targets above zero that increase, rewards zero or more"
     },
     "abort": {
       "invalid_action": "Invalid Action",
