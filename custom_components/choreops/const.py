@@ -764,6 +764,7 @@ CFOF_ACHIEVEMENTS_INPUT_DESCRIPTION: Final = "description"
 CFOF_ACHIEVEMENTS_INPUT_ICON: Final = "icon"
 CFOF_ACHIEVEMENTS_INPUT_LABELS: Final = "achievement_labels"
 CFOF_ACHIEVEMENTS_INPUT_LEVELS: Final = "levels"
+CFOF_ACHIEVEMENTS_INPUT_TOP_MULTIPLIER: Final = "top_multiplier"
 CFOF_ACHIEVEMENTS_INPUT_NAME: Final = "name"
 CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS: Final = "reward_points"
 CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID: Final = "selected_chore_id"
@@ -1016,6 +1017,8 @@ DATA_ACHIEVEMENT_FAMILY_BASELINE: Final = "family_baseline"
 DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT: Final = "family_streak_count"
 # Number of levels completed so far (0 = none yet)
 DATA_ACHIEVEMENT_FAMILY_LEVEL: Final = "family_level"
+# Each person's contribution when the current level began (per-level top contributor)
+DATA_ACHIEVEMENT_FAMILY_LEVEL_START: Final = "family_level_start"
 DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY: Final = "family_streak_last_day"
 
 # Challenge Types
@@ -1812,6 +1815,8 @@ DATA_ACHIEVEMENT_SOURCE_BADGE_ID: Final = "source_badge_id"
 DATA_ACHIEVEMENT_TARGET_VALUE: Final = "target_value"
 # Family goals: comma-separated level targets, e.g. "100, 250, 500"
 DATA_ACHIEVEMENT_LEVELS: Final = "levels"
+# Family goals: reward multiplier for the top contributor of each level (1 = off)
+DATA_ACHIEVEMENT_TOP_MULTIPLIER: Final = "top_multiplier"
 DATA_ACHIEVEMENT_TYPE: Final = "type"
 
 # CHALLENGES
@@ -2819,6 +2824,8 @@ ATTR_FAMILY_TOTAL: Final = "family_total"
 ATTR_FAMILY_CONTRIBUTIONS: Final = "family_contributions"
 ATTR_FAMILY_CAUGHT_UP_TODAY: Final = "family_caught_up_today"
 ATTR_FAMILY_LEVEL: Final = "family_level"
+ATTR_FAMILY_LEVEL_CONTRIBUTIONS: Final = "family_level_contributions"
+ATTR_FAMILY_TOP_MULTIPLIER: Final = "family_top_multiplier"
 ATTR_FAMILY_LEVELS: Final = "family_levels"
 ATTR_FAMILY_NEXT_TARGET: Final = "family_next_target"
 ATTR_FAMILY_NEXT_REWARD: Final = "family_next_reward"
@@ -3852,6 +3859,9 @@ TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_REWARD_POINTS: Final = (
     "invalid_achievement_reward_points"
 )
 TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_LEVELS: Final = "invalid_achievement_levels"
+TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_TOP_MULTIPLIER: Final = (
+    "invalid_achievement_top_multiplier"
+)
 TRANS_KEY_CFOF_INVALID_CHALLENGE: Final = "invalid_challenge"
 TRANS_KEY_CFOF_INVALID_CHALLENGE_COUNT: Final = "invalid_challenge_count"
 TRANS_KEY_CFOF_INVALID_CHALLENGE_NAME: Final = "invalid_challenge_name"

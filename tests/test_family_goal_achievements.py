@@ -477,3 +477,75 @@ async def test_editing_goal_keeps_family_runtime_state(
     assert rebuilt[const.DATA_ACHIEVEMENT_FAMILY_BASELINE] == {zoe: 12.0}
     assert rebuilt[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] == 1
     assert rebuilt[const.DATA_ACHIEVEMENT_TARGET_VALUE] == 40.0
+
+
+async def test_top_contributor_of_each_level_gets_the_multiplier(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Whoever added most DURING a level gets that level's reward multiplied."""
+    coordinator = scenario_full.coordinator
+    gm = coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        target=1.0,
+        reward=10.0,
+        assigned=[zoe, max_],
+    )
+    goal = coordinator.achievements_data[goal_id]
+    goal[const.DATA_ACHIEVEMENT_LEVELS] = "50:10, 500:10"
+    goal[const.DATA_ACHIEVEMENT_TOP_MULTIPLIER] = 2.0
+
+    awards: list[tuple[str, int | None, float | None]] = []
+    original = gm.award_achievement
+
+    async def recording(a: str, g: str, **kw: Any) -> None:
+        awards.append((a, kw.get("level"), kw.get("level_reward")))
+        await original(a, g, **kw)
+
+    gm.award_achievement = recording  # type: ignore[method-assign]
+
+    # Level 1: Zoë leads, so she gets 10 x 2; Max gets the plain 10.
+    await _earn_points(scenario_full, zoe, 60.0)
+    await _earn_points(scenario_full, max_, 30.0)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert (zoe, 1, 20.0) in awards
+    assert (max_, 1, 10.0) in awards
+
+    # Level 2 counts only what was added since level 1: Max leads this time.
+    await _earn_points(scenario_full, zoe, 20.0)
+    await _earn_points(scenario_full, max_, 450.0)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_family_level_info(goal_id)["level"] == 2
+    assert (max_, 2, 20.0) in awards
+    assert (zoe, 2, 10.0) in awards
+
+
+async def test_no_multiplier_when_off_or_nobody_contributed(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Multiplier 1 (off) pays everyone the plain reward."""
+    coordinator = scenario_full.coordinator
+    gm = coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+        target=50.0,
+        reward=10.0,
+        assigned=[zoe, max_],
+    )
+    await _earn_points(scenario_full, zoe, 60.0)
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert float(coordinator.assignees_data[zoe][const.DATA_USER_POINTS]) == (
+        pytest.approx(70.0)
+    )
+    assert _awarded(scenario_full, goal_id, max_)

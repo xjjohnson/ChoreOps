@@ -88,3 +88,14 @@ back to level 1.
 The goal's sensors expose `family_level` (levels completed), `family_levels`,
 `family_next_target` and `family_next_reward` for dashboards; the bar fills
 toward the next level's target.
+
+### Top contributor multiplier
+
+Set **Top Contributor Multiplier** above 1 (for example `2`) to give the
+biggest contributor to each level a larger reward. Contribution is measured per
+level: points or chores added since the previous level was reached. The top
+contributor's reward for that level is the level reward times the multiplier;
+ties share the bonus, and someone with zero contribution never gets it. The
+multiplier applies to every level and is exposed as `family_top_multiplier`,
+with the per-level shares in `family_level_contributions`. Level 1 counts
+everything since the goal was created or restarted.
