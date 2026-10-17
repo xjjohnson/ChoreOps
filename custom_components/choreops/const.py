@@ -1003,12 +1003,28 @@ ACHIEVEMENT_TYPE_FAMILY_CHORES: Final = "family_chore_total"
 # Pooled streak: consecutive days on which EVERY assigned person finished all
 # the chores that were due. The target value is the number of days.
 ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP: Final = "family_caught_up_days"
+# Pooled total where the SMALLEST share counts: every assigned person must
+# complete at least the target number of chores.
+ACHIEVEMENT_TYPE_FAMILY_EVERYONE: Final = "family_everyone_contributes"
+# Chores the whole family completes in a single day (resets each day; levels
+# already reached are kept).
+ACHIEVEMENT_TYPE_FAMILY_DAY: Final = "family_chores_in_day"
+# Pooled streak: consecutive days on which EVERY assigned person completed at
+# least one chore. The target value is the number of days.
+ACHIEVEMENT_TYPE_FAMILY_ACTIVE: Final = "family_active_days"
 FAMILY_ACHIEVEMENT_TYPES: Final = frozenset(
     {
         ACHIEVEMENT_TYPE_FAMILY_POINTS,
         ACHIEVEMENT_TYPE_FAMILY_CHORES,
         ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
+        ACHIEVEMENT_TYPE_FAMILY_EVERYONE,
+        ACHIEVEMENT_TYPE_FAMILY_DAY,
+        ACHIEVEMENT_TYPE_FAMILY_ACTIVE,
     }
+)
+# Family goals whose total is a shared day streak rather than a sum of shares.
+FAMILY_STREAK_ACHIEVEMENT_TYPES: Final = frozenset(
+    {ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP, ACHIEVEMENT_TYPE_FAMILY_ACTIVE}
 )
 # Stored on the achievement itself (not per person): the amount each person had
 # already contributed when the goal was last restarted, and the pooled
@@ -4517,9 +4533,6 @@ INCLUDE_RESET_SCHEDULE_BADGE_TYPES = [
 
 # Achievement Type Options
 ACHIEVEMENT_TYPE_OPTIONS = [
-    {"value": ACHIEVEMENT_TYPE_STREAK, "label": "Chore Streak"},
-    {"value": ACHIEVEMENT_TYPE_TOTAL, "label": "Chore Total"},
-    {"value": ACHIEVEMENT_TYPE_DAILY_MIN, "label": "Daily Minimum Chores"},
     {
         "value": ACHIEVEMENT_TYPE_FAMILY_POINTS,
         "label": "Family Goal: Total Points Earned",
@@ -4531,6 +4544,26 @@ ACHIEVEMENT_TYPE_OPTIONS = [
     {
         "value": ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
         "label": "Family Goal: Everyone Caught Up for X Days",
+    },
+    {
+        "value": ACHIEVEMENT_TYPE_FAMILY_EVERYONE,
+        "label": "Family Goal: Everyone Completes at Least X Chores",
+    },
+    {
+        "value": ACHIEVEMENT_TYPE_FAMILY_DAY,
+        "label": "Family Goal: X Chores Together in One Day",
+    },
+    {
+        "value": ACHIEVEMENT_TYPE_FAMILY_ACTIVE,
+        "label": "Family Goal: Everyone Completes a Chore for X Days",
+    },
+    # Single-person types are kept only so existing achievements and saved
+    # setups keep validating. New goals should be family goals.
+    {"value": ACHIEVEMENT_TYPE_STREAK, "label": "(Old) Chore Streak - one person"},
+    {"value": ACHIEVEMENT_TYPE_TOTAL, "label": "(Old) Chore Total - one person"},
+    {
+        "value": ACHIEVEMENT_TYPE_DAILY_MIN,
+        "label": "(Old) Daily Minimum Chores - one person",
     },
 ]
 

@@ -3961,7 +3961,7 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
         ):
             if (
                 achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-                == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
+                in const.FAMILY_STREAK_ACHIEVEMENT_TYPES
             ):
                 # Shared streak: everyone sees the same day count.
                 raw_progress = (
