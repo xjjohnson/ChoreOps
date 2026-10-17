@@ -410,7 +410,15 @@ class GamificationManager(BaseManager):
         for assignee_id in self.coordinator.assignees_data:
             self._mark_pending(assignee_id)
 
-    async def award_achievement(self, assignee_id: str, achievement_id: str) -> None:
+    async def award_achievement(
+        self,
+        assignee_id: str,
+        achievement_id: str,
+        *,
+        level: int | None = None,
+        level_reward: float | None = None,
+        is_final: bool = True,
+    ) -> None:
         """Award the achievement to the assignee.
 
         Update the achievement progress to indicate it is earned,
@@ -419,6 +427,12 @@ class GamificationManager(BaseManager):
         Args:
             assignee_id: The internal UUID of the assignee
             achievement_id: The internal UUID of the achievement
+            level: For leveled family goals, the level just reached. The name
+                carries the level.
+            level_reward: Reward points for that level, replacing the goal's
+                base reward.
+            is_final: False for a level that is not the last one, so the goal
+                stays open for the next level.
         """
         achievement_info = self.coordinator.achievements_data.get(achievement_id)
         if not achievement_info:
@@ -467,7 +481,7 @@ class GamificationManager(BaseManager):
         progress_for_assignee_checked: AchievementProgress = progress_for_assignee
 
         # Mark achievement as earned for the assignee
-        progress_for_assignee_checked[const.DATA_ACHIEVEMENT_AWARDED] = True
+        progress_for_assignee_checked[const.DATA_ACHIEVEMENT_AWARDED] = is_final
         progress_for_assignee_checked[const.DATA_ACHIEVEMENT_CURRENT_VALUE] = (  # type: ignore[typeddict-unknown-key]
             achievement_info.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 1)
         )
@@ -476,6 +490,11 @@ class GamificationManager(BaseManager):
         extra_points = achievement_info.get(
             const.DATA_ACHIEVEMENT_REWARD_POINTS, const.DEFAULT_ZERO
         )
+        achievement_name = str(achievement_info.get(const.DATA_ACHIEVEMENT_NAME, ""))
+        if level is not None:
+            achievement_name = f"{achievement_name} - Level {level}"
+        if level_reward is not None:
+            extra_points = level_reward
 
         const.LOGGER.debug(
             "DEBUG: Achievement Award - Achievement ID '%s' to Assignee ID '%s'",
@@ -493,7 +512,7 @@ class GamificationManager(BaseManager):
             user_id=assignee_id,
             achievement_id=achievement_id,
             user_name=eh.get_assignee_name_by_id(self.coordinator, assignee_id) or "",
-            achievement_name=achievement_info.get(const.DATA_ACHIEVEMENT_NAME, ""),
+            achievement_name=achievement_name,
             achievement_points=extra_points,
         )
 
@@ -3036,6 +3055,63 @@ class GamificationManager(BaseManager):
             for assignee_id in self._get_family_assigned_ids(achievement_data)
         }
 
+    def _get_family_levels(
+        self, achievement_data: AchievementData
+    ) -> list[tuple[float, float]]:
+        """Return a family goal's levels as (target, reward) pairs.
+
+        A level with no reward of its own pays the goal's base reward. A goal
+        with no levels entered has exactly one level: its target.
+        """
+        base_reward = float(
+            achievement_data.get(const.DATA_ACHIEVEMENT_REWARD_POINTS, 0.0)
+        )
+        try:
+            parsed = db.parse_achievement_levels(
+                achievement_data.get(const.DATA_ACHIEVEMENT_LEVELS, "")
+            )
+        except ValueError:
+            parsed = []
+        if parsed:
+            return [
+                (target, base_reward if reward is None else reward)
+                for target, reward in parsed
+            ]
+        target = float(achievement_data.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 0.0))
+        return [(target, base_reward)] if target > 0 else []
+
+    def get_family_level_info(self, achievement_id: str) -> dict[str, Any]:
+        """Return level progress for a family goal (read-only, for sensors).
+
+        Returns:
+            Dict with `level` (levels completed), `levels` (all level targets),
+            `rewards` (reward per level), `next_target` (the target the bar is
+            filling toward; the last level's once every level is done) and
+            `next_reward` (the reward at that level).
+        """
+        empty: dict[str, Any] = {
+            "level": 0,
+            "levels": [],
+            "rewards": [],
+            "next_target": 0.0,
+            "next_reward": 0.0,
+        }
+        achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        if not achievement_data:
+            return empty
+        levels = self._get_family_levels(achievement_data)
+        reached = int(achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_LEVEL, 0))
+        if not levels:
+            return {**empty, "level": reached}
+        next_index = min(reached, len(levels) - 1)
+        return {
+            "level": reached,
+            "levels": [target for target, _ in levels],
+            "rewards": [reward for _, reward in levels],
+            "next_target": levels[next_index][0],
+            "next_reward": levels[next_index][1],
+        }
+
     def _get_family_assigned_ids(self, achievement_data: AchievementData) -> list[str]:
         """Return assigned people who still exist."""
         return [
@@ -3239,6 +3315,7 @@ class GamificationManager(BaseManager):
                 for assignee_id in self._get_family_assigned_ids(achievement_data)
             }
 
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] = 0
         progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
         for entry in progress.values():
             if isinstance(entry, dict):
@@ -3263,33 +3340,45 @@ class GamificationManager(BaseManager):
             achievement_id: Achievement internal ID
             achievement_data: Family goal achievement definition
         """
-        target = float(achievement_data.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 0.0))
-        if target <= 0:
+        levels = self._get_family_levels(achievement_data)
+        if not levels:
             return
 
         if (
             achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
             == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
-        ):
-            if self._update_family_caught_up_streak(achievement_data):
-                self.coordinator._persist_and_update()
-        elif self.get_family_achievement_total(achievement_id) < target:
-            return
+        ) and self._update_family_caught_up_streak(achievement_data):
+            self.coordinator._persist_and_update()
 
-        if self.get_family_achievement_total(achievement_id) < target:
-            return
-
+        total = self.get_family_achievement_total(achievement_id)
+        reached = int(achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_LEVEL, 0))
         progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
-        for assignee_id in self._get_family_assigned_ids(achievement_data):
-            entry = progress.get(assignee_id)
-            if isinstance(entry, dict) and entry.get(const.DATA_ACHIEVEMENT_AWARDED):
-                continue
-            const.LOGGER.info(
-                "Family goal %s reached - awarding assignee %s",
-                achievement_id,
-                assignee_id,
-            )
-            await self.award_achievement(assignee_id, achievement_id)
+
+        # More than one level can be crossed at once (for example after a
+        # bulk point adjustment); each one is awarded in turn.
+        while reached < len(levels) and total >= levels[reached][0]:
+            reached += 1
+            is_final = reached == len(levels)
+            achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] = reached
+            for assignee_id in self._get_family_assigned_ids(achievement_data):
+                entry = progress.get(assignee_id)
+                if isinstance(entry, dict) and entry.get(
+                    const.DATA_ACHIEVEMENT_AWARDED
+                ):
+                    continue
+                const.LOGGER.info(
+                    "Family goal %s level %s reached - awarding assignee %s",
+                    achievement_id,
+                    reached,
+                    assignee_id,
+                )
+                await self.award_achievement(
+                    assignee_id,
+                    achievement_id,
+                    level=reached if len(levels) > 1 else None,
+                    level_reward=levels[reached - 1][1],
+                    is_final=is_final,
+                )
 
     # =========================================================================
     # CHALLENGE EVALUATION

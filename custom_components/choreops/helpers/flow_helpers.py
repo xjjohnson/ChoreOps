@@ -3248,6 +3248,11 @@ def build_achievement_schema(assignees_dict, chores_dict, default=None):
                     step=0.1,
                 )
             ),
+            # Family goals only: optional level targets, e.g. "100, 250, 500".
+            vol.Optional(
+                const.CFOF_ACHIEVEMENTS_INPUT_LEVELS,
+                default="",
+            ): str,
             vol.Required(
                 const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS,
                 default=const.DEFAULT_ACHIEVEMENT_REWARD_POINTS,
@@ -3351,6 +3356,9 @@ def validate_achievements_inputs(
         const.DATA_ACHIEVEMENT_REWARD_POINTS: user_input.get(
             const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS,
             const.DEFAULT_ACHIEVEMENT_REWARD_POINTS,
+        ),
+        const.DATA_ACHIEVEMENT_LEVELS: user_input.get(
+            const.CFOF_ACHIEVEMENTS_INPUT_LEVELS, const.SENTINEL_EMPTY
         ),
     }
 

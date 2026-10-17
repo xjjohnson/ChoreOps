@@ -72,3 +72,19 @@ streak target is hit the badge is awarded and the streak restarts from zero
 (tomorrow is day one of the next streak), so e.g. "7 days in a row" earns the
 badge again after each further 7-day run. Streak badges with a weekly/monthly
 reset schedule keep the once-per-cycle behavior.
+
+## Levels
+
+Family goals (points, chores and caught-up) can have levels. In the goal's
+**Levels** box, list one entry per level as `target:reward`, separated by commas,
+for example `100:10, 250:25, 500:50`. When the pooled total reaches a level's
+target, everyone assigned is awarded that level's reward and the goal stays open
+for the next level; the last level closes the goal. A level written without a
+reward (just `250`) pays the goal's own Extra Points value. Leave the box blank
+for a single level at the Target Value, which is how family goals worked before.
+The first level's target replaces the Target Value. Restarting a goal sends it
+back to level 1.
+
+The goal's sensors expose `family_level` (levels completed), `family_levels`,
+`family_next_target` and `family_next_reward` for dashboards; the bar fills
+toward the next level's target.

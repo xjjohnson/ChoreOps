@@ -3854,6 +3854,9 @@ class ChoreOpsOptionsFlowHandler(config_entries.OptionsFlow):
                 const.DATA_ACHIEVEMENT_REWARD_POINTS,
                 const.DEFAULT_ACHIEVEMENT_REWARD_POINTS,
             ),
+            const.CFOF_ACHIEVEMENTS_INPUT_LEVELS: achievement_data.get(
+                const.DATA_ACHIEVEMENT_LEVELS, const.SENTINEL_EMPTY
+            ),
         }
 
         # On validation error, merge user's attempted input (preserves user changes)
