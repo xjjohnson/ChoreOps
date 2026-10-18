@@ -1519,3 +1519,24 @@ def test_user_gamification_premier_template_contains_ui_control_contract() -> No
     assert "template_shared.chore_engine/settings_panel_v1" in template_str
     assert "template_shared.chore_engine/group_render_v1" in template_str
     assert "pref_ui_control_key_root = 'gamification/chores'" in template_str
+
+
+def test_user_family_hub_template_renders_without_parse_errors() -> None:
+    """Family Hub template renders and parses into a dashboard dict."""
+    template_str = _read_template("user-family-hub-v1.yaml")
+    context = dh.build_dashboard_context(
+        "Zoe",
+        assignee_id="user-123",
+        integration_entry_id="entry-123",
+        template_profile="user-family-hub-v1",
+        release_ref="0.0.1-beta.3",
+        generated_at="2026-10-18T00:00:00+00:00",
+    )
+
+    rendered = builder.render_dashboard_template(template_str, dict(context))
+
+    assert isinstance(rendered.get("views"), list)
+    assert len(rendered["views"]) == 1
+    assert rendered["views"][0]["title"] == "Family Hub"
+    assert rendered["views"][0]["path"] == "family-hub-zoe"
+    assert isinstance(rendered["views"][0].get("sections"), list)

@@ -151,6 +151,38 @@
       }
     },
     {
+      "template_id": "user-family-hub-v1",
+      "display_name": "Family Hub",
+      "description": "Shared family page: family goals, pool rewards, points leaderboard, and who still has chores today",
+      "audience": "user",
+      "category": "full",
+      "lifecycle_state": "active",
+      "min_integration_version": "1.5.0",
+      "maintainer": "xjjohnson",
+      "source": {
+        "type": "vendored",
+        "path": "templates/user-family-hub-v1.yaml"
+      },
+      "dependencies": {
+        "required": [
+          {
+            "id": "ha-card:auto-entities",
+            "name": "Auto-Entities",
+            "url": "https://github.com/thomasloven/lovelace-auto-entities"
+          },
+          {
+            "id": "ha-card:button-card",
+            "name": "Button Card",
+            "url": "https://github.com/custom-cards/button-card"
+          }
+        ],
+        "recommended": []
+      },
+      "preferences": {
+        "doc_asset_path": "preferences/user-family-hub-v1.md"
+      }
+    },
+    {
       "template_id": "user-kidschores-classic-v1",
       "display_name": "KidsChores Classic",
       "description": "Classic kid-focused user dashboard with chore, rewards, and showcase sections",
