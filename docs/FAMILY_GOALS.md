@@ -106,8 +106,9 @@ everything since the goal was created or restarted.
   goal only advances as fast as the person who has done the least. Everyone
   must reach the target before anyone is rewarded.
 - **X Chores Together in One Day** - the whole family's approved chores for
-  today. It starts at zero every day; levels already reached stay earned, so it
-  works as "beat your best day". Top contributor means most chores today.
+  today. It is a daily goal: at the start of each day it starts over (level,
+  awards and progress clear) and can be earned and rewarded again. Top
+  contributor means most chores that day.
 - **Everyone Completes a Chore for X Days** - a day counts once every assigned
   person has had at least one chore approved. A day that ends without that
   voids the streak (noticed on the next evaluation). Easier than "everyone

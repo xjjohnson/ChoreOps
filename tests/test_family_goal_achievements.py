@@ -584,7 +584,7 @@ async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
     hass: HomeAssistant,
     scenario_full: SetupResult,
 ) -> None:
-    """Today's family total decides the level; tomorrow's reset does not undo it."""
+    """Today's family total decides the level; every new day starts over."""
     gm = scenario_full.coordinator.gamification_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
@@ -608,10 +608,22 @@ async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
     assert _awarded(scenario_full, goal_id, zoe)
     assert _awarded(scenario_full, goal_id, max_)
 
-    # A new day starts at zero but the earned level stays earned.
+    # A new day starts the goal over: level and awards clear, ready to earn again.
+    achievement = scenario_full.coordinator.achievements_data[goal_id]
+    achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = "2000-01-01"
     today.update({zoe: 0, max_: 0})
+    await gm._evaluate_assignee(zoe)
     assert gm.get_family_achievement_total(goal_id) == 0
+    assert achievement[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] == 0
+    assert not _awarded(scenario_full, goal_id, zoe)
+    assert not _awarded(scenario_full, goal_id, max_)
+
+    # Earning it again on the new day pays out again.
+    today.update({zoe: 3, max_: 3})
+    await gm._evaluate_assignee(zoe)
+    await hass.async_block_till_done()
     assert _awarded(scenario_full, goal_id, zoe)
+    assert _awarded(scenario_full, goal_id, max_)
 
 
 async def test_active_streak_needs_everyone_every_day(
@@ -651,8 +663,10 @@ async def test_active_streak_needs_everyone_every_day(
     # Yesterday counted, today counts: target reached, everyone awarded.
     from datetime import date, timedelta
 
+    from custom_components.choreops.utils.dt_utils import dt_today_iso
+
     achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = (
-        date.today() - timedelta(days=1)
+        date.fromisoformat(dt_today_iso()) - timedelta(days=1)
     ).isoformat()
     await gm._evaluate_assignee(zoe)
     await hass.async_block_till_done()

@@ -2817,17 +2817,10 @@ class GamificationManager(BaseManager):
         """
         assignee_id = context["assignee_id"]
 
-        # Check if assignee already has this achievement (awarded flag in progress)
-        achievement_progress = achievement_data.get(const.DATA_ACHIEVEMENT_PROGRESS, {})
-        assignee_progress = achievement_progress.get(assignee_id, {})
-        already_awarded = assignee_progress.get(const.DATA_ACHIEVEMENT_AWARDED, False)
-
-        if already_awarded:
-            # Achievements are permanent - no re-evaluation needed
-            return
-
         # Family goals pool every assigned person's contribution into one total
         # and award everyone together, so they bypass the per-assignee engine.
+        # They are routed BEFORE the already-awarded check: a finished goal
+        # must still be looked at (the one-day goal restarts every day).
         if achievement_data.get(const.DATA_ACHIEVEMENT_TYPE) in (
             const.FAMILY_ACHIEVEMENT_TYPES
         ):
@@ -2839,6 +2832,15 @@ class GamificationManager(BaseManager):
                 await self._evaluate_family_achievement(
                     achievement_id, achievement_data
                 )
+            return
+
+        # Check if assignee already has this achievement (awarded flag in progress)
+        achievement_progress = achievement_data.get(const.DATA_ACHIEVEMENT_PROGRESS, {})
+        assignee_progress = achievement_progress.get(assignee_id, {})
+        already_awarded = assignee_progress.get(const.DATA_ACHIEVEMENT_AWARDED, False)
+
+        if already_awarded:
+            # Achievements are permanent - no re-evaluation needed
             return
 
         canonical_target = self._map_achievement_to_canonical_target(
@@ -3421,6 +3423,32 @@ class GamificationManager(BaseManager):
         const.LOGGER.info("Family goal %s restarted", achievement_id)
         self.coordinator._persist_and_update()
 
+    def _restart_family_day_goal_if_new_day(
+        self, achievement_data: AchievementData
+    ) -> bool:
+        """Start the one-day family goal over when a new day begins.
+
+        Levels, awards and the level snapshot are cleared so the goal can be
+        earned again today. Reward points already paid are untouched.
+
+        Returns:
+            True when stored state changed.
+        """
+        today_iso = dt_today_iso()
+        if (
+            str(achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY, ""))
+            == today_iso
+        ):
+            return False
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = today_iso
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] = 0
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START] = {}
+        progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
+        for entry in progress.values():
+            if isinstance(entry, dict):
+                entry[const.DATA_ACHIEVEMENT_AWARDED] = False
+        return True
+
     async def _evaluate_family_achievement(
         self,
         achievement_id: str,
@@ -3440,6 +3468,11 @@ class GamificationManager(BaseManager):
             return
 
         achievement_type = achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+        if (
+            achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_DAY
+            and self._restart_family_day_goal_if_new_day(achievement_data)
+        ):
+            self.coordinator._persist_and_update()
         if (
             achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
             and self._update_family_caught_up_streak(achievement_data)
