@@ -1,0 +1,356 @@
+<#-- ============================================= --#>
+<#-- ChoreOps Dashboard Template - FAMILY HUB    --#>
+<#-- Template Schema Version: 1                  --#>
+<#-- Integration: 1.0.0 (Schema 100)             --#>
+<#-- ============================================= --#>
+<#--                                             --#>
+<#-- Family Hub: one shared family page showing  --#>
+<#-- family goals, pool rewards, a points        --#>
+<#-- leaderboard, and who still has chores today.--#>
+<#-- Read-mostly: no approve/admin buttons.      --#>
+<#-- OUTPUT: Full dashboard document with root keys --#>
+<#--                                             --#>
+<#-- Injection variables (Python << >>):         --#>
+<#--   << user.name >> - User's display name      --#>
+<#--   << user.slug >> - URL-safe slug            --#>
+<#--   << user.user_id >> - User identity UUID    --#>
+<#--   << integration.entry_id >> - Instance scope ID --#>
+<#--                                             --#>
+<#-- Snippet tokens: template_snippets.user_setup,                       --#>
+<#-- template_snippets.user_validation,                                  --#>
+<#-- template_snippets.user_override_helper, template_snippets.meta_stamp --#>
+<#-- ============================================= --#>
+
+views:
+  - max_columns: 2
+    title: Family Hub
+    path: family-hub-<< user.slug >>
+    type: sections
+    sections:
+      - type: grid
+        column_span: 1
+        cards:
+          - square: false
+            type: grid
+            columns: 1
+            grid_options:
+              columns: full
+            cards:
+              - type: custom:auto-entities
+                card:
+                  square: false
+                  type: grid
+                  columns: 1
+                card_param: cards
+                filter:
+                  template: |-
+                    {#-- ===== FAMILY HUB CARD ===== --#}
+
+                    << template_snippets.meta_stamp >>
+
+
+                    {#-- 1. User Configuration --#}
+
+                    << template_snippets.user_override_helper | indent(width=20, first=true) >>
+
+                    {#-- 2. Dynamic Lookups & Validations --#}
+
+                    << template_snippets.user_setup | indent(width=20, first=true) >>
+
+                    << template_snippets.user_validation | indent(width=20, first=true) >>
+
+                    {%- if not skip_render -%}
+
+                      {#-- 3. Collect Data --#}
+                      {%- set core_sensors = state_attr(dashboard_helper, 'core_sensors') or {} -%}
+                      {%- set dashboard_helpers = state_attr(dashboard_helper, 'dashboard_helpers') or {} -%}
+                      {%- set translation_sensor = dashboard_helpers.get('translation_sensor_eid') -%}
+                      {%- set ui = state_attr(translation_sensor, 'ui_translations') if translation_sensor else {} -%}
+                      {%- set points_icon = (state_attr(core_sensors.get('points_eid'), 'icon') if core_sensors.get('points_eid') else None) or 'mdi:star-circle' -%}
+                      {%- set reward_list = state_attr(dashboard_helper, 'rewards') or [] -%}
+                      {%- set shared = integration_entities('choreops')
+                          | select('match', '^sensor\\.')
+                          | list
+                          | expand
+                          | selectattr('attributes.purpose', 'defined')
+                          | selectattr('attributes.purpose', 'eq', 'purpose_system_dashboard_helper')
+                          | selectattr('attributes.user_dashboard_helpers', 'defined')
+                          | map(attribute='entity_id')
+                          | first
+                          | default('', true) -%}
+                      {%- set helper_map = state_attr(shared, 'user_dashboard_helpers') | default({}, true) if shared != '' else {} -%}
+                      {%- set helpers = helper_map.values() | list | expand | sort(attribute='attributes.user_name') | list -%}
+
+                      {%- macro section_header(title, icon) -%}
+                        {{
+                          {
+                            'type': 'custom:button-card',
+                            'name': title,
+                            'icon': icon,
+                            'show_name': true,
+                            'show_icon': true,
+                            'show_label': false,
+                            'tap_action': {'action': 'none'},
+                            'hold_action': {'action': 'none'},
+                            'styles': {
+                              'card': [
+                                {'background': 'transparent'},
+                                {'box-shadow': 'none'},
+                                {'border': 'none'},
+                                {'border-left': '3px solid var(--primary-color)'},
+                                {'border-bottom': '3px solid var(--primary-color)'},
+                                {'border-radius': '10px'},
+                                {'padding': '10px 12px'},
+                                {'min-height': 'unset'},
+                                {'margin-top': '5px'}
+                              ],
+                              'grid': [
+                                {'grid-template-areas': '"i n"'},
+                                {'grid-template-columns': 'min-content 1fr'},
+                                {'column-gap': '5px'},
+                                {'align-items': 'center'}
+                              ],
+                              'icon': [{'width': '18px'}, {'color': 'var(--primary-color)'}],
+                              'name': [
+                                {'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '700'},
+                                {'text-transform': 'uppercase'}, {'letter-spacing': '0.4px'}, {'color': 'var(--primary-text-color)'}
+                              ]
+                            }
+                          }
+                        }},
+                      {%- endmacro -%}
+
+                      {%- macro html_card(html) -%}
+                        {{
+                          {
+                            'type': 'custom:button-card',
+                            'show_name': false,
+                            'show_icon': false,
+                            'tap_action': {'action': 'none'},
+                            'styles': {
+                              'card': [
+                                {'padding': '14px 16px'},
+                                {'border-radius': '18px'},
+                                {'box-shadow': 'none'}
+                              ],
+                              'grid': [
+                                {'grid-template-areas': '"content"'},
+                                {'grid-template-columns': '1fr'}
+                              ],
+                              'custom_fields': {
+                                'content': [{'width': '100%'}, {'justify-self': 'stretch'}, {'text-align': 'left'}]
+                              }
+                            },
+                            'custom_fields': {'content': "<div style='width:100%;'>" ~ html ~ "</div>"}
+                          }
+                        }},
+                      {%- endmacro -%}
+
+                      {#-- 4. Family goals --#}
+                      {%- set has_family = integration_entities('choreops')
+                          | select('search', '^sensor\\.')
+                          | list
+                          | expand
+                          | selectattr('attributes.family_contributions', 'defined')
+                          | list
+                          | length > 0 -%}
+                      {%- if has_family -%}
+                        {{ section_header(ui.get('family_goals', 'Family Goals'), 'mdi:home-heart') }}
+                      {%- set family_sensors = integration_entities('choreops')
+                          | select('search', '^sensor\\.')
+                          | list
+                          | expand
+                          | selectattr('attributes.family_contributions', 'defined')
+                          | map(attribute='entity_id')
+                          | list -%}
+                      {%- for fe in family_sensors -%}
+                        {%- if states(fe) not in ['unknown', 'unavailable'] -%}
+                          {%- set fname = state_attr(fe, 'achievement_name') | default('Family Goal', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                          {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                          {%- set ficon = state_attr(fe, 'icon') or 'mdi:trophy' -%}
+                          {%- set flevels = (state_attr(fe, 'family_levels') or []) | map('float', 0) | list -%}
+                          {%- set frewards = (state_attr(fe, 'family_level_rewards') or []) | map('float', 0) | list -%}
+                          {%- set flevel = state_attr(fe, 'family_level') | int(0) -%}
+                          {%- set fcount = flevels | length -%}
+                          {%- set fdone = fcount > 0 and flevel >= fcount -%}
+                          {%- set fnext = state_attr(fe, 'family_next_target') | float(0) -%}
+                          {%- set ftarget = (fnext if fnext > 0 else (state_attr(fe, 'target_value') | float(0))) | round(0) | int -%}
+                          {%- set fprev = 0 -%}
+                          {%- if fcount > 1 -%}
+                            {%- set pidx = (flevel - 1) if not fdone else (fcount - 2) -%}
+                            {%- set fprev = (flevels[pidx] | round(0) | int) if pidx >= 0 else 0 -%}
+                          {%- endif -%}
+                          {%- set freward = state_attr(fe, 'family_next_reward') | float(0) | round(0) | int -%}
+                          {%- set fmult = state_attr(fe, 'family_top_multiplier') | float(1) -%}
+                          {%- set ftotal = state_attr(fe, 'family_total') | float(0) | round(0) | int -%}
+                          {%- set fshares = state_attr(fe, 'family_level_contributions') or state_attr(fe, 'family_contributions') or {} -%}
+                          {%- set span = [ftarget - fprev, 1] | max -%}
+                          {%- set into = [[ftotal - fprev, 0] | max, span] | min -%}
+                          {%- set pct = ((into / span) * 100) | round(0) | int -%}
+                          {%- set togo = [ftarget - ftotal, 0] | max -%}
+                          {%- set ftop = (fshares.values() | map('float', 0) | list | max) if fshares else 0 -%}
+                          {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
+                          {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
+                          {%- set fui = namespace(v='') -%}
+
+                          {%- set fui.v = fui.v ~ "<div style='text-align:center;margin:0 0 " ~ ('2px' if fdesc else '8px') ~ " 0;'><ha-icon icon='" ~ ficon ~ "' style='display:inline-block;vertical-align:middle;width:22px;height:22px;--mdc-icon-size:22px;color:" ~ accent ~ ";margin-right:8px;'></ha-icon><span style='display:inline-block;vertical-align:middle;font-size:17px;font-weight:800;color:var(--primary-text-color);'>" ~ fname ~ "</span></div>" -%}
+                          {%- if fdesc -%}
+                            {%- set fui.v = fui.v ~ "<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);margin:0 0 10px 0;line-height:1.3;'>" ~ fdesc ~ "</div>" -%}
+                          {%- endif -%}
+
+                          {%- if fcount > 1 -%}
+                            {%- set chips = namespace(v='') -%}
+                            {%- for lv in flevels -%}
+                              {%- set idx = loop.index -%}
+                              {%- set is_done = idx <= flevel -%}
+                              {%- set is_cur = (idx == flevel + 1) -%}
+                              {%- set cbg = 'rgba(34,197,94,0.18)' if is_done else ('rgba(139,92,246,0.22)' if is_cur else 'rgba(127,127,127,0.10)') -%}
+                              {%- set cbd = 'rgba(34,197,94,0.7)' if is_done else ('#8b5cf6' if is_cur else 'rgba(127,127,127,0.25)') -%}
+                              {%- set ccol = '#22c55e' if is_done else ('var(--primary-text-color)' if is_cur else 'var(--secondary-text-color)') -%}
+                              {%- set crew = (frewards[loop.index0] | round(0) | int) if frewards | length >= idx else 0 -%}
+                              {%- set chips.v = chips.v ~ "<div style='min-width:62px;padding:6px 10px;border-radius:12px;background:" ~ cbg ~ ";border:" ~ ('2' if is_cur else '1') ~ "px solid " ~ cbd ~ ";color:" ~ ccol ~ ";text-align:center;'><div style='font-size:11px;font-weight:800;letter-spacing:0.5px;'>" ~ ('✓ ' if is_done else '') ~ "LEVEL " ~ idx ~ "</div><div style='font-size:14px;font-weight:800;'>" ~ (lv | round(0) | int) ~ "</div><div style='font-size:10px;opacity:0.85;'>+" ~ crew ~ " ⭐</div></div>" -%}
+                            {%- endfor -%}
+                            {%- set fui.v = fui.v ~ "<div style='display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:0 0 12px 0;'>" ~ chips.v ~ "</div>" -%}
+                          {%- endif -%}
+
+                          {%- set label = '🎉 ALL LEVELS COMPLETE' if fdone else ('NEXT: LEVEL ' ~ (flevel + 1) if fcount > 1 else 'GOAL') -%}
+                          {%- set sub = '' -%}
+                          {%- if not fdone -%}
+                            {%- set sub = (togo | string) ~ ' to go' -%}
+                            {%- if freward > 0 -%}{%- set sub = sub ~ ' · +' ~ freward ~ ' ⭐ each' -%}{%- endif -%}
+                            {%- if fmult > 1 -%}{%- set sub = sub ~ ' · 🏆 top contributor ×' ~ ('%g' | format(fmult)) -%}{%- endif -%}
+                          {%- endif -%}
+                          {%- set fui.v = fui.v ~ "<div style='padding:12px 14px;border-radius:16px;background:linear-gradient(135deg," ~ accent ~ "22," ~ accent2 ~ "14);border:1px solid " ~ accent ~ "80;margin:0 0 12px 0;'><div style='display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;'><span style='font-size:13px;font-weight:800;letter-spacing:0.6px;color:" ~ accent ~ ";'>🏠 " ~ label ~ "</span><span style='font-size:15px;font-weight:800;color:var(--primary-text-color);'>" ~ ftotal ~ " <span style='font-weight:600;opacity:0.7;'>/ " ~ ftarget ~ "</span></span></div><div style='height:16px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ pct ~ "%;min-width:" ~ ('16px' if pct > 0 else '0') ~ ";height:100%;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");border-radius:999px;'></div></div>" ~ ("<div style='margin-top:7px;font-size:12px;color:var(--secondary-text-color);text-align:center;'>" ~ sub ~ "</div>" if sub else '') ~ "</div>" -%}
+
+                          {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
+                          {%- set frecord_day = state_attr(fe, 'family_record_day') or '' -%}
+                          {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
+                          {%- if frecord > 0 -%}
+                            {%- set fui.v = fui.v ~ "<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);margin:-4px 0 12px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>" -%}
+                          {%- endif -%}
+
+                          {%- if fshares -%}
+                            {%- set rows = namespace(v='') -%}
+                            {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
+                              {%- set p = pts | float(0) | round(0) | int -%}
+                              {%- set ppct = ([((p / span) * 100) | round(0) | int, 100] | min) -%}
+                              {%- set lead = (p > 0 and (pts | float(0)) == ftop) -%}
+                              {%- set pcol = 'var(--warning-color)' if lead else 'var(--primary-color)' -%}
+                              {%- set badge = (" <span style='font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--warning-color);color:#000;'>×" ~ ('%g' | format(fmult)) ~ "</span>") if (lead and fmult > 1) else '' -%}
+                              {%- set rows.v = rows.v ~ "<div style='display:grid;grid-template-columns:minmax(0,92px) minmax(0,1fr) auto;align-items:center;column-gap:10px;padding:4px 0;'><div style='min-width:0;font-size:13px;font-weight:" ~ ('800' if lead else '600') ~ ";color:" ~ ('var(--warning-color)' if lead else 'var(--primary-text-color)') ~ ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ ('👑 ' if lead else '') ~ pname ~ "</div><div style='height:8px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ ppct ~ "%;height:100%;background:" ~ pcol ~ ";border-radius:999px;'></div></div><div style='font-size:12px;font-weight:700;color:" ~ pcol ~ ";white-space:nowrap;text-align:right;min-width:40px;'>" ~ p ~ badge ~ "</div></div>" -%}
+                            {%- endfor -%}
+                            {%- set fui.v = fui.v ~ "<div style='font-size:11px;font-weight:800;letter-spacing:0.6px;color:var(--secondary-text-color);margin:0 0 2px 2px;'>CONTRIBUTIONS THIS LEVEL</div>" ~ rows.v -%}
+                          {%- endif -%}
+
+                          {{
+                            {
+                              'type': 'custom:button-card',
+                              'show_name': false,
+                              'show_icon': false,
+                              'styles': {
+                                'card': [
+                                  {'padding': '14px 16px'},
+                                  {'border-radius': '18px'},
+                                  {'border-left': '4px solid ' ~ accent},
+                                  {'box-shadow': 'none'}
+                                ],
+                                'grid': [
+                                  {'grid-template-areas': '"content"'},
+                                  {'grid-template-columns': '1fr'}
+                                ],
+                                'custom_fields': {
+                                  'content': [
+                                    {'width': '100%'},
+                                    {'justify-self': 'stretch'},
+                                    {'text-align': 'left'}
+                                  ]
+                                }
+                              },
+                              'custom_fields': {
+                                'content': "<div style='width:100%;'>" ~ fui.v ~ "</div>"
+                              }
+                            }
+                          }},
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- endif -%}
+
+                      {#-- 5. Pool rewards (progress toward each shared reward) --#}
+                      {%- set pool = namespace(html='', count=0) -%}
+                      {%- for reward in reward_list -%}
+                        {%- set reward_eid = reward.get('eid') if reward is mapping else none -%}
+                        {%- if reward_eid and state_attr(reward_eid, 'pooled') | default(false, true) -%}
+                          {%- set pcost = (reward.get('cost', 0) | float(0)) -%}
+                          {%- set pnow = state_attr(reward_eid, 'pool_total') | float(0) -%}
+                          {%- set pmine = state_attr(reward_eid, 'pool_my_contribution') | float(0) -%}
+                          {%- set ppct = ([(pnow / pcost * 100) if pcost > 0 else 0, 100] | min) | round(0) | int -%}
+                          {%- set pfull = ppct >= 100 -%}
+                          {%- set pname = reward.get('name', '') | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                          {%- set picon = state_attr(reward_eid, 'icon') or 'mdi:gift' -%}
+                          {%- set pcol = 'var(--success-color)' if pfull else 'var(--primary-color)' -%}
+                          {%- set pool.count = pool.count + 1 -%}
+                          {%- set pool.html = pool.html ~ "<div style='margin:0 0 14px 0;'><div style='display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;'><span style='font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ picon ~ "' style='width:18px;height:18px;--mdc-icon-size:18px;color:" ~ pcol ~ ";margin-right:6px;vertical-align:middle;'></ha-icon>" ~ pname ~ "</span><span style='font-size:13px;font-weight:800;color:var(--primary-text-color);'>" ~ ('%g' | format(pnow | round(2))) ~ " <span style='font-weight:600;opacity:0.7;'>/ " ~ ('%g' | format(pcost | round(2))) ~ "</span></span></div><div style='height:14px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ ppct ~ "%;min-width:" ~ ('14px' if ppct > 0 else '0') ~ ";height:100%;background:" ~ pcol ~ ";border-radius:999px;'></div></div><div style='margin-top:4px;display:flex;justify-content:space-between;font-size:11px;color:var(--secondary-text-color);'><span>" ~ ppct ~ "%</span><span>" ~ ui.get('you', 'You') ~ ": " ~ ('%g' | format(pmine | round(2))) ~ "</span></div></div>" -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- if pool.count > 0 -%}
+                        {{ section_header(ui.get('pool_rewards', 'Pool Rewards'), 'mdi:piggy-bank') }}
+                        {{ html_card(pool.html) }}
+                      {%- endif -%}
+
+                      {#-- 6. Leaderboard --#}
+                      {%- set board = namespace(rows=[]) -%}
+                      {%- for h in helpers -%}
+                        {%- set h_core = h.attributes.core_sensors or {} -%}
+                        {%- set h_points_eid = h_core.get('points_eid', '') -%}
+                        {%- set h_pts = (states(h_points_eid) | float(0)) if h_points_eid else 0 -%}
+                        {%- set board.rows = board.rows + [[h_pts, h.attributes.user_name | string]] -%}
+                      {%- endfor -%}
+                      {%- set sorted_board = board.rows | sort(attribute='0', reverse=true) -%}
+                      {%- if sorted_board | length > 0 -%}
+                        {%- set top_pts = [sorted_board[0][0], 1] | max -%}
+                        {%- set lb = namespace(html='') -%}
+                        {%- for row in sorted_board -%}
+                          {%- set medal = ['🥇', '🥈', '🥉'][loop.index0] if loop.index0 < 3 else '' -%}
+                          {%- set bar_pct = ([(row[0] / top_pts * 100) | round(0) | int, 0] | max) -%}
+                          {%- set bar_pct = [bar_pct, 100] | min -%}
+                          {%- set nm = row[1] | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                          {%- set lb.html = lb.html ~ "<div style='display:grid;grid-template-columns:minmax(0,110px) minmax(0,1fr) auto;align-items:center;column-gap:10px;padding:5px 0;'><div style='min-width:0;font-size:14px;font-weight:" ~ ('800' if loop.first else '600') ~ ";color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ medal ~ ' ' ~ nm ~ "</div><div style='height:10px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ bar_pct ~ "%;height:100%;background:" ~ ('var(--warning-color)' if loop.first else 'var(--primary-color)') ~ ";border-radius:999px;'></div></div><div style='font-size:13px;font-weight:800;color:var(--primary-text-color);text-align:right;min-width:44px;'>" ~ (row[0] | round(0) | int) ~ "</div></div>" -%}
+                        {%- endfor -%}
+                        {{ section_header(ui.get('leaderboard', 'Leaderboard'), 'mdi:podium') }}
+                        {{ html_card(lb.html) }}
+                      {%- endif -%}
+
+                      {#-- 7. Today: who still has chores --#}
+                      {%- set today = namespace(html='', any=false) -%}
+                      {%- for h in helpers -%}
+                        {%- set h_core = h.attributes.core_sensors or {} -%}
+                        {%- set h_total = h_core.get('chores_eid', '') -%}
+                        {%- if h_total -%}
+                          {%- set t_over = state_attr(h_total, 'chore_stat_current_overdue') | int(0) -%}
+                          {%- set t_due = state_attr(h_total, 'chore_stat_current_due_today') | int(0) -%}
+                          {%- set t_done = state_attr(h_total, 'chore_stat_approved_today') | int(0) -%}
+                          {%- set paused = h.attributes.chores_paused | bool(false) -%}
+                          {%- set t_nm = h.attributes.user_name | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                          {%- if paused -%}
+                            {%- set t_col = 'var(--warning-color)' -%}
+                            {%- set t_txt = '⏸ ' ~ ui.get('chores_are_paused', 'Paused') -%}
+                          {%- elif t_over > 0 -%}
+                            {%- set t_col = 'var(--error-color)' -%}
+                            {%- set t_txt = ui.get('overdue', 'Overdue') ~ ': ' ~ t_over ~ (' · ' ~ ui.get('due_today', 'Due Today') ~ ': ' ~ t_due if t_due > 0 else '') -%}
+                          {%- elif t_due > 0 -%}
+                            {%- set t_col = 'var(--warning-color)' -%}
+                            {%- set t_txt = ui.get('due_today', 'Due Today') ~ ': ' ~ t_due -%}
+                          {%- else -%}
+                            {%- set t_col = 'var(--success-color)' -%}
+                            {%- set t_txt = '✓ ' ~ ui.get('all_caught_up', 'All Caught Up!') -%}
+                          {%- endif -%}
+                          {%- set today.any = true -%}
+                          {%- set today.html = today.html ~ "<div style='display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--divider-color);'><span style='font-size:14px;font-weight:700;color:var(--primary-text-color);'>" ~ t_nm ~ "</span><span style='font-size:12px;font-weight:700;color:" ~ t_col ~ ";text-align:right;'>" ~ t_txt ~ (" <span style='opacity:0.7;color:var(--secondary-text-color);'>· " ~ t_done ~ " ✓</span>" if t_done > 0 else '') ~ "</span></div>" -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- if today.any -%}
+                        {{ section_header(ui.get('today', 'Today'), 'mdi:calendar-today') }}
+                        {{ html_card(today.html) }}
+                      {%- endif -%}
+
+                    {%- endif -%}

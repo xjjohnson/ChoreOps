@@ -25,6 +25,7 @@ def test_user_templates_include_required_snippet_markers() -> None:
         "user-chores-essential-v1.yaml",
         "user-chores-lite-v1.yaml",
         "user-chores-standard-v1.yaml",
+        "user-family-hub-v1.yaml",
         "user-gamification-premier-v1.yaml",
         "user-kidschores-classic-v1.yaml",
     ):
@@ -80,6 +81,7 @@ def test_templates_keep_card_header_and_section_markers() -> None:
         "user-chores-essential-v1.yaml",
         "user-chores-lite-v1.yaml",
         "user-chores-standard-v1.yaml",
+        "user-family-hub-v1.yaml",
         "user-gamification-premier-v1.yaml",
         "user-kidschores-classic-v1.yaml",
         "admin-shared-v1.yaml",
