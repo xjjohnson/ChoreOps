@@ -2886,6 +2886,10 @@ def build_reward_schema(default=None, assignees_dict=None):
             const.CFOF_REWARDS_INPUT_ICON,
             default=const.SENTINEL_EMPTY,
         ): selector.IconSelector(),
+        vol.Optional(
+            const.CFOF_REWARDS_INPUT_POOLED,
+            default=False,
+        ): selector.BooleanSelector(),
     }
 
     # Add assigned users multi-select when assignees are available

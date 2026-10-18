@@ -1191,6 +1191,13 @@ create_reward:
       selector:
         text:
           multiple: true
+    pooled:
+      name: "Family Pool"
+      description: "Everyone assigned pays points into one shared pool and the cost becomes the pool's target."
+      example: true
+      required: false
+      selector:
+        boolean:
 
 update_reward:
   name: "Update Reward"
@@ -1264,6 +1271,13 @@ update_reward:
       selector:
         text:
           multiple: true
+    pooled:
+      name: "Family Pool"
+      description: "Everyone assigned pays points into one shared pool and the cost becomes the pool's target."
+      example: true
+      required: false
+      selector:
+        boolean:
 
 delete_reward:
   name: Delete Reward
@@ -2040,5 +2054,121 @@ open_rotation_cycle:
       description: "Name of the rotation chore to open. Optional if chore_id is provided."
       example: "Clean Bedroom"
       required: false
+      selector:
+        text:
+
+contribute_to_reward_pool:
+  name: "Contribute To Reward Pool"
+  description: >
+    Pay points from a user's balance into a family pool reward. The points
+    leave the balance immediately. A contribution never takes more than the
+    pool still needs. Returns the points actually contributed.
+  fields:
+    config_entry_id:
+      name: "Config Entry ID (Optional)"
+      description: "Use this if you have more than one ChoreOps setup. It targets one specific setup."
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+    config_entry_title:
+      name: "Config Entry Name (Optional)"
+      description: "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID."
+      required: false
+      example: "Family Chores"
+      selector:
+        text:
+    user_name:
+      name: "User Name"
+      description: "The user paying points into the pool."
+      example: "Alice"
+      required: true
+      selector:
+        text:
+    reward_name:
+      name: "Reward Name"
+      description: "The name of the family pool reward."
+      example: "Family Movie Night"
+      required: true
+      selector:
+        text:
+    amount:
+      name: "Amount (Optional)"
+      description: "Points to contribute. Leave empty to contribute as much as the user can afford, up to what the pool still needs."
+      example: 25
+      required: false
+      selector:
+        number:
+          min: 0.01
+          step: 0.01
+          mode: box
+
+approve_reward_pool:
+  name: "Approve Reward Pool"
+  description: >
+    Confirm that a full family pool's reward has been delivered. The pool is
+    emptied so the family can save up for it again.
+  fields:
+    config_entry_id:
+      name: "Config Entry ID (Optional)"
+      description: "Use this if you have more than one ChoreOps setup. It targets one specific setup."
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+    config_entry_title:
+      name: "Config Entry Name (Optional)"
+      description: "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID."
+      required: false
+      example: "Family Chores"
+      selector:
+        text:
+    approver_name:
+      name: "Approver Name (Optional)"
+      description: "Who is doing this. Recorded in the log; defaults to the signed-in user."
+      example: "Mom"
+      required: false
+      selector:
+        text:
+    reward_name:
+      name: "Reward Name"
+      description: "The name of the family pool reward."
+      example: "Family Movie Night"
+      required: true
+      selector:
+        text:
+
+refund_reward_pool:
+  name: "Refund Reward Pool"
+  description: >
+    Cancel a family pool and give every contributor back exactly what they
+    paid in.
+  fields:
+    config_entry_id:
+      name: "Config Entry ID (Optional)"
+      description: "Use this if you have more than one ChoreOps setup. It targets one specific setup."
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+    config_entry_title:
+      name: "Config Entry Name (Optional)"
+      description: "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID."
+      required: false
+      example: "Family Chores"
+      selector:
+        text:
+    approver_name:
+      name: "Approver Name (Optional)"
+      description: "Who is doing this. Recorded in the log; defaults to the signed-in user."
+      example: "Mom"
+      required: false
+      selector:
+        text:
+    reward_name:
+      name: "Reward Name"
+      description: "The name of the family pool reward."
+      example: "Family Movie Night"
+      required: true
       selector:
         text:

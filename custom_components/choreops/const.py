@@ -260,6 +260,10 @@ SIGNAL_SUFFIX_REWARD_APPROVED: Final = "reward_approved"
 SIGNAL_SUFFIX_REWARD_DISAPPROVED: Final = "reward_disapproved"
 SIGNAL_SUFFIX_REWARD_CLAIM_UNDONE: Final = "reward_claim_undone"
 SIGNAL_SUFFIX_REWARD_STATUS_RESET: Final = "reward_status_reset"
+SIGNAL_SUFFIX_REWARD_POOL_CONTRIBUTED: Final = "reward_pool_contributed"
+SIGNAL_SUFFIX_REWARD_POOL_FILLED: Final = "reward_pool_filled"
+SIGNAL_SUFFIX_REWARD_POOL_APPROVED: Final = "reward_pool_approved"
+SIGNAL_SUFFIX_REWARD_POOL_REFUNDED: Final = "reward_pool_refunded"
 
 # Penalty Events (PenaltyManager or EconomyManager)
 SIGNAL_SUFFIX_PENALTY_APPLIED: Final = "penalty_applied"
@@ -738,6 +742,7 @@ CFOF_REWARDS_INPUT_ASSIGNED_USER_NAMES: Final = "assigned_user_names"
 CFOF_REWARDS_INPUT_ASSIGNED_USER_IDS: Final = (
     "assigned_user_ids"  # Aligned with DATA_REWARD_ASSIGNED_USER_IDS
 )
+CFOF_REWARDS_INPUT_POOLED: Final = "pooled"  # Aligned with DATA_REWARD_POOLED
 CFOF_REWARDS_INPUT_REWARD_COUNT: Final = "reward_count"
 
 # BONUSES
@@ -1777,6 +1782,9 @@ DATA_REWARD_LABELS: Final = "reward_labels"
 DATA_REWARD_NAME: Final = "name"
 DATA_REWARD_TIMESTAMP: Final = "timestamp"
 DATA_REWARD_ASSIGNED_USER_IDS: Final = "assigned_user_ids"
+# Family pool: assigned users pay points into one shared pot (cost = target)
+DATA_REWARD_POOLED: Final = "pooled"
+DATA_REWARD_POOL_CONTRIBUTIONS: Final = "pool_contributions"  # user_id -> points
 
 # BONUSES
 DATA_BONUS_DESCRIPTION: Final = "description"
@@ -2504,6 +2512,12 @@ TRANS_KEY_NOTIF_TITLE_REWARD_CLAIMED_APPROVER: Final = (
 TRANS_KEY_NOTIF_MESSAGE_REWARD_CLAIMED_APPROVER: Final = (
     "notification_message_reward_claimed_approver"
 )
+TRANS_KEY_NOTIF_TITLE_REWARD_POOL_FULL_APPROVER: Final = (
+    "notification_title_reward_pool_full_approver"
+)
+TRANS_KEY_NOTIF_MESSAGE_REWARD_POOL_FULL_APPROVER: Final = (
+    "notification_message_reward_pool_full_approver"
+)
 
 # Non-gamified variants (no {points} or {points_label} references)
 TRANS_KEY_NOTIF_MESSAGE_CHORE_APPROVED_ASSIGNEE_NO_POINTS: Final = (
@@ -2863,6 +2877,12 @@ ATTR_SYSTEM_BADGE_EID: Final = "system_badge_eid"
 
 # Reward Status Sensor Attributes - Period Stats
 ATTR_REWARD_PENDING_CLAIMS: Final = "pending_claims"
+ATTR_REWARD_POOLED: Final = "pooled"
+ATTR_REWARD_POOL_TOTAL: Final = "pool_total"
+ATTR_REWARD_POOL_REMAINING: Final = "pool_remaining"
+ATTR_REWARD_POOL_CONTRIBUTIONS: Final = "pool_contributions"
+ATTR_REWARD_POOL_MY_CONTRIBUTION: Final = "pool_my_contribution"
+ATTR_REWARD_POOL_FULL: Final = "pool_full"
 ATTR_REWARD_LAST_CLAIMED: Final = "last_claimed"
 ATTR_REWARD_LAST_APPROVED: Final = "last_approved"
 ATTR_REWARD_LAST_DISAPPROVED: Final = "last_disapproved"
@@ -3114,6 +3134,9 @@ SERVICE_REDEEM_REWARD: Final = "redeem_reward"
 SERVICE_REMOVE_AWARDED_BADGES: Final = "remove_awarded_badges"
 SERVICE_REPAIR_BADGE_STREAK: Final = "repair_badge_streak"
 SERVICE_RESET_FAMILY_GOAL: Final = "reset_family_goal"
+SERVICE_CONTRIBUTE_TO_REWARD_POOL: Final = "contribute_to_reward_pool"
+SERVICE_APPROVE_REWARD_POOL: Final = "approve_reward_pool"
+SERVICE_REFUND_REWARD_POOL: Final = "refund_reward_pool"
 SERVICE_RESET_CHORES_TO_PENDING_STATE: Final = (
     "reset_chores_to_pending_state"  # Renamed from reset_all_chores
 )
@@ -3305,6 +3328,7 @@ SERVICE_FIELD_REWARD_CRUD_ICON: Final = "icon"
 SERVICE_FIELD_REWARD_CRUD_LABELS: Final = "labels"
 SERVICE_FIELD_REWARD_CRUD_ASSIGNED_USER_NAMES: Final = "assigned_user_names"
 SERVICE_FIELD_REWARD_CRUD_ASSIGNED_USER_IDS: Final = "assigned_user_ids"
+SERVICE_FIELD_REWARD_CRUD_POOLED: Final = "pooled"
 
 # Penalty service fields
 SERVICE_FIELD_PENALTY_NAME: Final = "penalty_name"
@@ -3536,6 +3560,13 @@ TRANS_KEY_ERROR_NOT_ASSIGNED: Final = (
 TRANS_KEY_ERROR_INSUFFICIENT_POINTS: Final = (
     "insufficient_points"  # {assignee} has {current}, needs {required}
 )
+TRANS_KEY_ERROR_REWARD_NOT_POOLED: Final = "reward_not_pooled"  # {reward}
+TRANS_KEY_ERROR_REWARD_IS_POOLED: Final = "reward_is_pooled"  # {reward}
+TRANS_KEY_ERROR_REWARD_POOL_FULL: Final = "reward_pool_full"  # {reward}
+TRANS_KEY_ERROR_REWARD_POOL_NOT_FULL: Final = (
+    "reward_pool_not_full"  # {reward} has {total} of {target}
+)
+TRANS_KEY_ERROR_REWARD_POOL_INVALID_AMOUNT: Final = "reward_pool_invalid_amount"
 TRANS_KEY_ERROR_ALREADY_CLAIMED: Final = "already_claimed"  # {entity} already claimed
 TRANS_KEY_ERROR_INVALID_FREQUENCY: Final = (
     "invalid_frequency"  # Recurring frequency '{frequency}' is not valid
@@ -3642,6 +3673,8 @@ ERROR_ACTION_ADJUST_POINTS: Final = "adjust_points"
 ERROR_ACTION_REMOVE_BADGES: Final = "remove_badges"
 ERROR_ACTION_REPAIR_BADGE_STREAK: Final = "repair_badge_streak"
 ERROR_ACTION_RESET_FAMILY_GOAL: Final = "reset_family_goal"
+ERROR_ACTION_CONTRIBUTE_REWARD_POOL: Final = "contribute_to_reward_pools"
+ERROR_ACTION_MANAGE_REWARD_POOL: Final = "manage_reward_pools"
 
 TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND: Final = "error_msg_no_entry_found"
 TRANS_KEY_ERROR_SERVICE_TARGET_AMBIGUOUS: Final = "service_target_ambiguous"

@@ -410,7 +410,7 @@ def build_reward(
     else:
         internal_id = existing.get(const.DATA_REWARD_INTERNAL_ID, str(uuid.uuid4()))
 
-    return RewardData(
+    reward = RewardData(
         internal_id=internal_id,
         name=name,
         cost=parse_points_value(
@@ -423,6 +423,14 @@ def build_reward(
         reward_labels=list(get_field(const.DATA_REWARD_LABELS, [])),
         assigned_user_ids=list(get_field(const.DATA_REWARD_ASSIGNED_USER_IDS, [])),
     )
+    pooled = bool(get_field(const.DATA_REWARD_POOLED, False))
+    contributions = dict(get_field(const.DATA_REWARD_POOL_CONTRIBUTIONS, {}))
+    # Pool keys are only written for pooled rewards (or a pool still holding
+    # points after the flag was turned off, so they can be refunded)
+    if pooled or contributions:
+        reward[const.DATA_REWARD_POOLED] = pooled
+        reward[const.DATA_REWARD_POOL_CONTRIBUTIONS] = contributions
+    return reward
 
 
 # --- Reward Data Reset Support ---
@@ -430,8 +438,10 @@ def build_reward(
 # - CONFIG fields: Add to _REWARD_DATA_RESET_PRESERVE_FIELDS (preserved during data reset)
 # - RUNTIME fields: No change needed (auto-cleared to defaults on data reset)
 #
-# NOTE: Rewards have no runtime fields on the reward record itself.
-# All runtime state is in assignee-side DATA_USER_REWARD_DATA structure.
+# NOTE: The only runtime field on the reward record is the family pool
+# (DATA_REWARD_POOL_CONTRIBUTIONS). It holds real points, so data reset leaves
+# it alone; it is emptied by approving or refunding the pool.
+# All other runtime state is in assignee-side DATA_USER_REWARD_DATA structure.
 
 _REWARD_DATA_RESET_PRESERVE_FIELDS: frozenset[str] = frozenset(
     {
@@ -444,6 +454,8 @@ _REWARD_DATA_RESET_PRESERVE_FIELDS: frozenset[str] = frozenset(
         const.DATA_REWARD_ICON,
         const.DATA_REWARD_LABELS,
         const.DATA_REWARD_ASSIGNED_USER_IDS,
+        const.DATA_REWARD_POOLED,
+        const.DATA_REWARD_POOL_CONTRIBUTIONS,
     }
 )
 

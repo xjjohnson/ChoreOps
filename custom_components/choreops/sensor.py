@@ -87,6 +87,7 @@ from .helpers.entity_helpers import (
     should_create_workflow_buttons,
 )
 from .helpers.translation_helpers import load_dashboard_translation
+from .managers.reward_manager import RewardManager
 from .managers.ui_manager import HelperShardRuntimePlan
 from .sensor_legacy import (
     AssigneeBonusAppliedSensor,
@@ -2946,6 +2947,15 @@ class AssigneeRewardStatusSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             float(reward_info.get(const.DATA_REWARD_COST, const.DEFAULT_ZERO))
         )
 
+        if reward_info.get(const.DATA_REWARD_POOLED, False):
+            # Family pool: full pool awaits approver; any balance can chip in
+            pool_total = RewardManager.get_pool_total(reward_info)
+            if pool_total >= reward_cost:
+                return const.REWARD_STATE_REQUESTED
+            if assignee_points > 0:
+                return const.REWARD_STATE_AVAILABLE
+            return const.REWARD_STATE_LOCKED
+
         if assignee_points >= reward_cost:
             return const.REWARD_STATE_AVAILABLE
         return const.REWARD_STATE_LOCKED
@@ -3097,6 +3107,29 @@ class AssigneeRewardStatusSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         except (KeyError, ValueError, AttributeError):
             pass
 
+        pool_attributes: dict[str, Any] = {}
+        if reward_info.get(const.DATA_REWARD_POOLED, False):
+            pool_target = round_points(
+                float(reward_info.get(const.DATA_REWARD_COST, const.DEFAULT_ZERO))
+            )
+            pool_total = RewardManager.get_pool_total(reward_info)
+            contributions = RewardManager.get_pool_contributions(reward_info)
+            pool_attributes = {
+                const.ATTR_REWARD_POOL_TOTAL: pool_total,
+                const.ATTR_REWARD_POOL_REMAINING: max(
+                    round_points(pool_target - pool_total), const.DEFAULT_ZERO
+                ),
+                const.ATTR_REWARD_POOL_FULL: pool_total >= pool_target,
+                const.ATTR_REWARD_POOL_MY_CONTRIBUTION: contributions.get(
+                    self._assignee_id, const.DEFAULT_ZERO
+                ),
+                const.ATTR_REWARD_POOL_CONTRIBUTIONS: {
+                    get_assignee_name_by_id(self.coordinator, user_id)
+                    or user_id: amount
+                    for user_id, amount in contributions.items()
+                },
+            }
+
         # Return attributes in logical order: common, status, timestamps, periods, rates, buttons, labels
         return {
             # Common fields
@@ -3112,6 +3145,11 @@ class AssigneeRewardStatusSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             ),
             # Status tracking
             const.ATTR_REWARD_PENDING_CLAIMS: pending_claims,
+            # Family pool (pool_* attributes only present for pooled rewards)
+            const.ATTR_REWARD_POOLED: bool(
+                reward_info.get(const.DATA_REWARD_POOLED, False)
+            ),
+            **pool_attributes,
             # Timestamps
             const.ATTR_REWARD_LAST_CLAIMED: last_claimed,
             const.ATTR_REWARD_LAST_APPROVED: last_approved,

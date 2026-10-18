@@ -268,9 +268,10 @@ class GamificationManager(BaseManager):
             )
             return
 
-        # Update cumulative badge progress (for positive deltas only)
+        # Update cumulative badge progress (for positive deltas only; a positive
+        # rewards delta is a family pool refund, not points earned)
         delta = payload.get("delta", 0.0)
-        if delta > 0 and assignee_id:
+        if delta > 0 and source != const.POINTS_SOURCE_REWARDS and assignee_id:
             assignee_info = self.coordinator.assignees_data.get(assignee_id)
             if assignee_info:
                 progress = self._ensure_cumulative_progress_container(assignee_info)
