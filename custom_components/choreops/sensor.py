@@ -3476,6 +3476,11 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
             attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
             attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
+            attributes.update(
+                self.coordinator.gamification_manager.get_family_day_record(
+                    self._achievement_id
+                )
+            )
             attributes[const.ATTR_FAMILY_TOP_MULTIPLIER] = float(
                 achievement.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0)
             )
@@ -4046,6 +4051,11 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
             attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
             attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
             attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
+            attributes.update(
+                self.coordinator.gamification_manager.get_family_day_record(
+                    self._achievement_id
+                )
+            )
             attributes[const.ATTR_FAMILY_TOP_MULTIPLIER] = float(
                 achievement.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0)
             )

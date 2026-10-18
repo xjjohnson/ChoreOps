@@ -2933,6 +2933,9 @@ def build_achievement(
             const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY,
             const.DATA_ACHIEVEMENT_FAMILY_LEVEL,
             const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START,
+            const.DATA_ACHIEVEMENT_FAMILY_RECORD,
+            const.DATA_ACHIEVEMENT_FAMILY_RECORD_DAY,
+            const.DATA_ACHIEVEMENT_FAMILY_RECORD_TOP,
         ):
             if runtime_key in existing:
                 achievement[runtime_key] = existing[runtime_key]

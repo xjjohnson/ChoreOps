@@ -608,6 +608,13 @@ async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
     assert _awarded(scenario_full, goal_id, zoe)
     assert _awarded(scenario_full, goal_id, max_)
 
+    # The best day is remembered.
+    record = gm.get_family_day_record(goal_id)
+    assert record["family_record"] == 6
+    assert record["family_record_top"] == [
+        scenario_full.coordinator.assignees_data[max_][const.DATA_USER_NAME]
+    ]
+
     # A new day starts the goal over: level and awards clear, ready to earn again.
     achievement = scenario_full.coordinator.achievements_data[goal_id]
     achievement[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = "2000-01-01"
@@ -624,6 +631,9 @@ async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
     await hass.async_block_till_done()
     assert _awarded(scenario_full, goal_id, zoe)
     assert _awarded(scenario_full, goal_id, max_)
+
+    # A tying day does not replace the record; it survives the daily restart.
+    assert gm.get_family_day_record(goal_id)["family_record"] == 6
 
 
 async def test_active_streak_needs_everyone_every_day(

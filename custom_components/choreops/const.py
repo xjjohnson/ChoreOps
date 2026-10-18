@@ -1035,6 +1035,10 @@ DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT: Final = "family_streak_count"
 DATA_ACHIEVEMENT_FAMILY_LEVEL: Final = "family_level"
 # Each person's contribution when the current level began (per-level top contributor)
 DATA_ACHIEVEMENT_FAMILY_LEVEL_START: Final = "family_level_start"
+# Best one-day total ever reached by the one-day family goal, and who/when.
+DATA_ACHIEVEMENT_FAMILY_RECORD: Final = "family_record"
+DATA_ACHIEVEMENT_FAMILY_RECORD_DAY: Final = "family_record_day"
+DATA_ACHIEVEMENT_FAMILY_RECORD_TOP: Final = "family_record_top"
 DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY: Final = "family_streak_last_day"
 
 # Challenge Types
@@ -2842,6 +2846,9 @@ ATTR_FAMILY_CAUGHT_UP_TODAY: Final = "family_caught_up_today"
 ATTR_FAMILY_LEVEL: Final = "family_level"
 ATTR_FAMILY_LEVEL_CONTRIBUTIONS: Final = "family_level_contributions"
 ATTR_FAMILY_TOP_MULTIPLIER: Final = "family_top_multiplier"
+ATTR_FAMILY_RECORD: Final = "family_record"
+ATTR_FAMILY_RECORD_DAY: Final = "family_record_day"
+ATTR_FAMILY_RECORD_TOP: Final = "family_record_top"
 ATTR_FAMILY_LEVELS: Final = "family_levels"
 ATTR_FAMILY_NEXT_TARGET: Final = "family_next_target"
 ATTR_FAMILY_NEXT_REWARD: Final = "family_next_reward"

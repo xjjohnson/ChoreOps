@@ -108,7 +108,10 @@ everything since the goal was created or restarted.
 - **X Chores Together in One Day** - the whole family's approved chores for
   today. It is a daily goal: at the start of each day it starts over (level,
   awards and progress clear) and can be earned and rewarded again. Top
-  contributor means most chores that day.
+  contributor means most chores that day. The best day is remembered as a
+  record (`family_record`, `family_record_day`, `family_record_top` on the
+  goal's sensors); it survives the daily restart and a goal reset, and a tying
+  day does not replace it.
 - **Everyone Completes a Chore for X Days** - a day counts once every assigned
   person has had at least one chore approved. A day that ends without that
   voids the streak (noticed on the next evaluation). Easier than "everyone
