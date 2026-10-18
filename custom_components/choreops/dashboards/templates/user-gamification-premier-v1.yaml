@@ -1334,12 +1334,12 @@ views:
                                 {%- set reward_state_html = "<b style='color:" ~ row_icon_color ~ ";'>" ~ reward_state_display | upper ~ "</b> <span style='opacity:0.7;'>•</span> <span>" ~ ui.get('pool', 'err-pool') ~ ": " ~ pool_total_text ~ " / " ~ reward_cost|string ~ " <ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;color:var(--secondary-text-color);transform:translateY(-1px);'></ha-icon></span> <span style='opacity:0.7;'>•</span> <span>" ~ ui.get('you', 'err-you') ~ ": " ~ pool_mine_text ~ "</span>" -%}
                               {%- endif -%}
                               {%- set reward_description_html = "<span>" ~ reward_description_safe ~ "</span>" -%}
-                              {#-- Family pool: progress bar under the description --#}
+                              {#-- Family pool: progress bar under the state line (always visible) --#}
                               {%- if state_attr(reward_sensor_eid, 'pooled') | default(false, true) -%}
                                 {%- set pool_cost = reward_cost | float(default=0) -%}
                                 {%- set pool_now = state_attr(reward_sensor_eid, 'pool_total') | float(default=0) -%}
                                 {%- set pool_pct = ([(pool_now / pool_cost * 100) if pool_cost > 0 else 0, 100] | min) | round(0) | int -%}
-                                {%- set reward_description_html = reward_description_html ~ "<div style='margin-top:8px;height:10px;border-radius:999px;background:color-mix(in srgb, var(--primary-text-color) 12%, transparent);overflow:hidden;'><div style='width:" ~ pool_pct ~ "%;height:100%;border-radius:999px;background:" ~ ('var(--success-color)' if pool_pct >= 100 else 'var(--primary-color)') ~ ";'></div></div><div style='margin-top:3px;font-size:10px;font-weight:700;color:var(--secondary-text-color);text-align:right;'>" ~ pool_pct ~ "%</div>" -%}
+                                {%- set reward_state_html = reward_state_html ~ "<div style='margin-top:8px;height:10px;border-radius:999px;background:color-mix(in srgb, var(--primary-text-color) 12%, transparent);overflow:hidden;'><div style='width:" ~ pool_pct ~ "%;height:100%;border-radius:999px;background:" ~ ('var(--success-color)' if pool_pct >= 100 else 'var(--primary-color)') ~ ";'></div></div><div style='margin-top:3px;font-size:10px;font-weight:700;color:var(--secondary-text-color);text-align:right;'>" ~ pool_pct ~ "%</div>" -%}
                               {%- endif -%}
                               {%- set reward_stats_html = "<span>" ~ ui.get('last', 'err-last') ~ ": " ~ reward_last_claimed_text ~ "</span> <span style='opacity:0.7;'>•</span> <span>" ~ reward_claimed_month|string ~ " " ~ ui.get('this_month', 'err-this_month') ~ "</span> <span style='opacity:0.7;'>•</span> <span>" ~ reward_claimed_all_time|string ~ " " ~ ui.get('total', 'err-total') ~ "</span>" -%}
 
