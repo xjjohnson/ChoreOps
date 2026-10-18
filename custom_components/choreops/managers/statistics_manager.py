@@ -312,7 +312,10 @@ class StatisticsManager(BaseManager):
 
         # Determine earned vs spent based on delta sign
         # Positive delta → points_earned, Negative delta → points_spent
-        if delta > 0:
+        # A positive rewards delta is a refund (family pool), so it reverses
+        # points_spent instead of counting as points earned
+        is_earned = delta > 0 and source != const.POINTS_SOURCE_REWARDS
+        if is_earned:
             increment_key = const.DATA_USER_POINT_PERIOD_POINTS_EARNED
         else:
             increment_key = const.DATA_USER_POINT_PERIOD_POINTS_SPENT
@@ -366,7 +369,7 @@ class StatisticsManager(BaseManager):
         # points_earned/spent tracking (all_time only - nested bucket requires manual handling)
         # record_transaction() writes to periods["all_time"] directly, but we need
         # periods["all_time"]["all_time"] for consistency with other period structures
-        if delta > 0:
+        if is_earned:
             current_earned = all_time_entry.get(
                 const.DATA_USER_POINT_PERIOD_POINTS_EARNED, 0.0
             )

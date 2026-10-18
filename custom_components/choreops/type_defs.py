@@ -133,6 +133,9 @@ class RewardData(TypedDict):
     icon: str
     reward_labels: list[str]
     assigned_user_ids: list[str]
+    pooled: NotRequired[bool]  # Family pool: assignees pay into one shared pot
+    pool_contributions: NotRequired[dict[str, float]]  # user_id -> points paid in
+    pool_chip_in: NotRequired[float]  # Points per button press (0 = all affordable)
 
 
 class PenaltyData(TypedDict):

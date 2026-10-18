@@ -117,6 +117,15 @@ class EconomyManager(BaseManager):
             const.SIGNAL_SUFFIX_REWARD_APPROVED,
             self._on_reward_approved,
         )
+        # Family pool: contributions leave the balance immediately, refunds return
+        self.listen(
+            const.SIGNAL_SUFFIX_REWARD_POOL_CONTRIBUTED,
+            self._on_reward_pool_contributed,
+        )
+        self.listen(
+            const.SIGNAL_SUFFIX_REWARD_POOL_REFUNDED,
+            self._on_reward_pool_refunded,
+        )
         # Listen for multiplier change requests (Phase 3B Landlord/Tenant ownership)
         # EconomyManager owns all assignee point data - GamificationManager emits requests
         self.listen(
@@ -386,6 +395,47 @@ class EconomyManager(BaseManager):
                 reference_id=reward_id,
                 item_name=reward_name,
                 allow_negative=False,  # Assignees must afford rewards
+            )
+
+    async def _on_reward_pool_contributed(self, payload: dict[str, Any]) -> None:
+        """Handle a family pool contribution - withdraw the points paid in.
+
+        Args:
+            payload: Event data containing user_id, reward_id, reward_name, amount
+        """
+        assignee_id = payload.get("user_id")
+        amount = payload.get("amount", 0.0)
+
+        if amount > 0 and assignee_id:
+            await self.withdraw(
+                assignee_id=assignee_id,
+                amount=amount,
+                source=const.POINTS_SOURCE_REWARDS,
+                reference_id=payload.get("reward_id"),
+                item_name=payload.get("reward_name"),
+                allow_negative=False,  # RewardManager checked the balance
+            )
+
+    async def _on_reward_pool_refunded(self, payload: dict[str, Any]) -> None:
+        """Handle a family pool refund - return each contributor's points.
+
+        Refunds use the rewards source, so statistics treat them as a reversal
+        of points spent rather than points earned.
+
+        Args:
+            payload: Event data containing reward_id, reward_name and refunds
+                (user_id -> points)
+        """
+        refunds: dict[str, float] = payload.get("refunds", {})
+        for assignee_id, amount in refunds.items():
+            if amount <= 0 or not self._get_assignee(assignee_id):
+                continue
+            await self.deposit(
+                assignee_id=assignee_id,
+                amount=amount,
+                source=const.POINTS_SOURCE_REWARDS,
+                reference_id=payload.get("reward_id"),
+                item_name=payload.get("reward_name"),
             )
 
     async def _on_chore_undone(self, payload: dict[str, Any]) -> None:

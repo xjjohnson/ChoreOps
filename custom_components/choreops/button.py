@@ -1133,6 +1133,20 @@ class AssigneeRewardRedeemButton(ChoreOpsCoordinatorEntity, ButtonEntity):
                 user_obj.name if user_obj else None
             ) or const.DISPLAY_UNKNOWN
 
+            reward_info = self.coordinator.rewards_data.get(self._reward_id)
+            if reward_info and reward_info.get(const.DATA_REWARD_POOLED, False):
+                # Family pool: each press chips in the reward's chip-in amount
+                # (0 = as much as the assignee can afford)
+                chip_in = float(
+                    reward_info.get(const.DATA_REWARD_POOL_CHIP_IN, const.DEFAULT_ZERO)
+                )
+                await self.coordinator.reward_manager.contribute_to_pool(
+                    self._assignee_id,
+                    self._reward_id,
+                    chip_in if chip_in > 0 else None,
+                )
+                return
+
             await self.coordinator.reward_manager.redeem(
                 approver_name=approver_name,
                 assignee_id=self._assignee_id,
@@ -1256,6 +1270,14 @@ class ApproverRewardApproveButton(ChoreOpsCoordinatorEntity, ButtonEntity):
                 const.ERROR_ACTION_APPROVE_REWARDS,
             )
 
+            reward_info = self.coordinator.rewards_data.get(self._reward_id)
+            if reward_info and reward_info.get(const.DATA_REWARD_POOLED, False):
+                # Family pool: confirm the full pool's reward was delivered
+                await self.coordinator.reward_manager.approve_pool(
+                    approver_name, self._reward_id
+                )
+                return
+
             # Approve the reward
             await self.coordinator.reward_manager.approve(
                 approver_name=approver_name,
@@ -1374,6 +1396,16 @@ class ApproverRewardDisapproveButton(ChoreOpsCoordinatorEntity, ButtonEntity):
             HomeAssistantError: If no pending approval found or user not authorized.
         """
         try:
+            reward_info = self.coordinator.rewards_data.get(self._reward_id)
+            if reward_info and reward_info.get(const.DATA_REWARD_POOLED, False):
+                # Family pool: contributors cannot withdraw, and a refund hits the
+                # whole family, so it is not offered on a one-tap dashboard button
+                raise HomeAssistantError(
+                    translation_domain=const.DOMAIN,
+                    translation_key=const.TRANS_KEY_ERROR_REWARD_POOL_NO_DISAPPROVE,
+                    translation_placeholders={"reward": self._reward_name},
+                )
+
             # Check if there's a pending approval for this assignee and reward.
             pending_approvals = self.coordinator.reward_manager.get_pending_approvals()
             if not any(
