@@ -994,7 +994,13 @@
           "description": "Description (optional)",
           "reward_labels": "Reward Labels",
           "icon": "Icon (mdi:xxx)",
-          "assigned_user_ids": "Assigned to"
+          "assigned_user_ids": "Assigned to",
+          "pooled": "Family pool",
+          "pool_chip_in": "Chip-in amount"
+        },
+        "data_description": {
+          "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full.",
+          "pool_chip_in": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford."
         }
       },
       "add_penalty": {
@@ -1492,7 +1498,13 @@
           "description": "Description (optional)",
           "reward_labels": "Reward Labels",
           "icon": "Icon (mdi:xxx)",
-          "assigned_user_ids": "Assigned to"
+          "assigned_user_ids": "Assigned to",
+          "pooled": "Family pool",
+          "pool_chip_in": "Chip-in amount"
+        },
+        "data_description": {
+          "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full.",
+          "pool_chip_in": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford."
         }
       },
       "edit_penalty": {
@@ -2657,6 +2669,16 @@
           "name": "Assigned to",
           "description": "User display names assigned to this reward. Use [\"*\"] for all users. Pass an empty list to assign to no users.",
           "example": "['Zoë', 'Max!']"
+        },
+        "pooled": {
+          "name": "Family Pool",
+          "description": "Everyone assigned pays points into one shared pool and the cost becomes the pool's target.",
+          "example": "true"
+        },
+        "pool_chip_in": {
+          "name": "Chip-in Amount",
+          "description": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford.",
+          "example": "10"
         }
       }
     },
@@ -2708,6 +2730,16 @@
           "name": "Assigned to",
           "description": "User display names assigned to this reward. Use [\"*\"] for all users. Pass an empty list to remove all assigned users. Omit to leave current assignments unchanged.",
           "example": "['Zoë', 'Max!']"
+        },
+        "pooled": {
+          "name": "Family Pool",
+          "description": "Everyone assigned pays points into one shared pool and the cost becomes the pool's target.",
+          "example": "true"
+        },
+        "pool_chip_in": {
+          "name": "Chip-in Amount",
+          "description": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford.",
+          "example": "10"
         }
       }
     },
@@ -3583,6 +3615,89 @@
           "name": "Achievement Name",
           "description": "The name of the family goal to restart.",
           "example": "Total Chores"
+        }
+      }
+    },
+    "contribute_to_reward_pool": {
+      "name": "Contribute To Reward Pool",
+      "description": "Pay points from a user's balance into a family pool reward. The points leave the balance immediately. A contribution never takes more than the pool still needs. Returns the points actually contributed.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config Entry ID (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup. It targets one specific setup.",
+          "example": "abc123def456"
+        },
+        "config_entry_title": {
+          "name": "Config Entry Name (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID.",
+          "example": "Family Chores"
+        },
+        "user_name": {
+          "name": "User Name",
+          "description": "The user paying points into the pool.",
+          "example": "Alice"
+        },
+        "reward_name": {
+          "name": "Reward Name",
+          "description": "The name of the family pool reward.",
+          "example": "Family Movie Night"
+        },
+        "amount": {
+          "name": "Amount (Optional)",
+          "description": "Points to contribute. Leave empty to contribute as much as the user can afford, up to what the pool still needs.",
+          "example": "25"
+        }
+      }
+    },
+    "approve_reward_pool": {
+      "name": "Approve Reward Pool",
+      "description": "Confirm that a full family pool's reward has been delivered. The pool is emptied so the family can save up for it again.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config Entry ID (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup. It targets one specific setup.",
+          "example": "abc123def456"
+        },
+        "config_entry_title": {
+          "name": "Config Entry Name (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID.",
+          "example": "Family Chores"
+        },
+        "approver_name": {
+          "name": "Approver Name (Optional)",
+          "description": "Who is doing this. Recorded in the log; defaults to the signed-in user.",
+          "example": "Mom"
+        },
+        "reward_name": {
+          "name": "Reward Name",
+          "description": "The name of the family pool reward.",
+          "example": "Family Movie Night"
+        }
+      }
+    },
+    "refund_reward_pool": {
+      "name": "Refund Reward Pool",
+      "description": "Cancel a family pool and give every contributor back exactly what they paid in.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config Entry ID (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup. It targets one specific setup.",
+          "example": "abc123def456"
+        },
+        "config_entry_title": {
+          "name": "Config Entry Name (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID.",
+          "example": "Family Chores"
+        },
+        "approver_name": {
+          "name": "Approver Name (Optional)",
+          "description": "Who is doing this. Recorded in the log; defaults to the signed-in user.",
+          "example": "Mom"
+        },
+        "reward_name": {
+          "name": "Reward Name",
+          "description": "The name of the family pool reward.",
+          "example": "Family Movie Night"
         }
       }
     }
@@ -4716,6 +4831,27 @@
           "pending_claims": {
             "name": "Pending Claims"
           },
+          "pooled": {
+            "name": "Family Pool"
+          },
+          "pool_total": {
+            "name": "Pool Total"
+          },
+          "pool_remaining": {
+            "name": "Pool Remaining"
+          },
+          "pool_full": {
+            "name": "Pool Full"
+          },
+          "pool_my_contribution": {
+            "name": "My Pool Contribution"
+          },
+          "pool_chip_in": {
+            "name": "Chip-in Amount"
+          },
+          "pool_contributions": {
+            "name": "Pool Contributions"
+          },
           "last_claimed": {
             "name": "Last Claimed"
           },
@@ -5695,6 +5831,24 @@
     },
     "insufficient_points": {
       "message": "{assignee} has {current} points but needs {required} points"
+    },
+    "reward_not_pooled": {
+      "message": "{reward} is not a family pool reward"
+    },
+    "reward_is_pooled": {
+      "message": "{reward} is a family pool reward. Contribute points to the pool instead of redeeming it."
+    },
+    "reward_pool_full": {
+      "message": "The family pool for {reward} is already full"
+    },
+    "reward_pool_not_full": {
+      "message": "The family pool for {reward} has {total} of {target} points and is not full yet"
+    },
+    "reward_pool_invalid_amount": {
+      "message": "Contribution must be more than zero points"
+    },
+    "reward_pool_no_disapprove": {
+      "message": "{reward} is a family pool reward. To cancel it and give everyone their points back, use the Refund Reward Pool action."
     },
     "already_claimed": {
       "message": "{entity} has already been claimed"

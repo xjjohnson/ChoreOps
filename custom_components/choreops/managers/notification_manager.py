@@ -186,6 +186,12 @@ class NotificationManager(BaseManager):
         self.listen(
             const.SIGNAL_SUFFIX_REWARD_DISAPPROVED, self._handle_reward_disapproved
         )
+        self.listen(
+            const.SIGNAL_SUFFIX_REWARD_POOL_FILLED, self._handle_reward_pool_filled
+        )
+        self.listen(
+            const.SIGNAL_SUFFIX_REWARD_POOL_APPROVED, self._handle_reward_pool_approved
+        )
 
         # Bonus/Penalty events
         self.listen(const.SIGNAL_SUFFIX_BONUS_APPLIED, self._handle_bonus_applied)
@@ -210,7 +216,7 @@ class NotificationManager(BaseManager):
         self.listen(const.SIGNAL_SUFFIX_USER_DELETED, self._handle_assignee_deleted)
 
         const.LOGGER.debug(
-            "NotificationManager initialized with 18 event subscriptions for entry %s",
+            "NotificationManager initialized with 20 event subscriptions for entry %s",
             self.entry_id,
         )
 
@@ -2512,6 +2518,43 @@ class NotificationManager(BaseManager):
             assignee_id,
             reward_name,
         )
+
+    async def _handle_reward_pool_filled(self, payload: dict[str, Any]) -> None:
+        """Handle REWARD_POOL_FILLED event - ask approvers to deliver the reward.
+
+        Args:
+            payload: Event data containing reward_id, reward_name, pool_total
+        """
+        await self.broadcast_to_all_approvers(
+            title_key=const.TRANS_KEY_NOTIF_TITLE_REWARD_POOL_FULL_APPROVER,
+            message_key=const.TRANS_KEY_NOTIF_MESSAGE_REWARD_POOL_FULL_APPROVER,
+            placeholders={
+                "reward_name": str(payload.get("reward_name", "")),
+                "points": str(payload.get("pool_total", 0)),
+            },
+        )
+
+    async def _handle_reward_pool_approved(self, payload: dict[str, Any]) -> None:
+        """Handle REWARD_POOL_APPROVED event - tell every contributor.
+
+        Args:
+            payload: Event data containing reward_id, reward_name, contributor_ids
+        """
+        reward_id = payload.get("reward_id", "")
+        reward_name = payload.get("reward_name", "")
+        for assignee_id in payload.get("contributor_ids", []):
+            if assignee_id not in self.coordinator.assignees_data:
+                continue
+            await self.notify_assignee_translated(
+                assignee_id,
+                title_key=const.TRANS_KEY_NOTIF_TITLE_REWARD_APPROVED_ASSIGNEE,
+                message_key=const.TRANS_KEY_NOTIF_MESSAGE_REWARD_APPROVED_ASSIGNEE,
+                message_data={"reward_name": reward_name},
+                extra_data={
+                    const.DATA_USER_ID: assignee_id,
+                    const.DATA_REWARD_ID: reward_id,
+                },
+            )
 
     async def _handle_reward_disapproved(self, payload: dict[str, Any]) -> None:
         """Handle REWARD_DISAPPROVED event - send notification to assignee.
