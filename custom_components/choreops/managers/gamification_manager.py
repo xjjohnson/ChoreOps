@@ -2818,17 +2818,10 @@ class GamificationManager(BaseManager):
         """
         assignee_id = context["assignee_id"]
 
-        # Check if assignee already has this achievement (awarded flag in progress)
-        achievement_progress = achievement_data.get(const.DATA_ACHIEVEMENT_PROGRESS, {})
-        assignee_progress = achievement_progress.get(assignee_id, {})
-        already_awarded = assignee_progress.get(const.DATA_ACHIEVEMENT_AWARDED, False)
-
-        if already_awarded:
-            # Achievements are permanent - no re-evaluation needed
-            return
-
         # Family goals pool every assigned person's contribution into one total
         # and award everyone together, so they bypass the per-assignee engine.
+        # They are routed BEFORE the already-awarded check: a finished goal
+        # must still be looked at (the one-day goal restarts every day).
         if achievement_data.get(const.DATA_ACHIEVEMENT_TYPE) in (
             const.FAMILY_ACHIEVEMENT_TYPES
         ):
@@ -2840,6 +2833,15 @@ class GamificationManager(BaseManager):
                 await self._evaluate_family_achievement(
                     achievement_id, achievement_data
                 )
+            return
+
+        # Check if assignee already has this achievement (awarded flag in progress)
+        achievement_progress = achievement_data.get(const.DATA_ACHIEVEMENT_PROGRESS, {})
+        assignee_progress = achievement_progress.get(assignee_id, {})
+        already_awarded = assignee_progress.get(const.DATA_ACHIEVEMENT_AWARDED, False)
+
+        if already_awarded:
+            # Achievements are permanent - no re-evaluation needed
             return
 
         canonical_target = self._map_achievement_to_canonical_target(
@@ -3422,6 +3424,97 @@ class GamificationManager(BaseManager):
         const.LOGGER.info("Family goal %s restarted", achievement_id)
         self.coordinator._persist_and_update()
 
+    def get_family_day_record(self, achievement_id: str) -> dict[str, Any]:
+        """Return the one-day goal's best day for sensors (empty for other goals).
+
+        Returns:
+            Dict keyed by the family record attribute names, or {} when the
+            achievement is not a one-day family goal.
+        """
+        achievement_data = self.coordinator.achievements_data.get(achievement_id)
+        if (
+            not achievement_data
+            or achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+            != const.ACHIEVEMENT_TYPE_FAMILY_DAY
+        ):
+            return {}
+        top_ids = [
+            a
+            for a in str(
+                achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_RECORD_TOP, "")
+            ).split(",")
+            if a
+        ]
+        return {
+            const.ATTR_FAMILY_RECORD: float(
+                achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_RECORD, 0.0)
+            ),
+            const.ATTR_FAMILY_RECORD_DAY: str(
+                achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_RECORD_DAY, "")
+            ),
+            const.ATTR_FAMILY_RECORD_TOP: [
+                eh.get_assignee_name_by_id(self.coordinator, a) or a for a in top_ids
+            ],
+        }
+
+    def _update_family_day_record(self, achievement_data: AchievementData) -> bool:
+        """Remember the best one-day total the one-day family goal has reached.
+
+        Survives the daily restart and a goal reset. Ties do not replace an
+        older record.
+
+        Returns:
+            True when a new record was stored.
+        """
+        achievement_id = next(
+            (
+                a_id
+                for a_id, data in self.coordinator.achievements_data.items()
+                if data is achievement_data
+            ),
+            "",
+        )
+        if not achievement_id:
+            return False
+        shares = self.get_family_contributions(achievement_id)
+        total = sum(shares.values())
+        if total <= float(
+            achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_RECORD, 0)
+        ):
+            return False
+        best = max(shares.values(), default=0.0)
+        top_ids = sorted(a for a, v in shares.items() if v == best and best > 0)
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_RECORD] = total
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_RECORD_DAY] = dt_today_iso()
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_RECORD_TOP] = ",".join(top_ids)
+        return True
+
+    def _restart_family_day_goal_if_new_day(
+        self, achievement_data: AchievementData
+    ) -> bool:
+        """Start the one-day family goal over when a new day begins.
+
+        Levels, awards and the level snapshot are cleared so the goal can be
+        earned again today. Reward points already paid are untouched.
+
+        Returns:
+            True when stored state changed.
+        """
+        today_iso = dt_today_iso()
+        if (
+            str(achievement_data.get(const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY, ""))
+            == today_iso
+        ):
+            return False
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY] = today_iso
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL] = 0
+        achievement_data[const.DATA_ACHIEVEMENT_FAMILY_LEVEL_START] = {}
+        progress = achievement_data.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {})
+        for entry in progress.values():
+            if isinstance(entry, dict):
+                entry[const.DATA_ACHIEVEMENT_AWARDED] = False
+        return True
+
     async def _evaluate_family_achievement(
         self,
         achievement_id: str,
@@ -3441,6 +3534,16 @@ class GamificationManager(BaseManager):
             return
 
         achievement_type = achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
+        if (
+            achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_DAY
+            and self._restart_family_day_goal_if_new_day(achievement_data)
+        ):
+            self.coordinator._persist_and_update()
+        if (
+            achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_DAY
+            and self._update_family_day_record(achievement_data)
+        ):
+            self.coordinator._persist_and_update()
         if (
             achievement_type == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
             and self._update_family_caught_up_streak(achievement_data)
