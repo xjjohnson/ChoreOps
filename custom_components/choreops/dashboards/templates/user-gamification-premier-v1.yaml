@@ -1105,7 +1105,29 @@ views:
                     {%- endif -%}
 
                     {#-- 6. Render --#}
+                    {%- set can_save = integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] -%}
+                    {%- set saved_filter = (ui_root.current.get('filter', 'all') if ui_root.current is mapping else 'all') | string -%}
                     {%- if gamification_enabled -%}
+                      {#-- 6a. Pre-pass: how many rewards are in each state --#}
+                      {%- set cnt = namespace(all=0, available=0, requested=0, locked=0, approved=0) -%}
+                      {%- for group in ns.label_groups -%}
+                        {%- for reward in group.rewards -%}
+                          {%- set st0 = states(reward.eid) if reward is mapping else '' -%}
+                          {%- set cnt.all = cnt.all + 1 -%}
+                          {%- if st0 == 'available' -%}{%- set cnt.available = cnt.available + 1 -%}
+                          {%- elif st0 == 'requested' -%}{%- set cnt.requested = cnt.requested + 1 -%}
+                          {%- elif st0 == 'locked' -%}{%- set cnt.locked = cnt.locked + 1 -%}
+                          {%- elif st0 == 'approved' -%}{%- set cnt.approved = cnt.approved + 1 -%}
+                          {%- endif -%}
+                        {%- endfor -%}
+                      {%- endfor -%}
+                      {%- set kinds = [] -%}
+                      {%- if cnt.available > 0 -%}{%- set kinds = kinds + ['available'] -%}{%- endif -%}
+                      {%- if cnt.requested > 0 -%}{%- set kinds = kinds + ['requested'] -%}{%- endif -%}
+                      {%- if cnt.locked > 0 -%}{%- set kinds = kinds + ['locked'] -%}{%- endif -%}
+                      {%- if cnt.approved > 0 -%}{%- set kinds = kinds + ['approved'] -%}{%- endif -%}
+                      {%- set active_filter = saved_filter if saved_filter in kinds else 'all' -%}
+
                       {{
                         {
                           'type': 'custom:button-card',
@@ -1123,7 +1145,7 @@ views:
                               'ui_control_action': 'remove',
                               'key': ui_control_key_header_collapsed
                             }
-                          } if header_collapsed and integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] else {
+                          } if header_collapsed and can_save else {
                             'action': 'call-service',
                             'service': 'choreops.manage_ui_control',
                             'data': {
@@ -1133,7 +1155,7 @@ views:
                               'key': ui_control_key_header_collapsed,
                               'value': true
                             }
-                          } if integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] else {
+                          } if can_save else {
                             'action': 'none'
                           }),
                           'hold_action': {'action': 'none'},
@@ -1142,11 +1164,11 @@ views:
                           },
                           'styles': {
                             'card': [
-                                {'background': ('color-mix(in srgb, var(--primary-color) ' ~ pref_primary_tint_mix_pct|string ~ '%, var(--card-background-color))') if header_collapsed else 'transparent'},
+                              {'background': ('color-mix(in srgb, var(--primary-color) ' ~ pref_primary_tint_mix_pct|string ~ '%, var(--card-background-color))') if header_collapsed else 'transparent'},
                               {'box-shadow': 'none'},
-                                {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
-                                {'border-left': '3px solid var(--primary-color)'},
-                                {'border-bottom': '3px solid var(--primary-color)'},
+                              {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
+                              {'border-left': '3px solid var(--primary-color)'},
+                              {'border-bottom': '3px solid var(--primary-color)'},
                               {'border-radius': '10px'},
                               {'padding': '10px 12px'},
                               {'min-height': 'unset'},
@@ -1220,11 +1242,99 @@ views:
                             }
                           }},
                         {%- else -%}
+
+                          {#-- 6b. Summary strip --#}
+                          {%- set sum_pts = ('%g' | format(current_points | round(2))) -%}
+                          {%- set sum_parts = [] -%}
+                          {%- if cnt.available > 0 -%}{%- set sum_parts = sum_parts + ["<b style='color:var(--primary-color);'>" ~ cnt.available ~ "</b> " ~ ui.get('available', 'available') | lower] -%}{%- endif -%}
+                          {%- if cnt.requested > 0 -%}{%- set sum_parts = sum_parts + ["<b style='color:" ~ pref_claim_accent ~ ";'>" ~ cnt.requested ~ "</b> " ~ ui.get('requested', 'requested') | lower] -%}{%- endif -%}
+                          {%- if cnt.locked > 0 -%}{%- set sum_parts = sum_parts + ["<b>" ~ cnt.locked ~ "</b> " ~ ui.get('locked', 'locked') | lower] -%}{%- endif -%}
+                          {%- set summary = "<div style='display:flex;align-items:center;justify-content:space-between;gap:10px;'><div style='display:flex;align-items:center;gap:8px;'><ha-icon icon='" ~ points_icon ~ "' style='width:26px;height:26px;--mdc-icon-size:26px;color:var(--primary-color);'></ha-icon><div style='text-align:left;'><div style='font-size:20px;font-weight:800;line-height:1.1;color:var(--primary-text-color);'>" ~ sum_pts ~ "</div><div style='font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ points_label ~ "</div></div></div><div style='font-size:12px;color:var(--secondary-text-color);text-align:right;line-height:1.5;'>" ~ (sum_parts | join(' &nbsp;•&nbsp; ')) ~ "</div></div>" -%}
+                          {{
+                            {
+                              'type': 'custom:button-card',
+                              'show_name': false,
+                              'show_icon': false,
+                              'tap_action': {'action': 'none'},
+                              'styles': {
+                                'card': [{'padding': '10px 12px'}, {'border-radius': '16px'}, {'box-shadow': 'none'}],
+                                'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                                'custom_fields': {'content': [{'width': '100%'}, {'justify-self': 'stretch'}]}
+                              },
+                              'custom_fields': {'content': summary}
+                            }
+                          }},
+
+                          {#-- 6c. Filter chips (only when there is more than one kind of reward) --#}
+                          {%- if kinds | length > 1 -%}
+                            {%- set chips = namespace(v=[]) -%}
+                            {%- for g in ['all'] + kinds -%}
+                              {%- set is_sel = (g == active_filter) -%}
+                              {%- set gcount = cnt.all if g == 'all' else (cnt.available if g == 'available' else (cnt.requested if g == 'requested' else (cnt.locked if g == 'locked' else cnt.approved))) -%}
+                              {%- set glabel = ui.get('all', 'All') if g == 'all' else (ui.get('available', 'Available') if g == 'available' else ui.get(g, g | title)) -%}
+                              {%- set chips.v = chips.v + [{
+                                'type': 'custom:button-card',
+                                'name': glabel ~ ' ' ~ gcount,
+                                'show_icon': false,
+                                'tap_action': ({
+                                  'action': 'call-service',
+                                  'service': 'choreops.manage_ui_control',
+                                  'data': ({'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'remove', 'key': ui_control_key_root ~ '/filter'} if g == 'all' else {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'update', 'key': ui_control_key_root ~ '/filter', 'value': g})
+                                } if can_save else {'action': 'none'}),
+                                'styles': {
+                                  'card': [
+                                    {'border-radius': '999px'},
+                                    {'padding': '7px 2px'},
+                                    {'box-shadow': 'none'},
+                                    {'border': ('2px solid var(--primary-color)' if is_sel else '1px solid var(--divider-color)')},
+                                    {'background': ('color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color))' if is_sel else 'transparent')}
+                                  ],
+                                  'name': [
+                                    {'font-size': '12px'},
+                                    {'font-weight': ('800' if is_sel else '600')},
+                                    {'color': ('var(--primary-text-color)' if is_sel else 'var(--secondary-text-color)')}
+                                  ]
+                                }
+                              }] -%}
+                            {%- endfor -%}
+                            {{
+                              {
+                                'type': 'grid',
+                                'columns': [chips.v | length, 3] | min,
+                                'square': false,
+                                'cards': chips.v
+                              }
+                            }},
+                          {%- endif -%}
+
+                          {#-- 6d. Reward groups and tiles --#}
                           {%- for group in ns.label_groups -%}
                             {%- set ns.group_cards = [] -%}
                             {%- set show_group_chip = (ns.label_groups | length > 1) or (group.name != ui.get('rewards', 'err-rewards')) -%}
 
-                            {%- if show_group_chip -%}
+                            {#-- sort keys: requested first, then available, then locked (closest first), then approved --#}
+                            {%- set keys = namespace(v=[]) -%}
+                            {%- for reward in group.rewards -%}
+                              {%- set k_eid = reward.eid if reward is mapping else '' -%}
+                              {%- set k_state = states(k_eid) -%}
+                              {%- if active_filter == 'all' or k_state == active_filter -%}
+                                {%- set k_cost = (reward.cost | float(default=0)) if reward is mapping else 0 -%}
+                                {%- if state_attr(k_eid, 'pooled') | default(false, true) -%}
+                                  {%- set k_have = state_attr(k_eid, 'pool_total') | float(default=0) -%}
+                                {%- else -%}
+                                  {%- set k_have = current_points | float(default=0) -%}
+                                {%- endif -%}
+                                {%- set k_pct = ([(k_have / k_cost * 100) if k_cost > 0 else 100, 100] | min) -%}
+                                {%- set k_rank = 0 if k_state == 'requested' else (1 if k_state == 'available' else (2 if k_state == 'locked' else 3)) -%}
+                                {%- if pref_sort_rewards == 'default' -%}
+                                  {%- set keys.v = keys.v + [[k_rank, (k_cost if k_rank == 1 else 100 - k_pct), (reward.name | default('') | lower) if reward is mapping else '', loop.index0]] -%}
+                                {%- else -%}
+                                  {%- set keys.v = keys.v + [[0, 0, '', loop.index0]] -%}
+                                {%- endif -%}
+                              {%- endif -%}
+                            {%- endfor -%}
+
+                            {%- if keys.v | length > 0 and show_group_chip -%}
                               {{
                                 {
                                   'type': 'custom:button-card',
@@ -1266,28 +1376,28 @@ views:
                               }},
                             {%- endif -%}
 
-                            {%- for reward in group.rewards -%}
+                            {%- for k in keys.v | sort -%}
+                              {%- set reward = group.rewards[k[3]] -%}
                               {%- set reward_name = reward.name if reward is mapping else 'Unknown' -%}
                               {%- set reward_cost = (reward.cost | float(default=0)) if reward is mapping else 0 -%}
                               {%- set reward_sensor_eid = reward.eid if reward is mapping else '' -%}
                               {%- set reward_icon = state_attr(reward_sensor_eid, 'icon') | default('mdi:gift', true) -%}
-                              {%- set reward_description = state_attr(reward_sensor_eid, 'description') | default('', true) -%}
-                              {%- set reward_description_clean = reward_description | string | trim -%}
-                              {%- set reward_description_safe = reward_description_clean | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                              {%- set rname = reward_name | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                              {%- set rdesc = (state_attr(reward_sensor_eid, 'description') | default('', true)) | string | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
                               {%- set claim_button_eid = state_attr(reward_sensor_eid, 'claim_button_eid') | default('', true) -%}
                               {%- set approve_button_eid = state_attr(reward_sensor_eid, 'approve_button_eid') | default('', true) -%}
                               {%- set disapprove_button_eid = state_attr(reward_sensor_eid, 'disapprove_button_eid') | default('', true) -%}
-                              {%- set reward_claimed_month = (state_attr(reward_sensor_eid, 'claimed_month') | int(default=0)) -%}
-                              {%- set reward_claimed_all_time = (state_attr(reward_sensor_eid, 'claimed_all_time') | int(default=0)) -%}
-                              {%- set reward_last_claimed = state_attr(reward_sensor_eid, 'last_claimed') | default('', true) -%}
-                              {%- set reward_last_claimed_text = (as_timestamp(reward_last_claimed) | timestamp_custom('%b %d')) if reward_last_claimed not in ['', 'unknown', 'unavailable', none] else ui.get('never', 'err-never') -%}
+                              {%- set claimed_month = (state_attr(reward_sensor_eid, 'claimed_month') | int(default=0)) -%}
+                              {%- set claimed_all = (state_attr(reward_sensor_eid, 'claimed_all_time') | int(default=0)) -%}
+                              {%- set last_claimed = state_attr(reward_sensor_eid, 'last_claimed') | default('', true) -%}
+                              {%- set last_text = (as_timestamp(last_claimed) | timestamp_custom('%b %d')) if last_claimed not in ['', 'unknown', 'unavailable', none] else '' -%}
 
                               {%- set reward_state = states(reward_sensor_eid) -%}
                               {%- set state_map = {
-                                  'locked': ui.get('locked', 'err-locked'),
-                                  'available': ui.get('available', 'err-available'),
-                                  'requested': ui.get('requested', 'err-requested'),
-                                  'approved': ui.get('approved', 'err-approved')
+                                'locked': ui.get('locked', 'err-locked'),
+                                'available': ui.get('available', 'err-available'),
+                                'requested': ui.get('requested', 'err-requested'),
+                                'approved': ui.get('approved', 'err-approved')
                               } -%}
                               {%- set reward_state_display = state_map.get(reward_state, reward_state) -%}
 
@@ -1301,236 +1411,172 @@ views:
                                 {%- set secondary_button_eid = disapprove_button_eid -%}
                               {%- elif reward_state == 'available' -%}
                                 {%- set primary_button_eid = claim_button_eid -%}
-                                {%- set primary_button_icon = 'mdi:arrow-right' -%}
                               {%- elif reward_state == 'locked' -%}
                                 {%- set primary_button_icon = 'mdi:lock-outline' -%}
                                 {%- set primary_button_is_locked = true -%}
                               {%- endif -%}
+                              {%- set has_primary = primary_button_eid not in ['', none] or primary_button_is_locked -%}
+                              {%- set has_secondary = secondary_button_eid not in ['', none] -%}
 
-                              {%- set row_icon_color = (
+                              {%- set accent = (
                                 pref_claim_accent if reward_state == 'requested' else
                                 'var(--primary-color)' if reward_state == 'available' else
                                 'var(--success-color)' if reward_state == 'approved' else
-                                  'var(--secondary-text-color)'
+                                'var(--secondary-text-color)'
                               ) -%}
-                              {%- set row_border_color = (
-                                pref_claim_accent if reward_state == 'requested' else
-                                'var(--divider-color)' if reward_state == 'available' else
-                                'var(--success-color)' if reward_state == 'approved' else
-                                  'var(--divider-color)'
-                              ) -%}
-                              {%- set row_background = (
-                                'color-mix(in srgb, ' ~ pref_claim_accent ~ ' 10%, var(--card-background-color))' if reward_state == 'requested' else
-                                'var(--card-background-color)' if reward_state in ['available', 'approved'] else
-                                  'var(--secondary-background-color)'
-                              ) -%}
-                              {%- set reward_state_html = "<b style='color:" ~ row_icon_color ~ ";'>" ~ reward_state_display | upper ~ "</b> <span style='opacity:0.7;'>•</span> <span>" ~ ui.get('cost', 'err-cost') ~ ": " ~ reward_cost|string ~ " <ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;color:var(--secondary-text-color);transform:translateY(-1px);'></ha-icon></span>" -%}
-                              {#-- Family pool: show only the state; progress is the bar below --#}
-                              {%- if state_attr(reward_sensor_eid, 'pooled') | default(false, true) -%}
-                                {%- set reward_state_html = "<b style='color:" ~ row_icon_color ~ ";'>" ~ reward_state_display | upper ~ "</b>" -%}
+                              {%- set is_pool = state_attr(reward_sensor_eid, 'pooled') | default(false, true) -%}
+                              {%- if is_pool -%}
+                                {%- set have = state_attr(reward_sensor_eid, 'pool_total') | float(default=0) -%}
+                              {%- else -%}
+                                {%- set have = current_points | float(default=0) -%}
                               {%- endif -%}
-                              {%- set reward_description_html = "<span>" ~ reward_description_safe ~ "</span>" -%}
-                              {#-- Family pool: progress bar under the state line (always visible) --#}
-                              {%- if state_attr(reward_sensor_eid, 'pooled') | default(false, true) -%}
-                                {%- set pool_cost = reward_cost | float(default=0) -%}
-                                {%- set pool_now = state_attr(reward_sensor_eid, 'pool_total') | float(default=0) -%}
+                              {%- set pct = ([(have / reward_cost * 100) if reward_cost > 0 else 100, 100] | min) | round(0) | int -%}
+                              {%- if reward_state == 'approved' -%}{%- set pct = 100 -%}{%- endif -%}
+                              {%- set to_go = [reward_cost - have, 0] | max -%}
+
+                              {%- set bar_color = 'var(--success-color)' if pct >= 100 else accent -%}
+                              {%- if is_pool -%}
                                 {%- set pool_mine = state_attr(reward_sensor_eid, 'pool_my_contribution') | float(default=0) -%}
-                                {%- set pool_pct = ([(pool_now / pool_cost * 100) if pool_cost > 0 else 0, 100] | min) | round(0) | int -%}
-                                {%- set reward_state_html = reward_state_html ~ "<div style='margin-top:8px;height:10px;border-radius:999px;background:color-mix(in srgb, var(--primary-text-color) 12%, transparent);overflow:hidden;'><div style='width:" ~ pool_pct ~ "%;min-width:" ~ ('10px' if pool_pct > 0 else '0') ~ ";height:100%;border-radius:999px;background:" ~ ('var(--success-color)' if pool_pct >= 100 else 'var(--primary-color)') ~ ";'></div></div><div style='margin-top:3px;display:flex;justify-content:space-between;font-size:10px;font-weight:700;color:var(--secondary-text-color);'><span>" ~ ('%g' | format(pool_now | round(2))) ~ " / " ~ ('%g' | format(pool_cost | round(2))) ~ "</span><span>" ~ ui.get('you', 'You') ~ ": " ~ ('%g' | format(pool_mine | round(2))) ~ "</span></div>" -%}
+                                {%- set bar_label = ui.get('family_pool', 'Family pool') -%}
+                                {%- set bar_value = ('%g' | format(have | round(2))) ~ ' / ' ~ ('%g' | format(reward_cost | round(2))) -%}
+                                {%- set bar_note = ui.get('you', 'You') ~ ': <b>' ~ ('%g' | format(pool_mine | round(2))) ~ '</b>' ~ (' &nbsp;•&nbsp; ' ~ ('%g' | format(to_go | round(2))) ~ ' ' ~ ui.get('to_go', 'to go') if to_go > 0 else '') -%}
+                              {%- else -%}
+                                {%- set bar_label = ui.get('your_points', 'Your points') -%}
+                                {%- set bar_value = ('%g' | format(have | round(2))) ~ ' / ' ~ ('%g' | format(reward_cost | round(2))) -%}
+                                {%- if reward_state == 'locked' -%}
+                                  {%- set bar_note = "<span style='font-weight:800;color:var(--primary-text-color);'>" ~ ui.get('need', 'Need') ~ ' ' ~ ('%g' | format(to_go | round(2))) ~ ' ' ~ points_label ~ ' ' ~ ui.get('more', 'more') ~ "</span>" -%}
+                                {%- elif reward_state == 'requested' -%}
+                                  {%- set bar_note = ui.get('waiting_for_approval', 'Waiting for approval') -%}
+                                {%- elif reward_state == 'approved' -%}
+                                  {%- set bar_note = '✓ ' ~ ui.get('approved', 'Approved') -%}
+                                {%- else -%}
+                                  {%- set bar_note = "<span style='font-weight:800;color:var(--success-color);'>✓ " ~ ui.get('you_can_claim', 'You can claim this') ~ "</span>" -%}
+                                {%- endif -%}
                               {%- endif -%}
-                              {%- set reward_stats_html = "<span>" ~ ui.get('last', 'err-last') ~ ": " ~ reward_last_claimed_text ~ "</span> <span style='opacity:0.7;'>•</span> <span>" ~ reward_claimed_month|string ~ " " ~ ui.get('this_month', 'err-this_month') ~ "</span> <span style='opacity:0.7;'>•</span> <span>" ~ reward_claimed_all_time|string ~ " " ~ ui.get('total', 'err-total') ~ "</span>" -%}
+
+                              {%- set foot_bits = [] -%}
+                              {%- if claimed_all > 0 -%}
+                                {%- set foot_bits = foot_bits + ['🕒 ' ~ last_text] if last_text | length > 0 else foot_bits -%}
+                                {%- set foot_bits = foot_bits + [claimed_month ~ ' ' ~ ui.get('this_month', 'this month')] + [claimed_all ~ ' ' ~ ui.get('total', 'total')] -%}
+                              {%- endif -%}
+
+                              {%- set ring_size = '46px' -%}
+                              {%- set ring_inner = "<div style='width:34px;height:34px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ reward_icon ~ "' style='width:21px;height:21px;--mdc-icon-size:21px;color:" ~ accent ~ ";'></ha-icon></div>" -%}
+                              {%- set ring = "<div style='flex:0 0 auto;width:" ~ ring_size ~ ";height:" ~ ring_size ~ ";border-radius:50%;background:conic-gradient(" ~ bar_color ~ " " ~ pct ~ "%, var(--divider-color) 0);display:flex;align-items:center;justify-content:center;'>" ~ ring_inner ~ "</div>" -%}
+                              {%- set top = "<div style='display:flex;align-items:center;gap:12px;'>" ~ ring
+                                  ~ "<div style='flex:1;min-width:0;text-align:left;'>"
+                                  ~ "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;'><span style='font-size:15px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ rname ~ "</span><span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 8px;border-radius:999px;color:" ~ accent ~ ";border:1px solid " ~ accent ~ ";'>" ~ (reward_state_display | string | upper) ~ "</span></div>"
+                                  ~ "<div style='margin-top:2px;font-size:11px;color:var(--secondary-text-color);'>" ~ ui.get('cost', 'Cost') ~ ": <b style='color:var(--primary-text-color);'>" ~ ('%g' | format(reward_cost | round(2))) ~ "</b> <ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;color:var(--primary-color);vertical-align:-2px;display:inline-block;'></ha-icon></div>"
+                                  ~ "</div></div>" -%}
+                              {%- set desc_row = ("<div style='margin-top:8px;font-size:11px;line-height:1.3;color:var(--secondary-text-color);text-align:left;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ rdesc ~ "</div>") if pref_show_reward_description and rdesc | length > 0 else '' -%}
+                              {%- set bar = ("<div style='margin-top:10px;'><div style='display:flex;justify-content:space-between;align-items:baseline;font-size:11px;font-weight:700;color:var(--secondary-text-color);'><span>" ~ bar_label ~ "</span><span style='color:var(--primary-text-color);'>" ~ bar_value ~ "</span></div><div style='margin-top:4px;display:flex;align-items:center;gap:8px;'><div style='flex:1;height:10px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ pct ~ "%;min-width:" ~ ('10px' if pct > 0 else '0') ~ ";height:100%;background:" ~ bar_color ~ ";border-radius:999px;'></div></div><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ pct ~ "%</span></div><div style='margin-top:4px;font-size:12px;color:var(--secondary-text-color);text-align:left;'>" ~ bar_note ~ "</div></div>") if (reward_state in ['available', 'locked'] or is_pool) else ("<div style='margin-top:8px;font-size:12px;font-weight:700;color:var(--secondary-text-color);text-align:left;'>" ~ bar_note ~ "</div>") -%}
+                              {%- set foot_row = ("<div style='margin-top:4px;font-size:10px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>" ~ (foot_bits | join(' &nbsp;•&nbsp; ')) ~ "</div>") if foot_bits | length > 0 else '' -%}
+
+                              {%- set btn_fields = {} -%}
+                              {%- if has_secondary -%}
+                                {%- set btn_fields = btn_fields | combine({'btn_secondary': {'card': {
+                                  'type': 'custom:button-card',
+                                  'show_name': false,
+                                  'show_icon': true,
+                                  'icon': 'mdi:undo-variant',
+                                  'styles': {
+                                    'card': [
+                                      {'width': '34px'},
+                                      {'height': '34px'},
+                                      {'border-radius': '50%'},
+                                      {'background-color': 'transparent'},
+                                      {'border': '1px solid ' ~ pref_claim_accent},
+                                      {'box-shadow': 'none'}
+                                    ],
+                                    'icon': [
+                                      {'width': '18px'},
+                                      {'color': pref_claim_accent}
+                                    ]
+                                  },
+                                  'tap_action': {'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': secondary_button_eid}}
+                                }}}) -%}
+                              {%- endif -%}
+                              {%- if has_primary -%}
+                                {%- set btn_fields = btn_fields | combine({'btn_primary': {'card': {
+                                  'type': 'custom:button-card',
+                                  'show_name': false,
+                                  'show_icon': true,
+                                  'icon': primary_button_icon,
+                                  'styles': {
+                                    'card': [
+                                      {'width': '34px'},
+                                      {'height': '34px'},
+                                      {'border-radius': '50%'},
+                                      {'background-color': 'transparent' if primary_button_is_locked else ('color-mix(in srgb, ' ~ pref_claim_accent ~ ' 14%, var(--card-background-color))' if reward_state == 'requested' else 'transparent')},
+                                      {'border': '1px solid var(--disabled-text-color)' if primary_button_is_locked else ('2px solid ' ~ pref_claim_accent if reward_state == 'requested' else '2px solid var(--primary-color)')},
+                                      {'box-shadow': 'none'}
+                                    ],
+                                    'icon': [
+                                      {'width': '18px'},
+                                      {'color': 'var(--disabled-text-color)' if primary_button_is_locked else 'var(--primary-text-color)'}
+                                    ]
+                                  },
+                                  'tap_action': ({'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': primary_button_eid}} if primary_button_eid not in ['', none] and not primary_button_is_locked else {'action': 'none'})
+                                }}}) -%}
+                              {%- endif -%}
+                              {%- set btn_fields = btn_fields | combine({'content': "<div style='width:100%;'>" ~ top ~ desc_row ~ bar ~ foot_row ~ "</div>"}) -%}
+
+                              {%- if has_secondary -%}
+                                {%- set areas = '"content btn_secondary btn_primary"' -%}
+                                {%- set cols = '1fr 34px 34px' -%}
+                              {%- elif has_primary -%}
+                                {%- set areas = '"content btn_primary"' -%}
+                                {%- set cols = '1fr 34px' -%}
+                              {%- else -%}
+                                {%- set areas = '"content"' -%}
+                                {%- set cols = '1fr' -%}
+                              {%- endif -%}
 
                               {%- set ns.group_cards = ns.group_cards + [{
                                 'type': 'custom:button-card',
                                 'entity': reward_sensor_eid,
-                                'name': reward_name,
-                                'icon': reward_icon,
-                                'show_name': true,
+                                'show_name': false,
+                                'show_icon': false,
+                                'show_state': false,
                                 'show_label': false,
-                                'show_icon': true,
-                                'custom_fields': {
-                                  'state': reward_state_html,
-                                  'description': reward_description_html,
-                                  'stats': reward_stats_html,
-                                  'btn_secondary': {
-                                    'card': {
-                                      'type': 'custom:button-card',
-                                      'show_name': false,
-                                      'show_icon': true,
-                                      'icon': 'mdi:undo-variant',
-                                      'styles': {
-                                        'card': [
-                                          {'width': '30px'},
-                                          {'height': '30px'},
-                                          {'border-radius': '50%'},
-                                          {'background-color': 'transparent'},
-                                          {'border': '1px solid ' ~ pref_claim_accent},
-                                          {'box-shadow': 'none'}
-                                        ],
-                                        'icon': [
-                                          {'width': '17px'},
-                                          {'color': pref_claim_accent}
-                                        ]
-                                      },
-                                      'tap_action': ({ 'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': secondary_button_eid } } if secondary_button_eid else { 'action': 'none' })
-                                    }
-                                  },
-                                  'btn_primary': {
-                                    'card': {
-                                      'type': 'custom:button-card',
-                                      'show_name': false,
-                                      'show_icon': true,
-                                      'icon': primary_button_icon,
-                                      'styles': {
-                                        'card': [
-                                          {'width': '30px'},
-                                          {'height': '30px'},
-                                          {'border-radius': '50%'},
-                                          {'background-color': 'transparent' if primary_button_is_locked else ('color-mix(in srgb, ' ~ pref_claim_accent ~ ' 14%, var(--card-background-color))' if reward_state == 'requested' else 'transparent')},
-                                          {'border': '1px solid var(--disabled-text-color)' if primary_button_is_locked else ('2px solid ' ~ pref_claim_accent if reward_state == 'requested' else '2px solid var(--primary-color)')},
-                                          {'box-shadow': 'none'}
-                                        ],
-                                        'icon': [
-                                          {'width': '17px'},
-                                          {'color': 'var(--disabled-text-color)' if primary_button_is_locked else 'var(--primary-text-color)'}
-                                        ]
-                                      },
-                                      'tap_action': ({ 'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': primary_button_eid } } if primary_button_eid and not primary_button_is_locked else { 'action': 'none' })
-                                    }
-                                  },
-                                },
-                                'tap_action': { 'action': 'more-info' },
-                                'hold_action': { 'action': 'none' },
+                                'custom_fields': btn_fields,
+                                'tap_action': {'action': 'more-info'},
+                                'hold_action': {'action': 'none'},
                                 'styles': {
                                   'card': [
-                                    {'background': row_background},
+                                    {'background': ('color-mix(in srgb, ' ~ pref_claim_accent ~ ' 8%, var(--card-background-color))' if reward_state == 'requested' else 'var(--card-background-color)')},
                                     {'box-shadow': 'none'},
-                                    {'border': '1px solid ' ~ row_border_color},
-                                    {'border-radius': '12px'},
-                                    {'padding': '7px 10px'}
+                                    {'border': '1px solid ' ~ (pref_claim_accent if reward_state == 'requested' else ('var(--success-color)' if reward_state == 'approved' else 'var(--divider-color)'))},
+                                    {'border-left': '4px solid ' ~ accent},
+                                    {'border-radius': '16px'},
+                                    {'padding': '12px 12px 12px 14px'},
+                                    {'opacity': '0.9' if reward_state == 'locked' else '1.0'}
                                   ],
                                   'grid': [
-                                    {'grid-template-areas': '"btn_secondary i btn_primary" "n n n" "state state state" "description description description" "stats stats stats"'},
-                                    {'grid-template-columns': '30px 1fr 30px'},
+                                    {'grid-template-areas': areas},
+                                    {'grid-template-columns': cols},
                                     {'column-gap': '8px'},
-                                    {'row-gap': '4px'},
-                                    {'align-items': 'start'}
-                                  ],
-                                  'icon': [
-                                    {'width': '30px'},
-                                    {'justify-self': 'center'},
-                                    {'align-self': 'start'},
-                                    {'margin-top': '2px'},
-                                    {'margin-bottom': '2px'},
-                                    {'color': row_icon_color}
-                                  ],
-                                  'name': [
-                                    {'justify-self': 'center'},
-                                    {'text-align': 'center'},
-                                    {'min-width': '0'},
-                                    {'width': '100%'},
-                                    {'font-size': '14px'},
-                                    {'font-weight': '600'},
-                                    {'line-height': '1.2'},
-                                    {'overflow': 'hidden'},
-                                    {'text-overflow': 'ellipsis'},
-                                    {'white-space': 'nowrap'},
-                                    {'color': 'var(--primary-text-color)'}
+                                    {'align-items': 'center'}
                                   ],
                                   'custom_fields': {
-                                    'state': [
-                                      {'justify-self': 'stretch'},
-                                      {'text-align': 'center'},
-                                      {'min-width': '0'},
-                                      {'width': '100%'},
-                                      {'font-size': '11px'},
-                                      {'color': 'var(--secondary-text-color)'},
-                                      {'line-height': '1.2'}
-                                    ],
-                                    'description': [
-                                      {'justify-self': 'stretch'},
-                                      {'text-align': 'center'},
-                                      {'min-width': '0'},
-                                      {'width': '100%'},
-                                      {'font-size': '10px'},
-                                      {'color': 'var(--secondary-text-color)'},
-                                      {'line-height': '1.2'},
-                                      {'display': 'block' if pref_show_reward_description and reward_description_clean | length > 0 else 'none'}
-                                    ],
-                                    'stats': [
-                                      {'justify-self': 'stretch'},
-                                      {'text-align': 'center'},
-                                      {'min-width': '0'},
-                                      {'width': '100%'},
-                                      {'font-size': '10px'},
-                                      {'color': 'var(--secondary-text-color)'},
-                                      {'line-height': '1.2'}
-                                    ],
-                                    'btn_secondary': [
-                                      {'width': '30px'},
-                                      {'height': '30px'},
-                                      {'align-self': 'start'},
-                                      {'justify-self': 'start'},
-                                      {'margin-top': '2px'},
-                                      {'display': 'block'},
-                                      {'visibility': 'visible' if secondary_button_eid not in ['', none] else 'hidden'},
-                                      {'pointer-events': 'auto' if secondary_button_eid not in ['', none] else 'none'}
-                                    ],
-                                    'btn_primary': [
-                                      {'width': '30px'},
-                                      {'height': '30px'},
-                                      {'align-self': 'start'},
-                                      {'justify-self': 'end'},
-                                      {'margin-top': '2px'},
-                                      {'display': 'block'},
-                                      {'visibility': 'visible' if primary_button_eid not in ['', none] or primary_button_is_locked else 'hidden'},
-                                      {'pointer-events': 'auto' if primary_button_eid not in ['', none] or primary_button_is_locked else 'none'}
-                                    ]
+                                    'content': [{'width': '100%'}, {'justify-self': 'stretch'}],
+                                    'btn_primary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'start'}, {'justify-self': 'end'}],
+                                    'btn_secondary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'start'}, {'justify-self': 'end'}]
                                   }
                                 }
                               }] -%}
                             {%- endfor -%}
 
-                            {{
-                              {
-                                'type': 'grid',
-                                'columns': 2,
-                                'square': false,
-                                'cards': ns.group_cards if ns.group_cards | length > 0 else [{
-                                  'type': 'custom:button-card',
-                                  'name': ui.get('no_rewards', 'err-no_rewards'),
-                                  'icon': 'mdi:gift-off-outline',
-                                  'show_name': true,
-                                  'show_icon': true,
-                                  'tap_action': {'action': 'none'},
-                                  'styles': {
-                                    'card': [
-                                      {'background': 'var(--secondary-background-color)'},
-                                      {'box-shadow': 'none'},
-                                      {'border': '1px solid var(--divider-color)'},
-                                      {'border-radius': '12px'},
-                                      {'padding': '10px 12px'}
-                                    ],
-                                    'grid': [
-                                      {'grid-template-areas': '"i n"'},
-                                      {'grid-template-columns': 'min-content 1fr'},
-                                      {'gap': '8px'},
-                                      {'align-items': 'center'}
-                                    ],
-                                    'icon': [
-                                      {'width': '18px'},
-                                      {'color': 'var(--secondary-text-color)'}
-                                    ],
-                                    'name': [
-                                      {'justify-self': 'start'},
-                                      {'font-size': '13px'},
-                                      {'font-weight': '600'},
-                                      {'color': 'var(--secondary-text-color)'}
-                                    ]
-                                  }
-                                }]
-                              }
-                            }},
+                            {%- if ns.group_cards | length > 0 -%}
+                              {{
+                                {
+                                  'type': 'grid',
+                                  'columns': pref_column_count if pref_column_count > 0 else 1,
+                                  'square': false,
+                                  'cards': ns.group_cards
+                                }
+                              }},
+                            {%- endif -%}
                           {%- endfor -%}
                         {%- endif -%}
                       {%- endif -%}
