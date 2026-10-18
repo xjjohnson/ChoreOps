@@ -155,7 +155,7 @@ views:
                           | list
                           | length > 0 -%}
                       {%- if has_family -%}
-                        {{ section_header(ui.get('family_goals', 'Family Goals'), 'mdi:home-heart') }}
+                        {{- section_header(ui.get('family_goals', 'Family Goals'), 'mdi:home-heart') -}}
                       {%- set family_sensors = integration_entities('choreops')
                           | select('search', '^sensor\\.')
                           | list
@@ -296,8 +296,8 @@ views:
                         {%- endif -%}
                       {%- endfor -%}
                       {%- if pool.count > 0 -%}
-                        {{ section_header(ui.get('pool_rewards', 'Pool Rewards'), 'mdi:piggy-bank') }}
-                        {{ html_card(pool.html) }}
+                        {{- section_header(ui.get('pool_rewards', 'Pool Rewards'), 'mdi:piggy-bank') -}}
+                        {{- html_card(pool.html) -}}
                       {%- endif -%}
 
                       {#-- 6. Leaderboard --#}
@@ -321,8 +321,8 @@ views:
                           {%- set nm = row[1] | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
                           {%- set lb.html = lb.html ~ "<div style='display:grid;grid-template-columns:minmax(0,110px) minmax(0,1fr) auto;align-items:center;column-gap:10px;padding:5px 0;'><div style='min-width:0;font-size:14px;font-weight:" ~ ('800' if loop.first else '600') ~ ";color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ medal ~ ' ' ~ nm ~ "</div><div style='height:10px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ bar_pct ~ "%;height:100%;background:" ~ ('var(--warning-color)' if loop.first else 'var(--primary-color)') ~ ";border-radius:999px;'></div></div><div style='font-size:13px;font-weight:800;color:var(--primary-text-color);text-align:right;min-width:44px;'>" ~ (row[0] | round(0) | int) ~ "</div></div>" -%}
                         {%- endfor -%}
-                        {{ section_header(ui.get('leaderboard', 'Leaderboard'), 'mdi:podium') }}
-                        {{ html_card(lb.html) }}
+                        {{- section_header(ui.get('leaderboard', 'Leaderboard'), 'mdi:podium') -}}
+                        {{- html_card(lb.html) -}}
                       {%- endif -%}
 
                       {#-- 7. Today: who still has chores --#}
@@ -354,8 +354,8 @@ views:
                         {%- endif -%}
                       {%- endfor -%}
                       {%- if today.any -%}
-                        {{ section_header(ui.get('today', 'Today'), 'mdi:calendar-today') }}
-                        {{ html_card(today.html) }}
+                        {{- section_header(ui.get('today', 'Today'), 'mdi:calendar-today') -}}
+                        {{- html_card(today.html) -}}
                       {%- endif -%}
 
                     {%- endif -%}
