@@ -1198,6 +1198,16 @@ create_reward:
       required: false
       selector:
         boolean:
+    pool_chip_in:
+      name: "Chip-in Amount"
+      description: "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford."
+      example: 10
+      required: false
+      selector:
+        number:
+          min: 0
+          step: 0.01
+          mode: box
 
 update_reward:
   name: "Update Reward"
@@ -1278,6 +1288,16 @@ update_reward:
       required: false
       selector:
         boolean:
+    pool_chip_in:
+      name: "Chip-in Amount"
+      description: "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford."
+      example: 10
+      required: false
+      selector:
+        number:
+          min: 0
+          step: 0.01
+          mode: box
 
 delete_reward:
   name: Delete Reward

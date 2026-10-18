@@ -5,12 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
+from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
+from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 import pytest
 
 from custom_components.choreops import const
-from tests.helpers import SetupResult, setup_from_yaml
+from tests.helpers import SetupResult, get_dashboard_helper, setup_from_yaml
+from tests.helpers.workflows import find_reward, get_reward_buttons
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -481,3 +484,107 @@ async def test_reward_status_sensor_shows_pool(
     assert state is not None
     assert state.state == const.REWARD_STATE_REQUESTED
     assert state.attributes[const.ATTR_REWARD_POOL_FULL] is True
+
+
+# =============================================================================
+# Dashboard buttons
+# =============================================================================
+
+
+async def _press(hass: HomeAssistant, button_eid: str, context: Context) -> None:
+    """Press a button entity, propagating errors."""
+    await hass.services.async_call(
+        BUTTON_DOMAIN,
+        SERVICE_PRESS,
+        {"entity_id": button_eid},
+        blocking=True,
+        context=context,
+    )
+    await hass.async_block_till_done()
+
+
+def _zoe_buttons(hass: HomeAssistant, reward_name: str) -> tuple[str, dict[str, str]]:
+    """Return Zoë's reward sensor entity ID and its claim/approve/disapprove buttons."""
+    reward = find_reward(get_dashboard_helper(hass, "zoe"), reward_name)
+    assert reward is not None
+    buttons = get_reward_buttons(hass, reward["eid"])
+    state = hass.states.get(reward["eid"])
+    assert state is not None
+    buttons["disapprove"] = state.attributes[
+        const.ATTR_REWARD_DISAPPROVE_BUTTON_ENTITY_ID
+    ]
+    return reward["eid"], buttons
+
+
+async def test_redeem_button_chips_in_by_chip_in_amount(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+    mock_hass_users: dict[str, Any],
+) -> None:
+    """On a pooled reward the dashboard button pays in the chip-in amount per press."""
+    rm = scenario_full.coordinator.reward_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    reward_id = _make_pool(scenario_full)
+    rm.update_reward(reward_id, {const.DATA_REWARD_POOL_CHIP_IN: 10.0})
+    _set_points(scenario_full, zoe, 35.0)
+    _, buttons = _zoe_buttons(hass, "Pick Next Movie")
+    zoe_context = Context(user_id=mock_hass_users["assignee1"].id)
+
+    await _press(hass, buttons["claim"], zoe_context)
+    await _press(hass, buttons["claim"], zoe_context)
+
+    assert _pool(scenario_full, reward_id) == {zoe: 20.0}
+    assert _points(scenario_full, zoe) == 15.0
+    # No claim was created - the reward never enters the normal approval queue
+    assert rm.get_pending_approvals() == []
+
+
+async def test_redeem_button_without_chip_in_puts_in_all_affordable(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+    mock_hass_users: dict[str, Any],
+) -> None:
+    """A chip-in amount of 0 puts in as much as the person can afford."""
+    zoe = scenario_full.assignee_ids["Zoë"]
+    reward_id = _make_pool(scenario_full)
+    _set_points(scenario_full, zoe, 35.0)
+    _, buttons = _zoe_buttons(hass, "Pick Next Movie")
+
+    await _press(
+        hass, buttons["claim"], Context(user_id=mock_hass_users["assignee1"].id)
+    )
+
+    assert _pool(scenario_full, reward_id) == {zoe: 35.0}
+    assert _points(scenario_full, zoe) == 0.0
+
+
+async def test_approve_button_confirms_full_pool_and_disapprove_refuses(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+    mock_hass_users: dict[str, Any],
+) -> None:
+    """Approve on a full pool empties it; disapprove never refunds from a tap."""
+    rm = scenario_full.coordinator.reward_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    reward_id = _make_pool(scenario_full)
+    _set_points(scenario_full, zoe, 100.0)
+    await rm.contribute_to_pool(zoe, reward_id)
+    await hass.async_block_till_done()
+    scenario_full.coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+
+    sensor_eid, buttons = _zoe_buttons(hass, "Pick Next Movie")
+    state = hass.states.get(sensor_eid)
+    assert state is not None
+    assert state.state == const.REWARD_STATE_REQUESTED
+    admin_context = Context(user_id=mock_hass_users["admin"].id)
+
+    with pytest.raises(HomeAssistantError) as err:
+        await _press(hass, buttons["disapprove"], admin_context)
+    assert err.value.translation_key == const.TRANS_KEY_ERROR_REWARD_POOL_NO_DISAPPROVE
+    assert _pool(scenario_full, reward_id) == {zoe: 100.0}
+
+    await _press(hass, buttons["approve"], admin_context)
+
+    assert _pool(scenario_full, reward_id) == {}
+    assert _points(scenario_full, zoe) == 0.0

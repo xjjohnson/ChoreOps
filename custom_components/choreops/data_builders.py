@@ -430,6 +430,11 @@ def build_reward(
     if pooled or contributions:
         reward[const.DATA_REWARD_POOLED] = pooled
         reward[const.DATA_REWARD_POOL_CONTRIBUTIONS] = contributions
+        reward[const.DATA_REWARD_POOL_CHIP_IN] = parse_points_value(
+            get_field(const.DATA_REWARD_POOL_CHIP_IN, const.DEFAULT_ZERO) or 0,
+            allow_negative=False,
+            allow_zero=True,
+        )
     return reward
 
 
@@ -456,6 +461,7 @@ _REWARD_DATA_RESET_PRESERVE_FIELDS: frozenset[str] = frozenset(
         const.DATA_REWARD_ASSIGNED_USER_IDS,
         const.DATA_REWARD_POOLED,
         const.DATA_REWARD_POOL_CONTRIBUTIONS,
+        const.DATA_REWARD_POOL_CHIP_IN,
     }
 )
 

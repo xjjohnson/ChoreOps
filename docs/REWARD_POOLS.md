@@ -16,12 +16,32 @@ Family pools are different: people *spend* their points into them.
 2. Tick **Family pool**.
 3. Set **Reward Cost**. This is the pool's target.
 4. Set **Assigned to**. Only these people can pay into the pool.
+5. Optionally set **Chip-in amount**: the points paid in each time the dashboard
+   button is pressed. Leave it at 0 to put in as much as the person can afford.
 
-The `create_reward` and `update_reward` services also take `pooled: true`.
+The `create_reward` and `update_reward` services also take `pooled: true` and
+`pool_chip_in`.
 
-## Paying in
+## On the dashboard
 
-Call `choreops.contribute_to_reward_pool` with `user_name`, `reward_name` and,
+A pooled reward uses the same reward buttons every dashboard already shows:
+
+| Button | On a family pool reward |
+| --- | --- |
+| Redeem / claim | Chips in the reward's chip-in amount (or everything the person can afford when it is 0) |
+| Approve | Confirms a full pool was delivered and empties it (approvers only) |
+| Disapprove / undo | Refused: contributors can't take points back, and refunds go through `refund_reward_pool` |
+
+So a pooled reward works on any dashboard. The bundled Gamification Premier and
+KidsChores Classic templates also replace the cost with the pool's progress
+("Pool: 55 / 100 · You: 20"), and Chores Lite adds the pool total to the tile.
+Those template changes are in the copies bundled with the integration. To use
+them, pick the currently installed release under **Dashboard Release Version**
+when generating the dashboard.
+
+## Paying in from automations
+
+Besides the dashboard button, you can call `choreops.contribute_to_reward_pool` with `user_name`, `reward_name` and,
 optionally, `amount`:
 
 - The points leave the person's balance **immediately**.
@@ -31,9 +51,8 @@ optionally, `amount`:
   what the pool still needs.
 - The service returns the points actually contributed.
 
-A family pool reward can't be redeemed the normal way. Its redeem button and
-`redeem_reward` both refuse it, because one person would be charged the full
-cost.
+The `redeem_reward` service refuses a family pool reward, because one person
+would be charged the full cost.
 
 ## When the pool is full
 
@@ -75,5 +94,6 @@ It also has these attributes:
 | `pool_total` | Points in the pool so far |
 | `pool_remaining` | Points still needed |
 | `pool_full` | Whether the target is reached |
+| `pool_chip_in` | Points paid in per dashboard button press (0 = all affordable) |
 | `pool_my_contribution` | This person's share of the current pool |
 | `pool_contributions` | Everyone's share, keyed by display name |

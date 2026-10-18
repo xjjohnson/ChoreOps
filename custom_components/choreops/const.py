@@ -743,6 +743,7 @@ CFOF_REWARDS_INPUT_ASSIGNED_USER_IDS: Final = (
     "assigned_user_ids"  # Aligned with DATA_REWARD_ASSIGNED_USER_IDS
 )
 CFOF_REWARDS_INPUT_POOLED: Final = "pooled"  # Aligned with DATA_REWARD_POOLED
+CFOF_REWARDS_INPUT_POOL_CHIP_IN: Final = "pool_chip_in"  # Aligned with DATA key
 CFOF_REWARDS_INPUT_REWARD_COUNT: Final = "reward_count"
 
 # BONUSES
@@ -1785,6 +1786,7 @@ DATA_REWARD_ASSIGNED_USER_IDS: Final = "assigned_user_ids"
 # Family pool: assigned users pay points into one shared pot (cost = target)
 DATA_REWARD_POOLED: Final = "pooled"
 DATA_REWARD_POOL_CONTRIBUTIONS: Final = "pool_contributions"  # user_id -> points
+DATA_REWARD_POOL_CHIP_IN: Final = "pool_chip_in"  # Points per button press (0 = all)
 
 # BONUSES
 DATA_BONUS_DESCRIPTION: Final = "description"
@@ -2883,6 +2885,7 @@ ATTR_REWARD_POOL_REMAINING: Final = "pool_remaining"
 ATTR_REWARD_POOL_CONTRIBUTIONS: Final = "pool_contributions"
 ATTR_REWARD_POOL_MY_CONTRIBUTION: Final = "pool_my_contribution"
 ATTR_REWARD_POOL_FULL: Final = "pool_full"
+ATTR_REWARD_POOL_CHIP_IN: Final = "pool_chip_in"
 ATTR_REWARD_LAST_CLAIMED: Final = "last_claimed"
 ATTR_REWARD_LAST_APPROVED: Final = "last_approved"
 ATTR_REWARD_LAST_DISAPPROVED: Final = "last_disapproved"
@@ -3329,6 +3332,7 @@ SERVICE_FIELD_REWARD_CRUD_LABELS: Final = "labels"
 SERVICE_FIELD_REWARD_CRUD_ASSIGNED_USER_NAMES: Final = "assigned_user_names"
 SERVICE_FIELD_REWARD_CRUD_ASSIGNED_USER_IDS: Final = "assigned_user_ids"
 SERVICE_FIELD_REWARD_CRUD_POOLED: Final = "pooled"
+SERVICE_FIELD_REWARD_CRUD_POOL_CHIP_IN: Final = "pool_chip_in"
 
 # Penalty service fields
 SERVICE_FIELD_PENALTY_NAME: Final = "penalty_name"
@@ -3567,6 +3571,7 @@ TRANS_KEY_ERROR_REWARD_POOL_NOT_FULL: Final = (
     "reward_pool_not_full"  # {reward} has {total} of {target}
 )
 TRANS_KEY_ERROR_REWARD_POOL_INVALID_AMOUNT: Final = "reward_pool_invalid_amount"
+TRANS_KEY_ERROR_REWARD_POOL_NO_DISAPPROVE: Final = "reward_pool_no_disapprove"
 TRANS_KEY_ERROR_ALREADY_CLAIMED: Final = "already_claimed"  # {entity} already claimed
 TRANS_KEY_ERROR_INVALID_FREQUENCY: Final = (
     "invalid_frequency"  # Recurring frequency '{frequency}' is not valid

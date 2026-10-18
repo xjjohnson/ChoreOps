@@ -3239,6 +3239,9 @@ class ChoreOpsOptionsFlowHandler(config_entries.OptionsFlow):
             const.CFOF_REWARDS_INPUT_POOLED: existing_reward.get(
                 const.DATA_REWARD_POOLED, False
             ),
+            const.CFOF_REWARDS_INPUT_POOL_CHIP_IN: existing_reward.get(
+                const.DATA_REWARD_POOL_CHIP_IN, const.DEFAULT_ZERO
+            ),
         }
 
         # On validation error, merge user's attempted input with existing data

@@ -774,6 +774,9 @@ CREATE_REWARD_SCHEMA = vol.Schema(
                 cv.ensure_list, [cv.string]
             ),
             vol.Optional(const.SERVICE_FIELD_REWARD_CRUD_POOLED): cv.boolean,
+            vol.Optional(const.SERVICE_FIELD_REWARD_CRUD_POOL_CHIP_IN): vol.All(
+                vol.Coerce(float), vol.Range(min=0)
+            ),
         }
     )
 )
@@ -799,6 +802,9 @@ UPDATE_REWARD_SCHEMA = vol.Schema(
                 cv.ensure_list, [cv.string]
             ),
             vol.Optional(const.SERVICE_FIELD_REWARD_CRUD_POOLED): cv.boolean,
+            vol.Optional(const.SERVICE_FIELD_REWARD_CRUD_POOL_CHIP_IN): vol.All(
+                vol.Coerce(float), vol.Range(min=0)
+            ),
         }
     )
 )
@@ -1146,6 +1152,7 @@ _SERVICE_TO_REWARD_DATA_MAPPING: dict[str, str] = {
         const.DATA_REWARD_ASSIGNED_USER_IDS
     ),
     const.SERVICE_FIELD_REWARD_CRUD_POOLED: const.DATA_REWARD_POOLED,
+    const.SERVICE_FIELD_REWARD_CRUD_POOL_CHIP_IN: const.DATA_REWARD_POOL_CHIP_IN,
 }
 
 

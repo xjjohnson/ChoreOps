@@ -995,10 +995,12 @@
           "reward_labels": "Reward Labels",
           "icon": "Icon (mdi:xxx)",
           "assigned_user_ids": "Assigned to",
-          "pooled": "Family pool"
+          "pooled": "Family pool",
+          "pool_chip_in": "Chip-in amount"
         },
         "data_description": {
-          "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full."
+          "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full.",
+          "pool_chip_in": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford."
         }
       },
       "add_penalty": {
@@ -1497,10 +1499,12 @@
           "reward_labels": "Reward Labels",
           "icon": "Icon (mdi:xxx)",
           "assigned_user_ids": "Assigned to",
-          "pooled": "Family pool"
+          "pooled": "Family pool",
+          "pool_chip_in": "Chip-in amount"
         },
         "data_description": {
-          "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full."
+          "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full.",
+          "pool_chip_in": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford."
         }
       },
       "edit_penalty": {
@@ -2670,6 +2674,11 @@
           "name": "Family Pool",
           "description": "Everyone assigned pays points into one shared pool and the cost becomes the pool's target.",
           "example": "true"
+        },
+        "pool_chip_in": {
+          "name": "Chip-in Amount",
+          "description": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford.",
+          "example": "10"
         }
       }
     },
@@ -2726,6 +2735,11 @@
           "name": "Family Pool",
           "description": "Everyone assigned pays points into one shared pool and the cost becomes the pool's target.",
           "example": "true"
+        },
+        "pool_chip_in": {
+          "name": "Chip-in Amount",
+          "description": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford.",
+          "example": "10"
         }
       }
     },
@@ -4832,6 +4846,9 @@
           "pool_my_contribution": {
             "name": "My Pool Contribution"
           },
+          "pool_chip_in": {
+            "name": "Chip-in Amount"
+          },
           "pool_contributions": {
             "name": "Pool Contributions"
           },
@@ -5829,6 +5846,9 @@
     },
     "reward_pool_invalid_amount": {
       "message": "Contribution must be more than zero points"
+    },
+    "reward_pool_no_disapprove": {
+      "message": "{reward} is a family pool reward. To cancel it and give everyone their points back, use the Refund Reward Pool action."
     },
     "already_claimed": {
       "message": "{entity} has already been claimed"

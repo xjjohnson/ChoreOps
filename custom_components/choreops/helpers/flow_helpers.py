@@ -2890,6 +2890,16 @@ def build_reward_schema(default=None, assignees_dict=None):
             const.CFOF_REWARDS_INPUT_POOLED,
             default=False,
         ): selector.BooleanSelector(),
+        vol.Optional(
+            const.CFOF_REWARDS_INPUT_POOL_CHIP_IN,
+            default=const.DEFAULT_ZERO,
+        ): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                mode=selector.NumberSelectorMode.BOX,
+                min=0,
+                step=0.01,
+            )
+        ),
     }
 
     # Add assigned users multi-select when assignees are available

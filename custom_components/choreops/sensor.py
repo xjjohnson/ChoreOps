@@ -3120,6 +3120,9 @@ class AssigneeRewardStatusSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     round_points(pool_target - pool_total), const.DEFAULT_ZERO
                 ),
                 const.ATTR_REWARD_POOL_FULL: pool_total >= pool_target,
+                const.ATTR_REWARD_POOL_CHIP_IN: reward_info.get(
+                    const.DATA_REWARD_POOL_CHIP_IN, const.DEFAULT_ZERO
+                ),
                 const.ATTR_REWARD_POOL_MY_CONTRIBUTION: contributions.get(
                     self._assignee_id, const.DEFAULT_ZERO
                 ),
