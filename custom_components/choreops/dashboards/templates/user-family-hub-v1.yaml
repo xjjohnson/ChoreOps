@@ -3040,6 +3040,20 @@ views:
                             {%- set fraw_done = fcount > 0 and flevel >= fcount -%}
                             {%- set fdone = fraw_done and ftotal >= ((flevels | last) | float(0)) -%}
                             {%- set elevel = (fcount - 1) if (fraw_done and not fdone) else flevel -%}
+                            {#-- Day-streak goals follow the CURRENT streak: when it breaks, the levels shown start over --#}
+                            {%- set scnt = namespace(v=0) -%}
+                            {%- if fstreak -%}
+                              {%- for lv0 in flevels -%}
+                                {%- if lv0 <= ftotal -%}
+                                  {%- set scnt.v = scnt.v + 1 -%}
+                                {%- endif -%}
+                              {%- endfor -%}
+                            {%- endif -%}
+                            {%- set streak_reset = fstreak and flevel > scnt.v -%}
+                            {%- set fdone = ((scnt.v >= fcount and fcount > 0) if fstreak else fdone) -%}
+                            {%- set elevel = (scnt.v if fstreak else elevel) -%}
+                            {%- set ftarget = (((flevels[elevel] if elevel < fcount else (flevels | last)) | round(0) | int) if (fstreak and fcount > 0) else ftarget) -%}
+                            {%- set freward = (((frewards[elevel] | round(0) | int) if elevel < (frewards | length) else 0) if (fstreak and fcount > 0) else freward) -%}
                             {%- set fshares = state_attr(fe, 'family_level_contributions') or state_attr(fe, 'family_contributions') or {} -%}
                             {%- set wtarget = ((flevels | last) if (fdone and fcount > 0) else ftarget) | float(1) | round(0) | int -%}
                             {%- set pidx = (elevel - 1) if not fdone else (fcount - 2) -%}
@@ -3052,9 +3066,10 @@ views:
                             {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
                             {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
                             {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
-                            {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>NEW PERIOD · LEVELS RESET</div>" if (fraw_done and not fdone) else '' -%}
+                            {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ('STREAK RESET · LEVELS RESET' if streak_reset else 'NEW PERIOD · LEVELS RESET') ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
                             {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
-                            {%- set sub = '🎉 All levels complete' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ funit ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '') ~ (' · 🏆 top contributor ×' ~ ('%g' | format(fmult)) if fmult > 1 else '')) -%}
+                            {%- set sub = '🎉 All levels complete' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ (' day' if (funit and togo == 1) else funit) ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '')) -%}
+                            {%- set mult_html = ("<div style='font-size:11px;font-weight:700;color:var(--warning-color);line-height:1.35;'>🏆 Top contributor ×" ~ ('%g' | format(fmult)) ~ "</div>") if (fmult > 1 and not fdone) else '' -%}
                             {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
 
                             {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
@@ -3082,23 +3097,30 @@ views:
                               {%- endif -%}
                               {#-- Level track: one node per level, green line fills as levels are reached --#}
                               {%- set nodes = namespace(v='') -%}
+                              {#-- Show at most 5 levels; the window slides so the current level sits in the middle with 2 before and 2 after --#}
+                              {%- set wcnt = [fcount, 5] | min -%}
+                              {%- set cidx = (fcount - 1) if fdone else elevel -%}
+                              {%- set wstart = [[cidx - 2, 0] | max, fcount - wcnt] | min -%}
                               {%- if fcount > 1 -%}
                                 {%- for lv in flevels -%}
+                                  {%- if loop.index0 >= wstart and loop.index0 < wstart + wcnt -%}
                                   {%- set n_reached = fdone or loop.index <= elevel -%}
                                   {%- set n_cur = (not fdone) and loop.index == elevel + 1 -%}
                                   {%- set n_col = '#22c55e' if n_reached else ('#8b5cf6' if n_cur else 'var(--divider-color)') -%}
                                   {%- set n_rw = (frewards[loop.index0] | round(0) | int) if loop.index0 < (frewards | length) else 0 -%}
                                   {%- set nodes.v = nodes.v ~ "<div style='position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;'><div style='width:34px;height:34px;border-radius:50%;border:3px solid " ~ n_col ~ ";background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ ('mdi:check' if n_reached else 'mdi:star') ~ "' style='width:17px;height:17px;--mdc-icon-size:17px;color:" ~ n_col ~ ";display:block;'></ha-icon></div><div style='font-size:11px;font-weight:800;margin-top:4px;color:" ~ ('var(--primary-text-color)' if n_cur else 'var(--secondary-text-color)') ~ ";'>" ~ (lv | round(0) | int) ~ funit ~ "</div>" ~ ("<div style='font-size:10px;color:var(--secondary-text-color);'>+" ~ n_rw ~ " ⭐</div>" if n_rw > 0 else '') ~ "</div>" -%}
+                                  {%- endif -%}
                                 {%- endfor -%}
                               {%- endif -%}
-                              {%- set tfrac = 1 if fdone else (0 if elevel == 0 else ([(elevel - 1 + bpct / 100) / ([fcount - 1, 1] | max), 1] | min)) -%}
-                              {%- set tinset = 'calc(100% / ' ~ (fcount * 2) ~ ')' -%}
+                              {%- set tfrac = 1 if fdone else (0 if elevel == 0 else ([([elevel - wstart - 1 + bpct / 100, 0] | max) / ([wcnt - 1, 1] | max), 1] | min)) -%}
+                              {%- set tinset = 'calc(100% / ' ~ (wcnt * 2) ~ ')' -%}
                               {%- set fui_v = "<div style='text-align:left;padding:14px 10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                                 ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
                                 ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
                                 ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
                                 ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:#22c55e;'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
                                 ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
+                                ~ (("<div style='text-align:center;'>" ~ mult_html ~ "</div>") if mult_html else '')
                                 ~ rec_html
                                 ~ ("<div style='display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:8px;'>" ~ cchips.v ~ "</div>" if cchips.v else '')
                                 ~ "</div>" -%}
@@ -3120,7 +3142,7 @@ views:
                                 ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
                                 ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
                                 ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
-                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div></div>"
+                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div>" ~ mult_html ~ "</div>"
                                 ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
                                 ~ rec_html ~ "<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div></div>" -%}
                             {%- endif -%}
