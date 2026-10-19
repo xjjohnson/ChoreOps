@@ -978,7 +978,7 @@ views:
 
                   << template_snippets.user_override_helper >>
 
-                  {%- set pref_column_count = 2 -%}
+                  {%- set pref_column_count = 1 -%}
 
                   {%- set pref_use_label_grouping = false -%}
 
@@ -993,6 +993,8 @@ views:
                   {%- set pref_default_header_collapsed = false -%}
 
                   {%- set pref_claim_accent = '#a957fa' -%}  {#-- Accent color for requested reward state and actions. --#}
+
+                  {%- set pref_pool_accent = '#8b5cf6' -%}  {#-- Accent color for family pool rewards that are still being filled. --#}
 
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Rewards header background when fill is enabled. Allowed: 0-100. --#}
 
@@ -1009,6 +1011,7 @@ views:
                   {%- set pref_show_reward_description = (pref_show_reward_description | default('true') | string | lower) == 'true' -%}
                   {%- set pref_default_header_collapsed = (pref_default_header_collapsed | default('false') | string | lower) == 'true' -%}
                   {%- set pref_claim_accent = pref_claim_accent | default('#a957fa', true) | string -%}
+                  {%- set pref_pool_accent = pref_pool_accent | default('#8b5cf6', true) | string -%}
                   {%- set pref_primary_tint_mix_pct = pref_primary_tint_mix_pct | int(default=14) -%}
                   {%- set pref_show_header_background = (pref_show_header_background | default('true') | string | lower) == 'true' -%}
                   {%- set pref_show_header_thin_border = (pref_show_header_thin_border | default('true') | string | lower) == 'true' -%}
@@ -1367,7 +1370,7 @@ views:
                             {%- set ns.group_cards = [] -%}
                             {%- set show_group_chip = (ns.label_groups | length > 1) or (group.name != ui.get('rewards', 'err-rewards')) -%}
 
-                            {#-- sort keys: requested first, then available, then locked (closest first), then approved --#}
+                            {#-- sort keys: family pool rewards first, then everything by star cost (cheapest first) --#}
                             {%- set keys = namespace(v=[]) -%}
                             {%- for reward in group.rewards -%}
                               {%- set k_eid = reward.eid if reward is mapping else '' -%}
@@ -1382,7 +1385,8 @@ views:
                                 {%- set k_pct = ([(k_have / k_cost * 100) if k_cost > 0 else 100, 100] | min) -%}
                                 {%- set k_rank = 0 if k_state == 'requested' else (1 if k_state == 'available' else (2 if k_state == 'locked' else 3)) -%}
                                 {%- if pref_sort_rewards == 'default' -%}
-                                  {%- set keys.v = keys.v + [[k_rank, (k_cost if k_rank == 1 else 100 - k_pct), (reward.name | default('') | lower) if reward is mapping else '', loop.index0]] -%}
+                                  {%- set k_pool = state_attr(k_eid, 'pooled') | default(false, true) -%}
+                                  {%- set keys.v = keys.v + [[0 if k_pool else 1, k_cost, (reward.name | default('') | lower) if reward is mapping else '', loop.index0]] -%}
                                 {%- else -%}
                                   {%- set keys.v = keys.v + [[0, 0, '', loop.index0]] -%}
                                 {%- endif -%}
@@ -1515,17 +1519,20 @@ views:
                                 {%- set foot_bits = foot_bits + [claimed_month ~ ' ' ~ ui.get('this_month', 'this month')] + [claimed_all ~ ' ' ~ ui.get('total', 'total')] -%}
                               {%- endif -%}
 
-                              {%- set ring_size = '46px' -%}
-                              {%- set ring_inner = "<div style='width:34px;height:34px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ reward_icon ~ "' style='width:21px;height:21px;--mdc-icon-size:21px;color:" ~ accent ~ ";'></ha-icon></div>" -%}
-                              {%- set ring = "<div style='flex:0 0 auto;width:" ~ ring_size ~ ";height:" ~ ring_size ~ ";border-radius:50%;background:conic-gradient(" ~ bar_color ~ " " ~ pct ~ "%, var(--divider-color) 0);display:flex;align-items:center;justify-content:center;'>" ~ ring_inner ~ "</div>" -%}
-                              {%- set top = "<div style='display:flex;align-items:center;gap:12px;'>" ~ ring
-                                  ~ "<div style='flex:1;min-width:0;text-align:left;'>"
-                                  ~ "<div style='display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:3px 8px;'><span style='min-width:0;max-width:100%;font-size:15px;line-height:1.15;font-weight:800;color:var(--primary-text-color);white-space:normal;overflow-wrap:anywhere;word-break:break-word;'>" ~ rname ~ "</span><span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 8px;border-radius:999px;color:" ~ accent ~ ";border:1px solid " ~ accent ~ ";'>" ~ (reward_state_display | string | upper) ~ "</span></div>"
-                                  ~ "<div style='margin-top:2px;display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:14px;color:var(--secondary-text-color);'><span>" ~ ui.get('cost', 'Cost') ~ ": <b style='color:var(--primary-text-color);'>" ~ ('%g' | format(reward_cost | round(2))) ~ "</b></span><ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;color:var(--primary-color);display:block;transform:translateY(-2px);'></ha-icon></div>"
-                                  ~ "</div></div>" -%}
-                              {%- set desc_row = ("<div style='margin-top:8px;font-size:11px;line-height:1.3;color:var(--secondary-text-color);text-align:left;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ rdesc ~ "</div>") if pref_show_reward_description and rdesc | length > 0 else '' -%}
-                              {%- set bar = ("<div style='margin-top:10px;'><div style='display:flex;justify-content:space-between;align-items:baseline;font-size:11px;font-weight:700;color:var(--secondary-text-color);'><span>" ~ bar_label ~ "</span><span style='color:var(--primary-text-color);'>" ~ bar_value ~ "</span></div><div style='margin-top:4px;display:flex;align-items:center;gap:8px;'><div style='flex:1;height:10px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ pct ~ "%;min-width:" ~ ('10px' if pct > 0 else '0') ~ ";height:100%;background:" ~ bar_color ~ ";border-radius:999px;'></div></div><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ pct ~ "%</span></div><div style='margin-top:4px;font-size:12px;color:var(--secondary-text-color);text-align:left;'>" ~ bar_note ~ "</div></div>") if (reward_state in ['available', 'locked'] or is_pool) else ("<div style='margin-top:8px;font-size:12px;font-weight:700;color:var(--secondary-text-color);text-align:left;'>" ~ bar_note ~ "</div>") -%}
-                              {%- set foot_row = ("<div style='margin-top:4px;font-size:10px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>" ~ (foot_bits | join(' &nbsp;•&nbsp; ')) ~ "</div>") if foot_bits | length > 0 else '' -%}
+                              {#-- Fill row: the card background fills to show progress; green when claimable, pool accent while a family pool is filling --#}
+                              {%- set row_col = pref_claim_accent if reward_state == 'requested' else ('var(--success-color)' if (reward_state == 'approved' or pct >= 100) else (pref_pool_accent if is_pool else 'var(--primary-color)')) -%}
+                              {%- set fill_pct = 100 if reward_state in ['requested', 'approved'] else pct -%}
+                              {%- set status_html = (bar_label ~ " <b style='color:var(--primary-text-color);'>" ~ bar_value ~ "</b> &nbsp;&bull;&nbsp; " ~ bar_note) if is_pool else bar_note -%}
+                              {%- set sub_bits = [] -%}
+                              {%- if pref_show_reward_description and rdesc | length > 0 -%}{%- set sub_bits = sub_bits + [rdesc] -%}{%- endif -%}
+                              {%- if foot_bits | length > 0 -%}{%- set sub_bits = sub_bits + [foot_bits | join(' &nbsp;&bull;&nbsp; ')] -%}{%- endif -%}
+                              {%- set tile = "<div style='flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb, " ~ row_col ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ reward_icon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ row_col ~ ";display:block;'></ha-icon></div>" -%}
+                              {%- set cost_pill = "<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>" ~ ('%g' | format(reward_cost | round(2))) ~ "</div>" -%}
+                              {%- set content_html = "<div style='display:flex;align-items:center;gap:10px;width:100%;text-align:left;'>" ~ tile
+                                  ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;line-height:1.2;font-weight:800;color:var(--primary-text-color);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;'>" ~ rname ~ "</div>"
+                                  ~ "<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);'>" ~ status_html ~ "</div>"
+                                  ~ ("<div style='font-size:11px;line-height:1.3;color:var(--secondary-text-color);opacity:0.85;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ (sub_bits | join(' &nbsp;&bull;&nbsp; ')) ~ "</div>" if sub_bits | length > 0 else '')
+                                  ~ "</div>" ~ cost_pill ~ "</div>" -%}
 
                               {%- set btn_fields = {} -%}
                               {%- if has_secondary -%}
@@ -1563,27 +1570,27 @@ views:
                                       {'height': '34px'},
                                       {'border-radius': '50%'},
                                       {'background-color': 'transparent' if primary_button_is_locked else ('color-mix(in srgb, ' ~ pref_claim_accent ~ ' 14%, var(--card-background-color))' if reward_state == 'requested' else 'transparent')},
-                                      {'border': '1px solid var(--disabled-text-color)' if primary_button_is_locked else ('2px solid ' ~ pref_claim_accent if reward_state == 'requested' else '2px solid var(--primary-color)')},
+                                      {'border': '1px solid var(--disabled-text-color)' if primary_button_is_locked else ('2px solid ' ~ pref_claim_accent if reward_state == 'requested' else '2px solid ' ~ row_col)},
                                       {'box-shadow': 'none'}
                                     ],
                                     'icon': [
                                       {'width': '18px'},
-                                      {'color': 'var(--disabled-text-color)' if primary_button_is_locked else 'var(--primary-text-color)'}
+                                      {'color': 'var(--disabled-text-color)' if primary_button_is_locked else row_col}
                                     ]
                                   },
                                   'tap_action': ({'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': primary_button_eid}} if primary_button_eid not in ['', none] and not primary_button_is_locked else {'action': 'none'})
                                 }}}) -%}
                               {%- endif -%}
-                              {%- set btn_fields = btn_fields | combine({'top_c': "<div style='width:100%;white-space:normal;'>" ~ top ~ desc_row ~ "</div>", 'bar_c': "<div style='width:100%;white-space:normal;'>" ~ bar ~ foot_row ~ "</div>"}) -%}
+                              {%- set btn_fields = btn_fields | combine({'content': "<div style='width:100%;white-space:normal;'>" ~ content_html ~ "</div>"}) -%}
 
                               {%- if has_secondary -%}
-                              {%- set areas = '"top_c top_c top_c" "bar_c btn_secondary btn_primary"' -%}
+                              {%- set areas = '"content btn_secondary btn_primary"' -%}
                               {%- set cols = '1fr 34px 34px' -%}
                               {%- elif has_primary -%}
-                              {%- set areas = '"top_c top_c" "bar_c btn_primary"' -%}
+                              {%- set areas = '"content btn_primary"' -%}
                               {%- set cols = '1fr 34px' -%}
                               {%- else -%}
-                              {%- set areas = '"top_c" "bar_c"' -%}
+                              {%- set areas = '"content"' -%}
                               {%- set cols = '1fr' -%}
                               {%- endif -%}
                               {%- set ns.group_cards = ns.group_cards + [{
@@ -1598,27 +1605,23 @@ views:
                                 'hold_action': {'action': 'none'},
                                 'styles': {
                                   'card': [
-                                    {'background': ('color-mix(in srgb, ' ~ pref_claim_accent ~ ' 8%, var(--card-background-color))' if reward_state == 'requested' else 'var(--card-background-color)')},
+                                    {'background': 'linear-gradient(90deg, color-mix(in srgb, ' ~ row_col ~ ' 34%, var(--card-background-color)) 0%, color-mix(in srgb, ' ~ row_col ~ ' 13%, var(--card-background-color)) ' ~ fill_pct ~ '%, var(--card-background-color) ' ~ fill_pct ~ '%)'},
                                     {'box-shadow': 'none'},
                                     {'border': '1px solid ' ~ (pref_claim_accent if reward_state == 'requested' else ('var(--success-color)' if reward_state == 'approved' else 'var(--divider-color)'))},
-                                    {'border-left': '4px solid ' ~ accent},
                                     {'border-radius': '16px'},
-                                    {'padding': '12px 12px 12px 14px'},
-                                    {'height': '100%'},
-                                    {'opacity': '0.9' if reward_state == 'locked' else '1.0'}
+                                    {'padding': '10px 12px'},
+                                    {'overflow': 'hidden'}
                                   ],
                                   'grid': [
                                     {'grid-template-areas': areas},
                                     {'grid-template-columns': cols},
-                                    {'grid-template-rows': '1fr auto'},
                                     {'column-gap': '8px'},
                                     {'align-items': 'center'}
                                   ],
                                   'custom_fields': {
-                                    'top_c': [{'width': '100%'}, {'justify-self': 'stretch'}, {'align-self': 'start'}],
-                                    'bar_c': [{'width': '100%'}, {'justify-self': 'stretch'}, {'align-self': 'end'}],
-                                    'btn_primary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'end'}, {'justify-self': 'end'}],
-                                    'btn_secondary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'end'}, {'justify-self': 'end'}]
+                                    'content': [{'width': '100%'}, {'justify-self': 'stretch'}, {'align-self': 'center'}],
+                                    'btn_primary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'center'}, {'justify-self': 'end'}],
+                                    'btn_secondary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'center'}, {'justify-self': 'end'}]
                                   }
                                 }
                               }] -%}
@@ -1794,19 +1797,22 @@ views:
                         {%- set ns.next_lower_badge_eid = '' -%}
                       {%- endif -%}
 
-                      {%- set badge_entries = [
-                        {'eid': middle_badge_eid, 'role': 'current', 'earned': true}
-                      ] -%}
-                      {%- if effective_show_next_higher_badge -%}
-                        {%- set badge_entries = [
-                          {'eid': ns.next_higher_badge_eid, 'role': 'next_higher', 'earned': false}
-                        ] + badge_entries -%}
+                      {#-- Full rank ladder: every cumulative badge assigned to this user, sorted by threshold below --#}
+                      {%- set ladder = namespace(eids=[], entries=[]) -%}
+                      {%- for lb in (state_attr(dashboard_helper, 'badges') or []) -%}
+                        {%- if lb is mapping and lb.get('badge_type') == 'cumulative' and lb.get('eid') not in ['', 'None', none] and lb.get('eid') not in ladder.eids -%}
+                          {%- set lb_role = 'current' if lb.get('eid') == middle_badge_eid else ('next_higher' if lb.get('eid') == ns.next_higher_badge_eid else 'ladder') -%}
+                          {%- set ladder.eids = ladder.eids + [lb.get('eid')] -%}
+                          {%- set ladder.entries = ladder.entries + [{'eid': lb.get('eid'), 'role': lb_role, 'earned': lb_role != 'next_higher'}] -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- if middle_badge_eid not in ladder.eids -%}
+                        {%- set ladder.entries = ladder.entries + [{'eid': middle_badge_eid, 'role': 'current', 'earned': true}] -%}
                       {%- endif -%}
-                      {%- if effective_show_next_lower_badge -%}
-                        {%- set badge_entries = badge_entries + [
-                          {'eid': ns.next_lower_badge_eid, 'role': 'next_lower', 'earned': true}
-                        ] -%}
+                      {%- if ns.next_higher_badge_eid not in ladder.eids -%}
+                        {%- set ladder.entries = ladder.entries + [{'eid': ns.next_higher_badge_eid, 'role': 'next_higher', 'earned': false}] -%}
                       {%- endif -%}
+                      {%- set badge_entries = ladder.entries -%}
 
                       {%- for entry in badge_entries -%}
                         {%- set badge_eid = entry.eid -%}
@@ -1859,6 +1865,24 @@ views:
                           {%- set ns.badges = ns.badges + [badge_info] -%}
                         {%- endif -%}
                       {%- endfor -%}
+
+                      {#-- Classify the rest of the ladder relative to the current rank, ordered by threshold --#}
+                      {%- set cur_thr = namespace(v=-1) -%}
+                      {%- for cb in ns.badges -%}
+                        {%- if cb.role == 'current' -%}
+                          {%- set cur_thr.v = cb.threshold -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- set sorted_badges = namespace(items=[]) -%}
+                      {%- for sb in ns.badges | sort(attribute='threshold') -%}
+                        {%- if sb.role == 'ladder' -%}
+                          {%- set sb_lower = sb.threshold < cur_thr.v -%}
+                          {%- set sorted_badges.items = sorted_badges.items + [sb | combine({'role': 'earned' if sb_lower else 'future', 'earned': sb_lower})] -%}
+                        {%- else -%}
+                          {%- set sorted_badges.items = sorted_badges.items + [sb] -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- set ns.badges = sorted_badges.items -%}
                     {%- endif -%}
 
                     {#-- 5. Render --#}
@@ -2194,6 +2218,66 @@ views:
                             }
                           }},
                         {%- else -%}
+                          {#-- Ladder layout: tracker + fill-bar rows (current, next) + slim earned/locked rows --#}
+                          {%- set n_b = ns.badges | length -%}
+                          {%- set cur_accent = 'var(--warning-color)' if ns.m_status == 'grace' else ('var(--error-color)' if ns.m_status == 'demoted' else 'var(--success-color)') -%}
+                          {%- set tr = namespace(ci=-1, has_next=false, nxt_name='', nxt_pct=0, nxt_to_go=0, nodes='') -%}
+                          {%- for badge in ns.badges -%}
+                            {%- if badge.role == 'current' -%}
+                              {%- set tr.ci = loop.index0 -%}
+                            {%- endif -%}
+                            {%- if badge.role == 'next_higher' and not tr.has_next -%}
+                              {%- set tr.has_next = true -%}
+                              {%- set tr.nxt_name = badge.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                              {%- if badge.threshold > 0 -%}
+                                {%- set tg = ns.points_to_next if ns.has_earned_any else (((badge.threshold - ns.points_earned_all_time) | float(default=0) | round(0, 'ceil')) | int) -%}
+                                {%- set tr.nxt_to_go = [tg, 0] | max -%}
+                                {%- set tr.nxt_pct = [((([badge.threshold - tr.nxt_to_go, 0] | max) / badge.threshold) * 100) | round(0) | int, 100] | min -%}
+                              {%- endif -%}
+                            {%- endif -%}
+                            {%- set nrole = badge.role -%}
+                            {%- set ncol = cur_accent if nrole == 'current' else ('var(--primary-color)' if nrole == 'next_higher' else ('var(--success-color)' if nrole == 'earned' else 'var(--secondary-text-color)')) -%}
+                            {%- set nsz = 46 if nrole == 'current' else 34 -%}
+                            {%- set nname = badge.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                            {%- set tr.nodes = tr.nodes
+                                ~ "<div style='position:relative;z-index:1;flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;'>"
+                                ~ "<div style='height:46px;display:flex;align-items:center;justify-content:center;'>"
+                                ~ "<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid " ~ ncol ~ ";background:" ~ ("color-mix(in srgb, " ~ ncol ~ " 20%, var(--card-background-color))" if nrole == 'current' else "var(--card-background-color)") ~ ";display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.6' if nrole == 'future' else '1') ~ ";'>"
+                                ~ "<ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('24' if nrole == 'current' else '18') ~ "px;height:" ~ ('24' if nrole == 'current' else '18') ~ "px;--mdc-icon-size:" ~ ('24' if nrole == 'current' else '18') ~ "px;color:" ~ ncol ~ ";display:block;'></ha-icon></div></div>"
+                                ~ "<div style='max-width:100%;margin-top:4px;font-size:11px;font-weight:800;color:" ~ ('var(--primary-text-color)' if nrole == 'current' else 'var(--secondary-text-color)') ~ ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ nname ~ "</div>"
+                                ~ "<div style='font-size:10px;color:var(--secondary-text-color);opacity:0.8;'>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div></div>" -%}
+                          {%- endfor -%}
+                          {%- set trk_frac = 0 if tr.ci < 0 else ([((tr.ci + ((tr.nxt_pct / 100) if tr.has_next else 0)) / ([n_b - 1, 1] | max)), 1] | min) -%}
+                          {%- set trk_caption = ("<div style='text-align:center;margin-top:8px;font-size:12px;color:var(--secondary-text-color);'><b style='color:var(--primary-color);'>" ~ (format_points(tr.nxt_to_go, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ ' ' ~ ui.get('to_go', 'to go') ~ "</b> &rarr; <b style='color:var(--primary-text-color);'>" ~ tr.nxt_name ~ "</b></div>") if tr.has_next and tr.nxt_to_go > 0 else '' -%}
+                          {%- set trk_html = "<div style='box-sizing:border-box;width:100%;border-radius:16px;border:1px solid var(--divider-color);background:var(--card-background-color);padding:14px 8px 12px;'>"
+                              ~ "<div style='position:relative;display:flex;'>"
+                              ~ "<div style='position:absolute;left:calc(50% / " ~ n_b ~ ");right:calc(50% / " ~ n_b ~ ");top:21px;height:4px;border-radius:4px;background:var(--divider-color);'></div>"
+                              ~ "<div style='position:absolute;left:calc(50% / " ~ n_b ~ ");width:calc((100% - 100% / " ~ n_b ~ ") * " ~ ('%.3f' | format(trk_frac)) ~ ");top:21px;height:4px;border-radius:4px;background:var(--success-color);'></div>"
+                              ~ tr.nodes ~ "</div>" ~ trk_caption ~ "</div>" -%}
+                          {%- set row_styles = {
+                            'card': [
+                              {'padding': '0'},
+                              {'background': 'none'},
+                              {'border': 'none'},
+                              {'box-shadow': 'none'},
+                              {'border-radius': '16px'}
+                            ],
+                            'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                            'custom_fields': {'content': [{'width': '100%'}, {'justify-self': 'stretch'}]}
+                          } -%}
+                          {{
+                            {
+                              'type': 'custom:button-card',
+                              'show_name': false,
+                              'show_icon': false,
+                              'show_state': false,
+                              'tap_action': {'action': 'none'},
+                              'custom_fields': {'content': trk_html},
+                              'styles': row_styles
+                            }
+                          }},
+
+                          {%- set rows = namespace(cur=[], nxt=[], earned=[], locked=[]) -%}
                           {%- for badge in ns.badges -%}
                             {%- set is_current = badge.role == 'current' -%}
                             {%- set is_target = badge.role == 'next_higher' -%}
@@ -2283,41 +2367,79 @@ views:
                               {%- set foot = foot + ['🥇 ' ~ ns.m_award_count] -%}
                             {%- endif -%}
 
-                            {%- set ring_inner = "<div style='width:40px;height:40px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='width:24px;height:24px;--mdc-icon-size:24px;color:" ~ accent ~ ";'></ha-icon></div>" -%}
-                            {%- set ring = "<div style='flex:0 0 auto;width:" ~ ('58px' if is_current else '50px') ~ ";height:" ~ ('58px' if is_current else '50px') ~ ";border-radius:50%;background:conic-gradient(" ~ (prog_color if show_bar else accent) ~ " " ~ pct ~ "%, var(--divider-color) 0);display:flex;align-items:center;justify-content:center;'>" ~ ring_inner ~ "</div>" -%}
-                            {%- set top = "<div style='display:flex;align-items:center;gap:12px;'>" ~ ring
-                                ~ "<div style='flex:1;min-width:0;text-align:left;'>"
-                                ~ "<div style='font-size:10px;font-weight:800;letter-spacing:0.8px;text-transform:uppercase;color:" ~ accent ~ ";'>" ~ role_label ~ "</div>"
-                                ~ "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;'><span style='font-size:" ~ ('18px' if is_current else '15px') ~ ";font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span><span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 8px;border-radius:999px;color:" ~ accent ~ ";border:1px solid " ~ accent ~ ";'>" ~ (pill_text | upper) ~ "</span></div>"
-                                ~ "<div style='margin-top:2px;font-size:11px;color:var(--secondary-text-color);'>🎯 " ~ ui.get('threshold', 'Threshold') ~ ": " ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ "</div>"
-                                ~ "</div></div>" -%}
-                            {%- set desc_row = ("<div style='margin-top:8px;font-size:11px;line-height:1.3;color:var(--secondary-text-color);text-align:left;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ bdesc ~ "</div>") if bdesc | length > 0 else '' -%}
-                            {%- set bar = ("<div style='margin-top:10px;'><div style='display:flex;justify-content:space-between;align-items:baseline;font-size:11px;font-weight:700;color:var(--secondary-text-color);'><span>" ~ prog_label ~ "</span><span style='color:var(--primary-text-color);'>" ~ prog_value ~ "</span></div><div style='margin-top:4px;display:flex;align-items:center;gap:8px;'><div style='flex:1;height:10px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ pct ~ "%;min-width:" ~ ('10px' if pct > 0 else '0') ~ ";height:100%;background:" ~ prog_color ~ ";border-radius:999px;'></div></div><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ pct ~ "%</span></div><div style='margin-top:4px;font-size:12px;text-align:left;'>" ~ prog_note ~ "</div></div>") if show_bar else '' -%}
-                            {%- set pill_row = ("<div style='margin-top:8px;text-align:left;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
-                            {%- set foot_row = ("<div style='margin-top:2px;font-size:10px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>" ~ (foot | join(' &nbsp;•&nbsp; ')) ~ "</div>") if foot | length > 0 else '' -%}
 
+                            {%- set row_html = '' -%}
+                            {%- if is_current or is_target -%}
+                              {%- set fill_col = prog_color if show_bar else accent -%}
+                              {%- set fill_pct = pct if show_bar else 100 -%}
+                              {%- set chip_label = pill_text if is_current else ui.get('next_rank', 'Next rank') -%}
+                              {%- set sub_html = '' -%}
+                              {%- if show_bar -%}
+                                {%- set sub_html = (("<span>" ~ prog_label ~ " <b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b></span> &nbsp;&bull;&nbsp; ") if is_current else ("<b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b> &nbsp;&bull;&nbsp; ")) ~ prog_note -%}
+                              {%- endif -%}
+                              {%- set tile = "<div style='flex:0 0 auto;width:" ~ ('48px' if is_current else '40px') ~ ";height:" ~ ('48px' if is_current else '40px') ~ ";border-radius:12px;background:color-mix(in srgb, " ~ accent ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('28' if is_current else '22') ~ "px;height:" ~ ('28' if is_current else '22') ~ "px;--mdc-icon-size:" ~ ('28' if is_current else '22') ~ "px;color:" ~ accent ~ ";display:block;'></ha-icon></div>" -%}
+                              {%- set chip = "<span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:" ~ accent ~ ";color:#fff;'>" ~ chip_label ~ "</span>" -%}
+                              {%- set cost_pill = "<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div>" -%}
+                              {%- set pill_row = ("<div style='margin-top:6px;text-align:left;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
+                              {%- set foot_row = ("<div style='margin-top:2px;font-size:10px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>" ~ (foot | join(' &nbsp;•&nbsp; ')) ~ "</div>") if foot | length > 0 else '' -%}
+                              {%- set desc_row = ("<div style='margin-top:2px;font-size:11px;line-height:1.3;color:var(--secondary-text-color);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ bdesc ~ "</div>") if bdesc | length > 0 else '' -%}
+                              {%- set row_html = "<div style='position:relative;overflow:hidden;box-sizing:border-box;width:100%;border-radius:16px;border:" ~ (('1px solid ' ~ accent) if is_current else '1px solid var(--divider-color)') ~ ";background:linear-gradient(90deg, color-mix(in srgb, " ~ fill_col ~ " 34%, var(--card-background-color)) 0%, color-mix(in srgb, " ~ fill_col ~ " 13%, var(--card-background-color)) " ~ fill_pct ~ "%, var(--card-background-color) " ~ fill_pct ~ "%);padding:" ~ ('14px' if is_current else '10px 12px') ~ ";text-align:left;'>"
+                                  ~ "<div style='display:flex;align-items:center;gap:10px;'>" ~ tile
+                                  ~ "<div style='flex:1;min-width:0;'><div style='display:flex;align-items:center;gap:6px;'><span style='font-size:" ~ ('18px' if is_current else '15px') ~ ";line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>" ~ chip ~ "</div>"
+                                  ~ (("<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);'>" ~ sub_html ~ "</div>") if sub_html | length > 0 else '')
+                                  ~ desc_row ~ pill_row ~ foot_row
+                                  ~ "</div>" ~ cost_pill ~ "</div></div>" -%}
+                            {%- else -%}
+                              {%- set slim_col = 'var(--success-color)' if badge.role == 'earned' else 'var(--secondary-text-color)' -%}
+                              {%- set slim_right = ('✓ ' ~ ui.get('earned', 'Earned') ~ ((' ' ~ last_earned) if last_earned | length > 0 else '')) if badge.role == 'earned' else ('🔒 ' ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ ' ' ~ ns.points_label) -%}
+                              {%- set row_html = "<div style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:8px 12px;border-radius:14px;background:var(--card-background-color);border:1px solid var(--divider-color);opacity:" ~ ('1' if badge.role == 'earned' else '0.8') ~ ";text-align:left;'>"
+                                  ~ "<ha-icon icon='" ~ badge.icon ~ "' style='flex:0 0 auto;width:20px;height:20px;--mdc-icon-size:20px;color:" ~ slim_col ~ ";display:block;'></ha-icon>"
+                                  ~ "<span style='min-width:0;font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>"
+                                  ~ "<span style='margin-left:auto;flex:0 0 auto;font-size:12px;color:var(--secondary-text-color);'>" ~ slim_right ~ "</span></div>" -%}
+                            {%- endif -%}
+                            {%- set item = {'eid': badge.entity_id, 'html': row_html} -%}
+                            {%- if is_current -%}
+                              {%- set rows.cur = rows.cur + [item] -%}
+                            {%- elif is_target -%}
+                              {%- set rows.nxt = rows.nxt + [item] -%}
+                            {%- elif badge.role == 'earned' -%}
+                              {%- set rows.earned = rows.earned + [item] -%}
+                            {%- else -%}
+                              {%- set rows.locked = rows.locked + [item] -%}
+                            {%- endif -%}
+                          {%- endfor -%}
+
+                          {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);margin:6px 0 6px 2px;text-align:left;" -%}
+                          {%- set emit = namespace(items=[]) -%}
+                          {%- for it in rows.cur -%}
+                            {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html, 'head': ''}] -%}
+                          {%- endfor -%}
+                          {%- if effective_show_next_higher_badge -%}
+                            {%- for it in rows.nxt -%}
+                              {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html, 'head': ''}] -%}
+                            {%- endfor -%}
+                          {%- endif -%}
+                          {%- if effective_show_next_lower_badge -%}
+                            {%- for it in (rows.earned | reverse | list) -%}
+                              {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html, 'head': ("<div style='" ~ head_style ~ "'>" ~ ui.get('earned', 'Earned') ~ "</div>") if loop.first else ''}] -%}
+                            {%- endfor -%}
+                          {%- endif -%}
+                          {%- if effective_show_next_higher_badge -%}
+                            {%- for it in rows.locked -%}
+                              {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html, 'head': ("<div style='" ~ head_style ~ "'>" ~ ui.get('future_goal', 'Locked') ~ "</div>") if loop.first else ''}] -%}
+                            {%- endfor -%}
+                          {%- endif -%}
+                          {%- for it in emit.items -%}
                             {{
                               {
                                 'type': 'custom:button-card',
-                                'entity': badge.entity_id,
+                                'entity': it.eid,
                                 'show_name': false,
                                 'show_icon': false,
                                 'show_state': false,
                                 'tap_action': {'action': 'more-info'},
-                                'custom_fields': {'content': "<div style='width:100%;'>" ~ top ~ desc_row ~ bar ~ pill_row ~ foot_row ~ "</div>"},
-                                'styles': {
-                                  'card': [
-                                    {'padding': '14px 16px'},
-                                    {'border-radius': '16px'},
-                                    {'background-color': 'var(--card-background-color)'},
-                                    {'border': ('1px solid ' ~ accent) if is_current else '1px solid var(--divider-color)'},
-                                    {'border-left': '4px solid ' ~ accent},
-                                    {'opacity': '1.0' if badge.earned else '0.85'},
-                                    {'box-shadow': '0 2px 6px rgba(0,0,0,0.08)' if is_current else 'none'}
-                                  ],
-                                  'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
-                                  'custom_fields': {'content': [{'width': '100%'}, {'justify-self': 'stretch'}]}
-                                }
+                                'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ it.html ~ "</div>"},
+                                'styles': row_styles
                               }
                             }},
                           {%- endfor -%}
@@ -2353,6 +2475,7 @@ views:
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Periodic header background when fill is enabled. Allowed: 0-100. --#}
                   {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the main Periodic header background fill and leave it transparent. Allowed: true, false. --#}
                   {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
+                  {%- set pref_urgent_days = 3 -%}  {#-- Quests ending within this many days get an orange border and a countdown badge. Allowed: 0-30. --#}
 
 
                   {#-- 2. Dynamic Lookups & Validations --#}
@@ -2361,6 +2484,7 @@ views:
                   {%- set pref_primary_tint_mix_pct = pref_primary_tint_mix_pct | int(default=14) -%}
                   {%- set pref_show_header_background = (pref_show_header_background | default('true') | string | lower) == 'true' -%}
                   {%- set pref_show_header_thin_border = (pref_show_header_thin_border | default('true') | string | lower) == 'true' -%}
+                  {%- set pref_urgent_days = [[pref_urgent_days | int(default=3), 0] | max, 30] | min -%}
                   {%- if pref_primary_tint_mix_pct < 0 -%}
                     {%- set pref_primary_tint_mix_pct = 0 -%}
                   {%- elif pref_primary_tint_mix_pct > 100 -%}
@@ -2388,7 +2512,6 @@ views:
                       {%- set ui_root.current = ui_root.current.get(segment, {}) if ui_root.current is mapping else {} -%}
                     {%- endfor -%}
                     {%- set header_collapsed = (ui_root.current.get('header_collapse', pref_default_header_collapsed) if ui_root.current is mapping else pref_default_header_collapsed) in [true, 'true', 'True'] -%}
-                    {%- set saved_filter = (ui_root.current.get('filter', 'all') if ui_root.current is mapping else 'all') | string -%}
                     {%- set integration_entry_id = state_attr(dashboard_helper, 'integration_entry_id') -%}
                     {%- set dashboard_helper_user_id = state_attr(dashboard_helper, 'user_id') -%}
                     {%- set can_save = integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] -%}
@@ -2409,6 +2532,10 @@ views:
                         {%- set grp = 'special' if btype == 'special_occasion' else ('daily' if (btype == 'daily' or freq == 'daily') else ('longer' if freq in ['biweekly', 'quarterly', 'yearly', 'semiannual', 'semi_annual', 'annual', 'custom'] else (freq if freq not in ['', 'none'] else 'other'))) -%}
                         {%- set rank = 2 if status in ['earned', 'completed'] else (1 if progress <= 0 else 0) -%}
                         {%- set awards = ba.get('awards') if ba.get('awards') is mapping else {} -%}
+                        {%- set b_end = ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', '') -%}
+                        {%- set b_start = ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', '') -%}
+                        {%- set b_days_left = (((as_timestamp(b_end ~ 'T12:00:00') - as_timestamp(current_date ~ 'T12:00:00')) / 86400) | round(0) | int) if b_end | length > 0 else 999 -%}
+                        {%- set b_starts_future = b_start | length > 0 and b_start > current_date -%}
                         {%- set ns.badges = ns.badges + [{
                           'eid': be,
                           'name': (ba.get('badge_name') or badge.get('name') or state_attr(be, 'friendly_name') or '') | string,
@@ -2422,6 +2549,8 @@ views:
                           'last_awarded': ((ba.get('last_awarded_date') or '') | string) | regex_replace('T.*$', ''),
                           'start': ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', ''),
                           'end': ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', ''),
+                          'days_left': b_days_left,
+                          'starts_future': b_starts_future,
                           'points': awards.get('award_points', 0) | float(default=0),
                           'mult': awards.get('points_multiplier', 0) | float(default=0),
                           'rewards': (awards.get('rewards') if awards.get('rewards') is iterable and awards.get('rewards') is not string else []) | length,
@@ -2435,13 +2564,6 @@ views:
                     {%- set grp_order = ['daily', 'weekly', 'monthly', 'longer', 'other', 'special'] -%}
                     {%- set present = ns.badges | map(attribute='group') | unique | list -%}
                     {%- set groups = (grp_order | select('in', present) | list) + (present | reject('in', grp_order) | list) -%}
-                    {%- set active_filter = saved_filter if saved_filter in groups else 'all' -%}
-                    {%- set keys = namespace(v=[]) -%}
-                    {%- for b in ns.badges -%}
-                      {%- if active_filter == 'all' or b.group == active_filter -%}
-                        {%- set keys.v = keys.v + [[b.rank, 100 - b.progress, b.name | lower, loop.index0]] -%}
-                      {%- endif -%}
-                    {%- endfor -%}
                     {%- set earned_n = ns.badges | selectattr('rank', 'eq', 2) | list | length -%}
                     {%- set active_n = ns.badges | selectattr('rank', 'eq', 0) | list | length -%}
                     {%- set todo_n = ns.badges | selectattr('rank', 'eq', 1) | list | length -%}
@@ -2539,134 +2661,128 @@ views:
                             }
                           }},
 
-                          {#-- filter chips (only when there is more than one kind of quest) --#}
-                          {%- if groups | length > 1 -%}
-                            {%- set chips = namespace(v=[]) -%}
-                            {%- for g in ['all'] + groups -%}
-                              {%- set is_sel = (g == active_filter) -%}
-                              {%- set cnt = ns.badges | length if g == 'all' else (ns.badges | selectattr('group', 'eq', g) | list | length) -%}
-                              {%- set glabel = ui.get('all', 'All') if g == 'all' else (ui.get('special_occasion', 'Special') if g == 'special' else ('Longer' if g == 'longer' else ui.get(g, g | replace('_', ' ') | title))) -%}
-                              {%- set chips.v = chips.v + [{
-                                'type': 'custom:button-card',
-                                'name': glabel ~ ' ' ~ cnt,
-                                'show_icon': false,
-                                'tap_action': ({
-                                  'action': 'call-service',
-                                  'service': 'choreops.manage_ui_control',
-                                  'data': ({'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'remove', 'key': key_root ~ '/filter'} if g == 'all' else {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'update', 'key': key_root ~ '/filter', 'value': g})
-                                } if can_save else {'action': 'none'}),
-                                'styles': {
-                                  'card': [
-                                    {'border-radius': '999px'},
-                                    {'padding': '7px 2px'},
-                                    {'box-shadow': 'none'},
-                                    {'border': ('2px solid var(--primary-color)' if is_sel else '1px solid var(--divider-color)')},
-                                    {'background': ('color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color))' if is_sel else 'transparent')}
-                                  ],
-                                  'name': [
-                                    {'font-size': '12px'},
-                                    {'font-weight': ('800' if is_sel else '600')},
-                                    {'color': ('var(--primary-text-color)' if is_sel else 'var(--secondary-text-color)')}
-                                  ]
-                                }
-                              }] -%}
-                            {%- endfor -%}
-                            {{
-                              {
-                                'type': 'grid',
-                                'columns': [chips.v | length, 3] | min,
-                                'square': false,
-                                'cards': chips.v
-                              }
-                            }},
-                          {%- endif -%}
-
-                          {#-- quest tiles --#}
-                          {%- for k in keys.v | sort -%}
-                            {%- set b = ns.badges[k[3]] -%}
-                            {%- set done = b.rank == 2 -%}
-                            {%- set color = 'var(--success-color)' if done else ('var(--primary-color)' if b.rank == 0 else 'var(--secondary-text-color)') -%}
-                            {%- set status_text = (ui.get('earned', 'Earned') if done else (ui.get('in_progress', 'In progress') if b.rank == 0 else 'Not started')) | upper -%}
-                            {%- set bname = b.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
-                            {%- set bdesc = b.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
-                            {%- set pct = 100 if done else (b.progress | round(0) | int) -%}
-
-                            {#-- reward pills --#}
-                            {%- set pills = namespace(v='') -%}
-                            {%- set pill_style = "display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;background:color-mix(in srgb, var(--primary-color) 12%, transparent);font-size:11px;font-weight:700;color:var(--primary-text-color);margin:0 6px 4px 0;" -%}
-                            {%- if b.points > 0 -%}
-                              {%- set pills.v = pills.v ~ "<span style='" ~ pill_style ~ "'>+" ~ ('%g' | format(b.points | round(2))) ~ " <ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;color:var(--primary-color);'></ha-icon></span>" -%}
-                            {%- endif -%}
-                            {%- if b.mult > 0 -%}
-                              {%- set pills.v = pills.v ~ "<span style='" ~ pill_style ~ "'>⚡ ×" ~ ('%g' | format(b.mult | round(2))) ~ "</span>" -%}
-                            {%- endif -%}
-                            {%- if b.bonuses > 0 -%}
-                              {%- set pills.v = pills.v ~ "<span style='" ~ pill_style ~ "'>✨ " ~ ui.get('bonus', 'Bonus') ~ (' ×' ~ b.bonuses if b.bonuses > 1 else '') ~ "</span>" -%}
-                            {%- endif -%}
-                            {%- if b.rewards > 0 -%}
-                              {%- set pills.v = pills.v ~ "<span style='" ~ pill_style ~ "'>🎁 " ~ ui.get('reward', 'Reward') ~ (' ×' ~ b.rewards if b.rewards > 1 else '') ~ "</span>" -%}
-                            {%- endif -%}
-
-                            {#-- if-missed line (only while the quest is still open and has an end date) --#}
-                            {%- set missed = namespace(v=[]) -%}
-                            {%- for pn in b.penalties -%}
-                              {%- if pn is mapping and (pn.get('name') or '') | string | trim | length > 0 -%}
-                                {%- set missed.v = missed.v + [pn.get('name') | string | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;')] -%}
+                          {#-- Quest list: groups by cadence, ending-soon quests get an orange edge + countdown, earned quests shrink to slim rows --#}
+                          {%- set row_styles = {
+                            'card': [
+                              {'padding': '0'},
+                              {'background': 'none'},
+                              {'border': 'none'},
+                              {'box-shadow': 'none'},
+                              {'border-radius': '16px'}
+                            ],
+                            'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                            'custom_fields': {'content': [{'width': '100%'}, {'justify-self': 'stretch'}]}
+                          } -%}
+                          {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);" -%}
+                          {%- set emit = namespace(items=[]) -%}
+                          {%- for g in groups -%}
+                            {%- set glabel = ui.get('special_occasion', 'Special') if g == 'special' else ('Longer' if g == 'longer' else ui.get(g, g | replace('_', ' ') | title)) -%}
+                            {%- set gstat = namespace(total=0, done=0, keys=[], earned=[]) -%}
+                            {%- for b in ns.badges -%}
+                              {%- if b.group == g -%}
+                                {%- set gstat.total = gstat.total + 1 -%}
+                                {%- set b_urgent = b.rank != 2 and not b.starts_future and b.days_left >= 0 and b.days_left <= pref_urgent_days -%}
+                                {%- if b.rank == 2 -%}
+                                  {%- set gstat.done = gstat.done + 1 -%}
+                                  {%- set gstat.earned = gstat.earned + [loop.index0] -%}
+                                {%- else -%}
+                                  {%- set gstat.keys = gstat.keys + [[0 if b_urgent else 1, b.days_left if b_urgent else 0, b.rank, 100 - b.progress, b.name | lower, loop.index0]] -%}
+                                {%- endif -%}
                               {%- endif -%}
                             {%- endfor -%}
-                            {%- if missed.v | length == 0 and b.penalties | length > 0 -%}
-                              {%- set missed.v = [ui.get('penalty', 'Penalty')] -%}
-                            {%- endif -%}
+                            {%- set ghead = namespace(v="<div style='display:flex;justify-content:space-between;align-items:baseline;margin:6px 2px 6px;text-align:left;'><span style='" ~ head_style ~ "'>" ~ glabel ~ "</span><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ gstat.done ~ ' / ' ~ gstat.total ~ ' ' ~ ui.get('done', 'done') ~ "</span></div>") -%}
 
-                            {%- set dates = '' -%}
-                            {%- if b.start | length > 0 and b.end | length > 0 -%}
-                              {%- set dates = b.end if b.start == b.end else (b.start ~ ' → ' ~ b.end) -%}
-                            {%- elif b.end | length > 0 -%}
-                              {%- set dates = b.end -%}
-                            {%- endif -%}
+                            {%- for k in gstat.keys | sort -%}
+                              {%- set b = ns.badges[k[5]] -%}
+                              {%- set is_urgent = k[0] == 0 -%}
+                              {%- set started = b.rank == 0 -%}
+                              {%- set row_col = 'var(--primary-color)' if started else 'var(--secondary-text-color)' -%}
+                              {%- set pct = b.progress | round(0) | int -%}
+                              {%- set bname = b.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                              {%- set bdesc = b.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
 
-                            {%- set ring = "<div style='flex:0 0 auto;width:50px;height:50px;border-radius:50%;background:conic-gradient(" ~ color ~ " " ~ pct ~ "%, var(--divider-color) 0);display:flex;align-items:center;justify-content:center;'><div style='width:40px;height:40px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:24px;height:24px;--mdc-icon-size:24px;color:" ~ color ~ ";'></ha-icon></div></div>" -%}
-                            {%- set top = "<div style='display:flex;align-items:center;gap:12px;'>" ~ ring
-                                ~ "<div style='flex:1;min-width:0;text-align:left;'><div style='display:flex;justify-content:space-between;align-items:center;gap:8px;'><span style='font-size:15px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span><span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 8px;border-radius:999px;color:" ~ color ~ ";border:1px solid " ~ color ~ ";'>" ~ status_text ~ "</span></div>"
-                                ~ ("<div style='margin-top:2px;font-size:11px;line-height:1.3;color:var(--secondary-text-color);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ bdesc ~ "</div>" if bdesc | length > 0 else '')
-                                ~ "</div></div>" -%}
-                            {%- set bar = "" if done else ("<div style='margin-top:10px;display:flex;align-items:center;gap:8px;'><div style='flex:1;height:8px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ pct ~ "%;min-width:" ~ ('8px' if pct > 0 else '0') ~ ";height:100%;background:" ~ color ~ ";border-radius:999px;'></div></div><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ pct ~ "%</span></div>") -%}
-                            {%- set pill_row = ("<div style='margin-top:8px;text-align:left;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
-                            {%- set miss_row = ("<div style='margin-top:2px;font-size:11px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>⏳ " ~ ui.get('if_missed', 'If missed') ~ ": " ~ (missed.v | join(' • ')) ~ "</div>") if (not done and b.end | length > 0 and missed.v | length > 0) else '' -%}
-                            {%- set foot_parts = [] -%}
-                            {%- if b.award_count > 0 -%}
-                              {%- set foot_parts = foot_parts + ['🥇 ' ~ b.award_count] -%}
-                            {%- endif -%}
-                            {%- if b.last_awarded | length > 0 -%}
-                              {%- set foot_parts = foot_parts + ['🕒 ' ~ b.last_awarded] -%}
-                            {%- endif -%}
-                            {%- if dates | length > 0 and not done -%}
-                              {%- set foot_parts = foot_parts + ['📅 ' ~ dates] -%}
-                            {%- endif -%}
-                            {%- set foot_row = ("<div style='margin-top:4px;font-size:10px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>" ~ (foot_parts | join(' &nbsp;•&nbsp; ')) ~ "</div>") if foot_parts | length > 0 else '' -%}
+                              {#-- countdown badge (ending soon) --#}
+                              {%- set badge_txt = '' -%}
+                              {%- if is_urgent -%}
+                                {%- set badge_txt = ui.get('ends_today', 'Ends today') if b.days_left == 0 else ((b.days_left ~ ' ' ~ ui.get('days_left', 'days left')) if b.days_left > 1 else ui.get('one_day_left', '1 day left')) -%}
+                              {%- endif -%}
+                              {%- set badge_html = ("<span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:var(--warning-color);color:#000;'>" ~ badge_txt ~ "</span>") if badge_txt | length > 0 else '' -%}
 
+                              {#-- one info row: percent, awards, if-missed, earned count, time left --#}
+                              {%- set bits = [] -%}
+                              {%- if started -%}
+                                {%- set bits = bits + ["<b style='color:var(--primary-color);'>" ~ pct ~ "%</b>"] -%}
+                              {%- endif -%}
+                              {%- if b.mult > 0 -%}
+                                {%- set bits = bits + ['⚡×' ~ ('%g' | format(b.mult | round(2)))] -%}
+                              {%- endif -%}
+                              {%- if b.rewards > 0 -%}
+                                {%- set bits = bits + ['🎁 ' ~ ui.get('reward', 'Reward') ~ (' ×' ~ b.rewards if b.rewards > 1 else '')] -%}
+                              {%- endif -%}
+                              {%- if b.bonuses > 0 -%}
+                                {%- set bits = bits + ['✨ ' ~ ui.get('bonus', 'Bonus') ~ (' ×' ~ b.bonuses if b.bonuses > 1 else '')] -%}
+                              {%- endif -%}
+                              {%- set missed = namespace(v=[]) -%}
+                              {%- for pn in b.penalties -%}
+                                {%- if pn is mapping and (pn.get('name') or '') | string | trim | length > 0 -%}
+                                  {%- set missed.v = missed.v + [pn.get('name') | string | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;')] -%}
+                                {%- endif -%}
+                              {%- endfor -%}
+                              {%- if missed.v | length == 0 and b.penalties | length > 0 -%}
+                                {%- set missed.v = [ui.get('penalty', 'Penalty')] -%}
+                              {%- endif -%}
+                              {%- if b.end | length > 0 and missed.v | length > 0 -%}
+                                {%- set bits = bits + ["<span style='color:var(--error-color);'>⏳ " ~ (missed.v | join(' • ')) ~ "</span>"] -%}
+                              {%- endif -%}
+                              {%- if b.award_count > 0 -%}
+                                {%- set bits = bits + ['🥇 ' ~ b.award_count] -%}
+                              {%- endif -%}
+                              {%- if b.starts_future -%}
+                                {%- set bits = bits + ['📅 ' ~ ui.get('starts', 'starts') ~ ' ' ~ (as_timestamp(b.start ~ 'T12:00:00') | timestamp_custom('%b %d'))] -%}
+                              {%- elif not is_urgent and b.end | length > 0 -%}
+                                {%- if b.days_left > 3 and b.days_left < 999 -%}
+                                  {%- set bits = bits + ['📅 ' ~ b.days_left ~ ' ' ~ ui.get('days_left', 'days left')] -%}
+                                {%- else -%}
+                                  {%- set bits = bits + ['📅 ' ~ b.end] -%}
+                                {%- endif -%}
+                              {%- endif -%}
+
+                              {%- set tile = "<div style='flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb, " ~ row_col ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ row_col ~ ";display:block;'></ha-icon></div>" -%}
+                              {%- set reward_pill = ("<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>+" ~ ('%g' | format(b.points | round(2))) ~ "</div>") if b.points > 0 else '' -%}
+                              {%- set sub_txt = bdesc if bdesc | length > 0 else ui.get('complete_to_earn', 'Complete to earn') -%}
+                              {%- set row_html = "<div style='position:relative;overflow:hidden;box-sizing:border-box;width:100%;border-radius:16px;border:" ~ ('1px solid var(--warning-color)' if is_urgent else '1px solid var(--divider-color)') ~ ";background:linear-gradient(90deg, color-mix(in srgb, " ~ row_col ~ " 34%, var(--card-background-color)) 0%, color-mix(in srgb, " ~ row_col ~ " 13%, var(--card-background-color)) " ~ pct ~ "%, var(--card-background-color) " ~ pct ~ "%);padding:12px;text-align:left;'>"
+                                  ~ "<div style='display:flex;align-items:center;gap:10px;'>" ~ tile
+                                  ~ "<div style='flex:1;min-width:0;'><div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;'><span style='font-size:15px;line-height:1.2;font-weight:800;color:var(--primary-text-color);'>" ~ bname ~ "</span>" ~ badge_html ~ "</div>"
+                                  ~ "<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ sub_txt ~ "</div>"
+                                  ~ ("<div style='margin-top:3px;font-size:11px;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ (bits | join(' &nbsp;·&nbsp; ')) ~ "</div>" if bits | length > 0 else '')
+                                  ~ "</div>" ~ reward_pill ~ "</div></div>" -%}
+                              {%- set emit.items = emit.items + [{'eid': b.eid, 'html': row_html, 'head': ghead.v}] -%}
+                              {%- set ghead.v = '' -%}
+                            {%- endfor -%}
+
+                            {%- for idx in gstat.earned -%}
+                              {%- set b = ns.badges[idx] -%}
+                              {%- set bname = b.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                              {%- set slim_html = "<div style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:8px 12px;border-radius:14px;background:var(--card-background-color);border:1px solid var(--divider-color);text-align:left;'>"
+                                  ~ "<ha-icon icon='" ~ b.icon ~ "' style='flex:0 0 auto;width:20px;height:20px;--mdc-icon-size:20px;color:var(--success-color);display:block;'></ha-icon>"
+                                  ~ "<span style='min-width:0;font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>"
+                                  ~ "<span style='margin-left:auto;flex:0 0 auto;font-size:12px;color:var(--secondary-text-color);'>✓ " ~ (b.last_awarded if b.last_awarded | length > 0 else ui.get('earned', 'Earned')) ~ "</span></div>" -%}
+                              {%- set emit.items = emit.items + [{'eid': b.eid, 'html': slim_html, 'head': ghead.v}] -%}
+                              {%- set ghead.v = '' -%}
+                            {%- endfor -%}
+                          {%- endfor -%}
+
+                          {%- for it in emit.items -%}
                             {{
                               {
                                 'type': 'custom:button-card',
-                                'entity': b.eid,
+                                'entity': it.eid,
                                 'show_name': false,
                                 'show_icon': false,
                                 'show_state': false,
                                 'tap_action': {'action': 'more-info'},
-                                'custom_fields': {'content': "<div style='width:100%;'>" ~ top ~ bar ~ pill_row ~ miss_row ~ foot_row ~ "</div>"},
-                                'styles': {
-                                  'card': [
-                                    {'padding': '14px 16px'},
-                                    {'border-radius': '16px'},
-                                    {'background-color': 'var(--card-background-color)'},
-                                    {'border': ('1px solid var(--success-color)' if done else '1px solid var(--divider-color)')},
-                                    {'border-left': '4px solid ' ~ color},
-                                    {'box-shadow': ('0 2px 6px rgba(0,0,0,0.08)' if done else 'none')},
-                                    {'opacity': ('0.92' if done else '1')}
-                                  ],
-                                  'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
-                                  'custom_fields': {'content': [{'width': '100%'}, {'justify-self': 'stretch'}]}
-                                }
+                                'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ it.html ~ "</div>"},
+                                'styles': row_styles
                               }
                             }},
                           {%- endfor -%}
@@ -2885,11 +3001,32 @@ views:
                             | selectattr('attributes.family_contributions', 'defined')
                             | map(attribute='entity_id')
                             | list -%}
-                        {%- for fe in family_sensors -%}
+                        {#-- Goals that track people (day streaks, everyone-contributes) go first, then the scoreboards --#}
+                        {%- set fsort = namespace(top=[], rest=[]) -%}
+                        {%- for fe0 in family_sensors -%}
+                          {%- if (state_attr(fe0, 'type') or '') | string | lower in ['family_caught_up_days', 'family_active_days', 'family_everyone_contributes'] -%}
+                            {%- set fsort.top = fsort.top + [fe0] -%}
+                          {%- else -%}
+                            {%- set fsort.rest = fsort.rest + [fe0] -%}
+                          {%- endif -%}
+                        {%- endfor -%}
+                        {%- for fe in fsort.top + fsort.rest -%}
                           {%- if states(fe) not in ['unknown', 'unavailable'] -%}
                             {%- set fname = state_attr(fe, 'achievement_name') | default('Family Goal', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set ficon = state_attr(fe, 'icon') or 'mdi:trophy' -%}
+                            {%- set ftype = (state_attr(fe, 'type') or '') | string | lower -%}
+                            {#-- Day-streak goals count shared days, so they show a level track and no per-person rows --#}
+                            {%- set fstreak = ftype in ['family_caught_up_days', 'family_active_days'] -%}
+                            {%- set fgrid = fstreak or ftype == 'family_everyone_contributes' -%}
+                            {%- set funit = ' days' if fstreak else '' -%}
+                            {#-- Time left: only goals that run on the calendar day have a known end (midnight) --#}
+                            {%- set secs_left = 86400 - (now().hour * 3600 + now().minute * 60 + now().second) -%}
+                            {%- set hrs_left = (secs_left // 3600) | int -%}
+                            {%- set mins_left = ((secs_left % 3600) // 60) | int -%}
+                            {%- set time_txt = ((hrs_left ~ 'h ' ~ mins_left ~ 'm left') if hrs_left > 0 else (mins_left ~ 'm left')) if ftype in ['family_caught_up_days', 'family_active_days', 'family_chores_in_day'] else '' -%}
+                            {%- set time_col = 'var(--warning-color)' if hrs_left < 3 else 'var(--secondary-text-color)' -%}
+                            {%- set time_html = ("<div style='display:inline-flex;align-items:center;gap:3px;margin-top:4px;font-size:10px;font-weight:800;color:" ~ time_col ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ time_txt ~ "</div>") if time_txt else '' -%}
                             {%- set flevels = (state_attr(fe, 'family_levels') or []) | map('float', 0) | list -%}
                             {%- set frewards = (state_attr(fe, 'family_level_rewards') or []) | map('float', 0) | list -%}
                             {%- set flevel = state_attr(fe, 'family_level') | int(0) -%}
@@ -2909,55 +3046,83 @@ views:
                             {%- set fprev = ((flevels[pidx] | round(0) | int) if (fcount > 1 and pidx >= 0) else 0) -%}
                             {%- set wspan = [wtarget - fprev, 1] | max -%}
                             {%- set winto = [[ftotal - fprev, 0] | max, wspan] | min -%}
-                            {%- set bpct = ((winto / wspan) * 100) | round(1) -%}
+                            {%- set bpct = 100 if fdone else (((winto / wspan) * 100) | round(1)) -%}
                             {%- set togo = [ftarget - ftotal, 0] | max -%}
                             {%- set ftop = (fshares.values() | map('float', 0) | list | max) if fshares else 0 -%}
+                            {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
                             {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
                             {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
-
-                            {%- set pips = namespace(v='') -%}
-                            {%- if fcount > 1 -%}
-                              {%- for lv in flevels -%}
-                                {%- set pcol_l = '#22c55e' if loop.index <= elevel else ('#8b5cf6' if loop.index == elevel + 1 else 'var(--divider-color)') -%}
-                                {%- set pips.v = pips.v ~ "<div style='flex:1;height:5px;border-radius:999px;background:" ~ pcol_l ~ ";'></div>" -%}
-                              {%- endfor -%}
-                            {%- endif -%}
-                            {%- set lvl_txt = ('✓ ALL ' ~ fcount ~ ' LEVELS' if fdone else ('LEVEL ' ~ (elevel + 1) ~ ' OF ' ~ fcount)) if fcount > 1 else '' -%}
-
-                            {%- set sub = '🎉 ALL LEVELS COMPLETE' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '') ~ (' · 🏆 top contributor ×' ~ ('%g' | format(fmult)) if fmult > 1 else '')) -%}
-
-                            {%- set fui = namespace(v='') -%}
-                            {%- set fui.v = "<div style='text-align:left;padding:14px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "55;'>"
-                              ~ "<div style='display:flex;align-items:center;gap:10px;margin-bottom:12px;'>"
-                              ~ "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>"
-                              ~ "<div style='flex:1;min-width:0;'><div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "</div>"
-                              ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ "</div></div></div>"
-                              ~ ("<div style='display:flex;gap:3px;margin-bottom:6px;'>" ~ pips.v ~ "</div><div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:" ~ accent ~ ";margin-bottom:6px;'>" ~ lvl_txt ~ "</div>" if fcount > 1 else '')
-                              ~ "<div style='position:relative;height:18px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;min-width:" ~ ('18px' if bpct > 0 else '0') ~ ";border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"
-                              ~ "<div style='display:flex;justify-content:space-between;margin-top:5px;font-size:10px;font-weight:800;color:var(--secondary-text-color);'><span>" ~ fprev ~ "</span><span>" ~ wtarget ~ "</span></div>"
-                              ~ "<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);margin-top:2px;'>" ~ sub ~ "</div></div>" -%}
+                            {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>NEW PERIOD · LEVELS RESET</div>" if (fraw_done and not fdone) else '' -%}
+                            {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
+                            {%- set sub = '🎉 All levels complete' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ funit ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '') ~ (' · 🏆 top contributor ×' ~ ('%g' | format(fmult)) if fmult > 1 else '')) -%}
+                            {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
 
                             {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
                             {%- set frecord_day = state_attr(fe, 'family_record_day') or '' -%}
                             {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
-                            {%- if frecord > 0 -%}
-                              {%- set fui.v = fui.v ~ "<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);margin:6px 0 4px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>" -%}
-                            {%- endif -%}
+                            {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
 
-                            {%- if fshares -%}
+                            {%- if fgrid -%}
+                              {#-- Who is in: a check for everyone who has done their part, the count for the rest --#}
+                              {%- set cchips = namespace(v='') -%}
+                              {%- if ftype == 'family_everyone_contributes' -%}
+                                {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
+                                  {%- set p = pts | float(0) | round(0) | int -%}
+                                  {%- set p_ok = p >= wtarget -%}
+                                  {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;'>" ~ ("<ha-icon icon='mdi:check-bold' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" if p_ok else p) ~ "</span>" ~ pname_safe ~ "<span style='opacity:0.6;font-weight:600;'>" ~ p ~ "/" ~ wtarget ~ "</span></div>" -%}
+                                {%- endfor -%}
+                              {%- elif ftype == 'family_caught_up_days' -%}
+                                {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
+                                {%- for pname, ptxt in cstat.items() -%}
+                                  {%- set p_ok = (ptxt | string).startswith('0 still') -%}
+                                  {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
+                                {%- endfor -%}
+                              {%- endif -%}
+                              {#-- Level track: one node per level, green line fills as levels are reached --#}
+                              {%- set nodes = namespace(v='') -%}
+                              {%- if fcount > 1 -%}
+                                {%- for lv in flevels -%}
+                                  {%- set n_reached = fdone or loop.index <= elevel -%}
+                                  {%- set n_cur = (not fdone) and loop.index == elevel + 1 -%}
+                                  {%- set n_col = '#22c55e' if n_reached else ('#8b5cf6' if n_cur else 'var(--divider-color)') -%}
+                                  {%- set n_rw = (frewards[loop.index0] | round(0) | int) if loop.index0 < (frewards | length) else 0 -%}
+                                  {%- set nodes.v = nodes.v ~ "<div style='position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;'><div style='width:34px;height:34px;border-radius:50%;border:3px solid " ~ n_col ~ ";background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ ('mdi:check' if n_reached else 'mdi:star') ~ "' style='width:17px;height:17px;--mdc-icon-size:17px;color:" ~ n_col ~ ";display:block;'></ha-icon></div><div style='font-size:11px;font-weight:800;margin-top:4px;color:" ~ ('var(--primary-text-color)' if n_cur else 'var(--secondary-text-color)') ~ ";'>" ~ (lv | round(0) | int) ~ funit ~ "</div>" ~ ("<div style='font-size:10px;color:var(--secondary-text-color);'>+" ~ n_rw ~ " ⭐</div>" if n_rw > 0 else '') ~ "</div>" -%}
+                                {%- endfor -%}
+                              {%- endif -%}
+                              {%- set tfrac = 1 if fdone else (0 if elevel == 0 else ([(elevel - 1 + bpct / 100) / ([fcount - 1, 1] | max), 1] | min)) -%}
+                              {%- set tinset = 'calc(100% / ' ~ (fcount * 2) ~ ')' -%}
+                              {%- set fui_v = "<div style='text-align:left;padding:14px 10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
+                                ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
+                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
+                                ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
+                                ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:#22c55e;'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
+                                ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
+                                ~ rec_html
+                                ~ ("<div style='display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:8px;'>" ~ cchips.v ~ "</div>" if cchips.v else '')
+                                ~ "</div>" -%}
+                            {%- else -%}
+                              {#-- Scoreboard: goal fill row on top, one fill row per contributor underneath --#}
                               {%- set rows = namespace(v='') -%}
                               {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
                                 {%- set p = pts | float(0) | round(0) | int -%}
                                 {%- set ppct = ([((p / ftop) * 100) | round(0) | int, 100] | min) if ftop > 0 else 0 -%}
-                                {%- set lead = (p > 0 and (pts | float(0)) == ftop) -%}
+                                {%- set lead = (p > 0 and (pts | float(0)) == ftop and ntop == 1) -%}
                                 {%- set pcol = 'var(--warning-color)' if lead else 'var(--primary-color)' -%}
                                 {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                                {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px;'>"
-                                  ~ "<div style='width:26px;height:26px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
-                                  ~ "<div style='flex:1;min-width:0;'><div style='display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--primary-text-color);'><span>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><span>" ~ p ~ "</span></div>"
-                                  ~ "<div style='height:6px;background:var(--divider-color);border-radius:999px;margin-top:3px;'><div style='width:" ~ ppct ~ "%;height:100%;border-radius:999px;background:" ~ pcol ~ ";'></div></div></div></div>" -%}
+                                {%- set rows.v = rows.v ~ "<div style='position:relative;overflow:hidden;border-radius:12px;border:1px solid var(--divider-color);'>"
+                                  ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ ppct ~ "%;background:linear-gradient(90deg,color-mix(in srgb," ~ pcol ~ " 34%,transparent),color-mix(in srgb," ~ pcol ~ " 10%,transparent));'></div>"
+                                  ~ "<div style='position:relative;display:flex;align-items:center;gap:6px;padding:6px 8px;'><div style='width:20px;height:20px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
+                                  ~ "<span style='flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary-text-color);'>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><b style='font-size:12px;color:var(--primary-text-color);'>" ~ p ~ "</b></div></div>" -%}
                               {%- endfor -%}
-                              {%- set fui.v = fui.v ~ "<div style='text-align:left;margin:8px 2px 4px 2px;'>" ~ rows.v ~ "</div>" -%}
+                              {%- set fui_v = "<div style='text-align:left;padding:10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
+                                ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
+                                ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
+                                ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
+                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div></div>"
+                                ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
+                                ~ rec_html ~ "<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div></div>" -%}
                             {%- endif -%}
 
                             {{
@@ -2967,7 +3132,7 @@ views:
                                 'show_icon': false,
                                 'tap_action': {'action': 'none'},
                                 'hold_action': {'action': 'none'},
-                                'custom_fields': {'content': fui.v},
+                                'custom_fields': {'content': fui_v},
                                 'styles': {
                                   'card': [
                                     {'background': 'transparent'},
