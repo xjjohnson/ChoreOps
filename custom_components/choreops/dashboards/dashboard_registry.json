@@ -314,10 +314,10 @@
     {
       "template_id": "user-family-home-v1",
       "display_name": "Family Home",
-      "description": "Family home page: tappable person cards that open each Family Hub page, family goals tiles, and family achievements",
+      "description": "Family Home tab (added automatically as the first tab of dashboards that use Family Hub): tappable person cards, family goals tiles, and family achievements",
       "audience": "user",
       "category": "full",
-      "lifecycle_state": "active",
+      "lifecycle_state": "archived",
       "min_integration_version": "1.5.0",
       "maintainer": "xjjohnson",
       "source": {
