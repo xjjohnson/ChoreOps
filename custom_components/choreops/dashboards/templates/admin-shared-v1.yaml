@@ -1693,6 +1693,7 @@ views:
                 {%- set qa_paused_until = state_attr(selected_dashboard_helper, 'chores_paused_until') -%}
                 {%- set qa_gam = state_attr(selected_dashboard_helper, 'gamification_enabled') | default(false, true) -%}
                 {%- set qa_pbuttons = (state_attr(selected_dashboard_helper, 'points_buttons') | default([], true)) if qa_user_ok else [] -%}
+                {%- set qa_notify = ((state_attr(selected_dashboard_helper, 'notify_service') or '') | string | trim) if qa_user_ok else '' -%}
                 {%- set qa_badges = (state_attr(selected_dashboard_helper, 'badges') | default([], true)) if qa_user_ok else [] -%}
                 {%- set qa_specs = namespace(items=[]) -%}
 
@@ -1752,6 +1753,13 @@ views:
                       'color': 'var(--primary-color)',
                       'tint': qa_open.get('adjust-open', false),
                       'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/adjust-open', 'value': not (qa_open.get('adjust-open', false) | bool(false))}}
+                    }
+                    ,{
+                      'icon': 'mdi:chart-box-outline',
+                      'name': 'Activity report',
+                      'label': ('Send to ' ~ qa_notify) if qa_notify else 'Set a notify service in settings',
+                      'color': 'var(--primary-color)',
+                      'tap': ({'action': 'call-service', 'service': 'choreops.generate_activity_report', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'notify_service': qa_notify}, 'confirmation': {'text': 'Send the last 7 days of activity for ' ~ selected_user_name ~ ' to ' ~ qa_notify ~ '?'}} if qa_notify else {'action': 'url', 'url_path': '/config/integrations/integration/choreops'})
                     }
                   ] -%}
                 {%- elif qa_tab == 'system' -%}

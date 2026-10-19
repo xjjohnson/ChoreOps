@@ -1488,9 +1488,15 @@ def test_admin_quick_actions_economy_uses_configured_point_buttons() -> None:
         {"eid": "button.alice_plus_50", "name": "Points +50"},
     ]
     eco = _render_quick_actions(
-        "economy", {"adjust-open": True}, {"points_buttons": buttons}
+        "economy",
+        {"adjust-open": True},
+        {"points_buttons": buttons, "notify_service": "notify.family"},
     )
-    assert eco[1]["cards"][0]["name"] == "Adjust points"
+    assert [t["name"] for t in eco[1]["cards"]] == ["Adjust points", "Activity report"]
+    report = eco[1]["cards"][1]["tap_action"]
+    assert report["service"] == "choreops.generate_activity_report"
+    assert report["data"]["notify_service"] == "notify.family"
+    assert report["data"]["user_name"] == "Alice"
     amounts = eco[3]["cards"]
     assert [c["name"] for c in amounts] == ["-200", "+50"]
     assert amounts[0]["tap_action"] == {
@@ -1774,3 +1780,13 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     html = parsed[0]["custom_fields"]["content"]
     assert "Dishes" in html and "+10" in html and "Today" in html
     assert "Late" in html and "Yesterday" in html and "-2" in html
+
+
+def test_admin_activity_report_without_notify_service_points_to_settings() -> None:
+    """With no notify service saved, the Activity report tile opens the settings."""
+
+    eco = _render_quick_actions("economy", None, {"points_buttons": []})
+    tile = eco[1]["cards"][1]
+    assert tile["name"] == "Activity report"
+    assert tile["tap_action"]["action"] == "url"
+    assert "notify service" in tile["label"].lower()
