@@ -1035,17 +1035,21 @@ class RewardManager(BaseManager):
         )
         return {user_id: amount for user_id, amount in refunds.items() if amount > 0}
 
-    async def refund_pool(self, reward_id: str) -> dict[str, float]:
-        """Cancel a pool and return everyone's contribution.
+    async def refund_pool(
+        self, reward_id: str, user_id: str | None = None
+    ) -> dict[str, float]:
+        """Cancel a pool and return everyone's contribution, or just one person's.
 
         Works on any reward still holding pool points, so a pool can be
         refunded even after the reward was switched back to a normal reward.
 
         Args:
             reward_id: The reward's internal ID.
+            user_id: When set, refund only this user's contribution and leave
+                everyone else's points in the pool.
 
         Returns:
-            Refund per user ID (empty when the pool held nothing).
+            Refund per user ID (empty when there was nothing to refund).
 
         Raises:
             HomeAssistantError: If the reward is not found.
@@ -1068,9 +1072,18 @@ class RewardManager(BaseManager):
                 for user_id, amount in self.get_pool_contributions(reward_info).items()
                 if amount > 0
             }
+            if user_id is not None:
+                refunds = {
+                    uid: amount for uid, amount in refunds.items() if uid == user_id
+                }
             if not refunds:
                 return {}
-            reward_info[const.DATA_REWARD_POOL_CONTRIBUTIONS] = {}
+            if user_id is not None:
+                remaining = self.get_pool_contributions(reward_info)
+                remaining.pop(user_id, None)
+                reward_info[const.DATA_REWARD_POOL_CONTRIBUTIONS] = remaining
+            else:
+                reward_info[const.DATA_REWARD_POOL_CONTRIBUTIONS] = {}
 
             # Persist → Emit (per DEVELOPMENT_STANDARDS.md § 5.3)
             self.coordinator._persist_and_update()

@@ -550,7 +550,14 @@ _REWARD_POOL_BASE = {
 
 APPROVE_REWARD_POOL_SCHEMA = vol.Schema(_with_service_target_fields(_REWARD_POOL_BASE))
 
-REFUND_REWARD_POOL_SCHEMA = vol.Schema(_with_service_target_fields(_REWARD_POOL_BASE))
+REFUND_REWARD_POOL_SCHEMA = vol.Schema(
+    _with_service_target_fields(
+        {
+            **_REWARD_POOL_BASE,
+            vol.Optional(const.SERVICE_FIELD_USER_NAME): cv.string,
+        }
+    )
+)
 
 # Optional filter base patterns for reset operations
 _OPTIONAL_ASSIGNEE_FILTER = {vol.Optional(const.SERVICE_FIELD_USER_NAME): cv.string}
@@ -3225,12 +3232,18 @@ def async_setup_services(hass: HomeAssistant):
     )
 
     async def handle_refund_reward_pool(call: ServiceCall) -> None:
-        """Cancel a family pool and give everyone their points back."""
+        """Cancel a family pool, or refund one person's share of it."""
         resolved = await _resolve_reward_pool_call(call, "Refund Reward Pool")
         if resolved is None:
             return
         coordinator, reward_id = resolved
-        await coordinator.reward_manager.refund_pool(reward_id)
+        user_name = call.data.get(const.SERVICE_FIELD_USER_NAME)
+        user_id = (
+            get_item_id_or_raise(coordinator, const.ITEM_TYPE_USER, user_name)
+            if user_name
+            else None
+        )
+        await coordinator.reward_manager.refund_pool(reward_id, user_id)
 
     hass.services.async_register(
         const.DOMAIN,

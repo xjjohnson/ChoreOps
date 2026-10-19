@@ -2162,7 +2162,7 @@ refund_reward_pool:
   name: "Refund Reward Pool"
   description: >
     Cancel a family pool and give every contributor back exactly what they
-    paid in.
+    paid in, or refund just one person's share when a user name is given.
   fields:
     config_entry_id:
       name: "Config Entry ID (Optional)"
@@ -2190,5 +2190,12 @@ refund_reward_pool:
       description: "The name of the family pool reward."
       example: "Family Movie Night"
       required: true
+      selector:
+        text:
+    user_name:
+      name: "User Name (Optional)"
+      description: "Refund only this user's share and leave everyone else's points in the pool. Leave empty to cancel the pool and refund everyone."
+      example: "Zoë"
+      required: false
       selector:
         text:
