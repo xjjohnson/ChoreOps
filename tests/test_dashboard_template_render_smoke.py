@@ -1553,7 +1553,7 @@ def test_user_family_hub_template_renders_without_parse_errors() -> None:
 
     assert isinstance(rendered.get("views"), list)
     assert len(rendered["views"]) == 1
-    assert rendered["views"][0]["title"] == "Family Hub"
+    assert rendered["views"][0]["title"] == "Zoe"
     assert rendered["views"][0]["path"] == "family-hub-zoe"
     assert isinstance(rendered["views"][0].get("sections"), list)
     assert "chore_row_timeline_v1" in rendered["button_card_templates"]
