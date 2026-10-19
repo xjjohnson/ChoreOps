@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+import json
 import inspect
 from pathlib import Path
 import re
@@ -770,24 +771,45 @@ def _render_family_home_view(
     release_version: str | None,
     generated_at: str,
     root_button_card_templates: dict[str, Any],
+    user_names: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Render the Family Home view (added first when Family Hub is used)."""
-    rendered = render_dashboard_template(
-        template_str,
-        build_admin_dashboard_context(
-            integration_entry_id=integration_entry_id,
-            template_profile=FAMILY_HOME_TEMPLATE_ID,
-            release_ref=release_ref,
-            release_version=release_version,
-            generated_at=generated_at,
-        ),
+    """Render the Family Home view (added first when Family Hub is used).
+
+    user_names limits the cards to the people the dashboard was generated for.
+    """
+    context = build_admin_dashboard_context(
+        integration_entry_id=integration_entry_id,
+        template_profile=FAMILY_HOME_TEMPLATE_ID,
+        release_ref=release_ref,
+        release_version=release_version,
+        generated_at=generated_at,
     )
+    context["home"] = {"user_names": json.dumps(list(user_names or []))}
+    rendered = render_dashboard_template(template_str, context)
     view, root_templates = _extract_rendered_template_view_and_root_templates(rendered)
     _merge_root_button_card_templates(root_button_card_templates, root_templates)
     view["path"] = FAMILY_HOME_VIEW_PATH
     view.setdefault("title", "Home")
     return view
 
+
+
+def _family_home_user_names(
+    assignee_names: list[str], existing_views: list[dict[str, Any]]
+) -> list[str]:
+    """People shown on Family Home: this run's users plus existing Family Hub pages."""
+    names = list(assignee_names)
+    for view in existing_views:
+        path = view.get("path")
+        title = view.get("title")
+        if (
+            isinstance(path, str)
+            and path.startswith("family-hub-")
+            and isinstance(title, str)
+            and title not in names
+        ):
+            names.append(title)
+    return names
 
 
 def build_multi_view_dashboard(
@@ -1283,6 +1305,7 @@ async def create_choreops_dashboard(
                 release_version=local_release_version,
                 generated_at=generated_at,
                 root_button_card_templates=root_button_card_templates,
+                user_names=list(assignee_names),
             ),
         )
 
@@ -1676,6 +1699,7 @@ async def update_choreops_dashboard_views(
             release_version=local_release_version,
             generated_at=generated_at,
             root_button_card_templates=root_button_card_templates,
+            user_names=_family_home_user_names(assignee_names, existing_views),
         )
 
     for view in existing_views:

@@ -43,6 +43,10 @@ views:
                 | selectattr('attributes.purpose', 'defined')
                 | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
                 | list -%}
+              {%- set pref_users = << home.user_names >> -%}
+              {%- if pref_users | length > 0 -%}
+                {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
+              {%- endif -%}
               {%- set hour_now = now().hour -%}
               {#-- 3. Render one tappable card per person --#}
               {%- for h in helpers -%}
@@ -130,6 +134,10 @@ views:
                 | selectattr('attributes.purpose', 'defined')
                 | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
                 | list -%}
+              {%- set pref_users = << home.user_names >> -%}
+              {%- if pref_users | length > 0 -%}
+                {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
+              {%- endif -%}
               {%- set today = now().strftime('%Y-%m-%d') -%}
               {%- set ns = namespace(q={}) -%}
               {%- for h in helpers -%}
