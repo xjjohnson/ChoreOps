@@ -4689,6 +4689,33 @@ class SystemDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         """Return the translation sensor entity ID for the resolved language."""
         return self.coordinator.ui_manager.get_translation_sensor_eid(language_code)
 
+    def _build_family_goals(self) -> list[dict[str, Any]]:
+        """Return every family goal for the OpsCenter reset card.
+
+        Read straight from storage so the card does not depend on per-person
+        entity lookups.
+        """
+        goals: list[dict[str, Any]] = []
+        manager = self.coordinator.gamification_manager
+        for achievement_id, info in self.coordinator.achievements_data.items():
+            if info.get(const.DATA_ACHIEVEMENT_TYPE) not in const.FAMILY_ACHIEVEMENT_TYPES:
+                continue
+            name = str(info.get(const.DATA_ACHIEVEMENT_NAME, "")).strip()
+            if not name:
+                continue
+            target = float(info.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 0) or 0)
+            total = float(manager.get_family_achievement_total(achievement_id))
+            goals.append(
+                {
+                    "name": name,
+                    "type": str(info.get(const.DATA_ACHIEVEMENT_TYPE, "")),
+                    "total": round(total, 2),
+                    "target": round(target, 2),
+                }
+            )
+        goals.sort(key=lambda goal: goal["name"].lower())
+        return goals
+
     def _get_user_dashboard_helpers(self) -> dict[str, str]:
         """Return a minimal user-to-helper entity map for shared admin templates."""
         entity_registry = async_get(self.hass)
@@ -4730,6 +4757,7 @@ class SystemDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                 f"{self._entry.entry_id}:{const.ATTR_UI_ROOT_SHARED_ADMIN}"
             ),
             const.ATTR_USER_DASHBOARD_HELPERS: self._get_user_dashboard_helpers(),
+            "family_goals": self._build_family_goals(),
             const.TRANS_KEY_ATTR_LANGUAGE: language_code,
             const.ATTR_TRANSLATION_SENSOR_EID: self._get_translation_sensor_eid(
                 language_code

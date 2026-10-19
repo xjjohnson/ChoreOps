@@ -138,7 +138,7 @@ views:
           card:
             type: grid
             square: false
-            columns: 1
+            columns: 2
           card_param: cards
           filter:
             template: |-
@@ -200,8 +200,7 @@ views:
                 {%- set html = "<div style='width:100%;text-align:left;position:relative;'>"
                   ~ "<div style='display:flex;align-items:center;gap:8px;'>"
                   ~ "<div style='width:36px;height:36px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex:0 0 auto;'>" ~ (nm[:1] | upper) ~ "</div>"
-                  ~ "<div style='flex:1;min-width:0;'><div style='font-size:9px;font-weight:700;opacity:.65;text-transform:uppercase;letter-spacing:.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ greet ~ "</div>"
-                  ~ "<div style='font-size:16px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div></div>"
+                  ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div></div>"
                   ~ pts_html ~ "</div>"
                   ~ "<div style='display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;margin-top:8px;'>" ~ rank_html
                   ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:" ~ sc ~ ";background:color-mix(in srgb," ~ sc ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='" ~ si ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ st ~ "</span>" ~ flame_html ~ "</div>"
