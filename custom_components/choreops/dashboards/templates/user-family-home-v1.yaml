@@ -375,12 +375,15 @@ views:
                   {%- set pkey = pos | string -%}
                   {%- set kk = mk.seen.get(pkey, 0) -%}
                   {%- set mk.seen = mk.seen | combine({pkey: kk + 1}) -%}
-                  {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (97 if pos > 97 else pos) ~ "% - 8px);top:-6px;margin-left:" ~ (kk * 9) ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
+                  {#-- People at the same spot alternate above and below the track so every initial stays readable --#}
+                  {%- set lane_top = -22 if kk % 2 == 0 else 7 -%}
+                  {%- set lane_off = (kk // 2) * 13 -%}
+                  {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (94 if pos > 94 else pos) ~ "% - 8px + " ~ lane_off ~ "px);top:" ~ lane_top ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
                 {%- endfor -%}
                 {%- set done_n = q.people | selectattr('e') | list | length -%}
                 {%- set ticks = namespace(v='') -%}
                 {%- for tk in [25, 50, 75] -%}
-                  {%- set ticks.v = ticks.v ~ "<div style='position:absolute;left:" ~ tk ~ "%;top:-2px;width:1.5px;height:10px;background:var(--divider-color);opacity:0.9;'></div><div style='position:absolute;left:" ~ tk ~ "%;top:12px;font-size:8px;color:var(--secondary-text-color);transform:translateX(-50%);opacity:0.8;'>" ~ tk ~ "</div>" -%}
+                  {%- set ticks.v = ticks.v ~ "<div style='position:absolute;left:" ~ tk ~ "%;top:-2px;width:1.5px;height:10px;background:var(--divider-color);opacity:0.9;'></div>" -%}
                 {%- endfor -%}
                 {%- set lead_user = (q.people | sort(attribute='p', reverse=true) | map(attribute='u') | first) | default('', true) -%}
                 {%- set nav_path = ((('/' ~ pref_dashboard_path ~ '/') if pref_dashboard_path else '') ~ 'family-hub-' ~ (lead_user | slugify)) -%}
@@ -390,7 +393,7 @@ views:
                   ~ "<div style='display:flex;flex-direction:column;gap:7px;padding:9px 10px;'>"
                   ~ "<div style='display:flex;align-items:center;gap:8px;'><div style='width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg," ~ acc ~ "," ~ acc2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#fff;display:block;'></ha-icon></div>"
                   ~ "<div style='flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.15;color:var(--primary-text-color);'>" ~ qname ~ "</div></div>"
-                  ~ "<div style='position:relative;height:32px;'><div style='position:relative;height:6px;border-radius:4px;background:var(--divider-color);margin:10px 16px 0 8px;'>"
+                  ~ "<div style='position:relative;height:48px;'><div style='position:relative;height:6px;border-radius:4px;background:var(--divider-color);margin:22px 16px 0 8px;'>"
                   ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ fillw ~ "%;border-radius:4px;background:linear-gradient(90deg," ~ acc ~ "," ~ acc2 ~ ");'></div>"
                   ~ ticks.v ~ mk.v
                   ~ "<div style='position:absolute;right:-15px;top:-9px;font-size:12px;line-height:1;'>🏁</div></div></div>"
