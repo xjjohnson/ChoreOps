@@ -290,7 +290,7 @@ views:
                   {%- set nm = r.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                   {%- set pct = ((r.pts / lb.top * 100) | round(0) | int) if lb.top > 0 else 0 -%}
                   {%- set crown = '&#128081;' if (loop.first and r.pts > 0) else '' -%}
-                  {%- set rows_html.v = rows_html.v ~ "<div style='display:flex;align-items:center;gap:8px;margin-top:8px;'><span style='width:18px;font-size:14px;text-align:center;'>" ~ crown ~ "</span><span style='width:28px;height:28px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;'>" ~ (r.name[:1] | upper) ~ "</span><span style='width:64px;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</span><div style='flex:1;height:9px;border-radius:99px;background:var(--divider-color);overflow:hidden;'><div style='height:100%;width:" ~ (pct | string) ~ "%;border-radius:99px;background:" ~ ('var(--warning-color)' if (loop.first and r.pts > 0) else 'var(--primary-color)') ~ ";'></div></div><span style='width:40px;text-align:right;font-size:12px;font-weight:800;'>" ~ ('%g' | format(r.pts | round(1))) ~ "</span></div>" -%}
+                  {%- set rows_html.v = rows_html.v ~ "<div style='display:flex;align-items:center;gap:8px;margin-top:8px;'><span style='width:18px;font-size:14px;text-align:center;'>" ~ crown ~ "</span><span style='width:28px;height:28px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;'>" ~ (r.name[:1] | upper) ~ "</span><span style='width:64px;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</span><div style='flex:1;height:9px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='height:100%;width:" ~ (pct | string) ~ "%;border-radius:999px;background:" ~ ('var(--warning-color)' if (loop.first and r.pts > 0) else 'var(--primary-color)') ~ ";'></div></div><span style='width:40px;text-align:right;font-size:12px;font-weight:800;'>" ~ ('%g' | format(r.pts | round(1))) ~ "</span></div>" -%}
                 {%- endfor -%}
                 {%- set html = "<div style='width:100%;text-align:left;'><div style='display:flex;align-items:center;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'>Points earned</div></div>" ~ rows_html.v ~ "</div>" -%}
                 {%- set bcol = 'var(--divider-color)' -%}
@@ -373,7 +373,7 @@ views:
                 {%- set items.l = items.l + [q | combine({'top': top, 'alldone': alldone, 'key': [(1 if alldone else 0), (1 if q.left >= 999 else 0), (q.left if q.left < 999 else 0), (100 - top), qn | lower]})] -%}
               {%- endfor -%}
               {%- for q in items.l | sort(attribute='key') -%}
-                {%- set acc = '#22c55e' if q.alldone else '#8b5cf6' -%}
+                {%- set acc = 'var(--success-color)' if q.alldone else '#8b5cf6' -%}
                 {%- set acc2 = '#86efac' if q.alldone else '#ec4899' -%}
                 {%- set urgent = (not q.alldone) and q.left >= 0 and q.left <= pref_urgent_days -%}
                 {%- set tcol = 'var(--warning-color)' if urgent else 'var(--secondary-text-color)' -%}
@@ -382,7 +382,7 @@ views:
                 {%- set av = namespace(v='') -%}
                 {%- for pp in q.people -%}
                   {%- set lead = pp.p > 0 and pp.p == q.top -%}
-                  {%- set pc = '#22c55e' if pp.e else ('var(--warning-color)' if lead else 'var(--primary-color)') -%}
+                  {%- set pc = 'var(--success-color)' if pp.e else ('var(--warning-color)' if lead else 'var(--primary-color)') -%}
                   {%- set nm = pp.u | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                   {%- set av.v = av.v ~ "<div style='margin-left:-4px;border:2px solid var(--card-background-color);border-radius:50%;'><div style='width:18px;height:18px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
                 {%- endfor -%}
@@ -525,7 +525,7 @@ views:
                   {%- set togo = [ftarget - ftotal, 0] | max -%}
                   {%- set ftop = (fshares.values() | map('float', 0) | list | max) if fshares else 0 -%}
                   {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
-                  {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
+                  {%- set accent = 'var(--success-color)' if fdone else '#8b5cf6' -%}
                   {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
                   {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ('STREAK RESET · LEVELS RESET' if streak_reset else 'NEW PERIOD · LEVELS RESET') ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
                   {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
@@ -546,14 +546,14 @@ views:
                         {%- set p = pts | float(0) | round(0) | int -%}
                         {%- set p_ok = p >= wtarget -%}
                         {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                        {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;'>" ~ ("<ha-icon icon='mdi:check-bold' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" if p_ok else p) ~ "</span>" ~ pname_safe ~ "<span style='opacity:0.6;font-weight:600;'>" ~ p ~ "/" ~ wtarget ~ "</span></div>" -%}
+                        {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('var(--success-color)' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;'>" ~ ("<ha-icon icon='mdi:check-bold' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" if p_ok else p) ~ "</span>" ~ pname_safe ~ "<span style='opacity:0.6;font-weight:600;'>" ~ p ~ "/" ~ wtarget ~ "</span></div>" -%}
                       {%- endfor -%}
                     {%- elif ftype == 'family_caught_up_days' -%}
                       {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
                       {%- for pname, ptxt in cstat.items() -%}
                         {%- set p_ok = (ptxt | string).startswith('0 still') -%}
                         {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                        {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
+                        {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('var(--success-color)' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
                       {%- endfor -%}
                     {%- endif -%}
                     {#-- Level track: one node per level, green line fills as levels are reached --#}
@@ -567,7 +567,7 @@ views:
                         {%- if loop.index0 >= wstart and loop.index0 < wstart + wcnt -%}
                         {%- set n_reached = fdone or loop.index <= elevel -%}
                         {%- set n_cur = (not fdone) and loop.index == elevel + 1 -%}
-                        {%- set n_col = '#22c55e' if n_reached else ('#8b5cf6' if n_cur else 'var(--divider-color)') -%}
+                        {%- set n_col = 'var(--success-color)' if n_reached else ('#8b5cf6' if n_cur else 'var(--divider-color)') -%}
                         {%- set n_rw = (frewards[loop.index0] | round(0) | int) if loop.index0 < (frewards | length) else 0 -%}
                         {%- set nodes.v = nodes.v ~ "<div style='position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;'><div style='width:34px;height:34px;border-radius:50%;border:3px solid " ~ n_col ~ ";background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ ('mdi:check' if n_reached else 'mdi:star') ~ "' style='width:17px;height:17px;--mdc-icon-size:17px;color:" ~ n_col ~ ";display:block;'></ha-icon></div><div style='font-size:11px;font-weight:800;margin-top:4px;color:" ~ ('var(--primary-text-color)' if n_cur else 'var(--secondary-text-color)') ~ ";'>" ~ (lv | round(0) | int) ~ funit ~ "</div>" ~ ("<div style='font-size:10px;color:var(--secondary-text-color);'>+" ~ n_rw ~ " ⭐</div>" if n_rw > 0 else '') ~ "</div>" -%}
                         {%- endif -%}
@@ -579,7 +579,7 @@ views:
                       ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
                       ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
                       ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
-                      ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:#22c55e;'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
+                      ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:var(--success-color);'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
                       ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
                       ~ (("<div style='text-align:center;'>" ~ mult_html ~ "</div>") if mult_html else '')
                       ~ rec_html

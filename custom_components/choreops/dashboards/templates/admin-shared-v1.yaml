@@ -172,7 +172,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '9px 12px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': '1px solid color-mix(in srgb, ' ~ pref_claim_accent ~ ' 14%, var(--divider-color))'},
                             {'background-color': 'var(--card-background-color)'},
@@ -325,7 +325,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '9px 12px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': '1px solid color-mix(in srgb, ' ~ pref_claim_accent ~ ' 14%, var(--divider-color))'},
                             {'background-color': 'var(--card-background-color)'},
@@ -507,7 +507,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '10px 10px 3px 10px'},
-                            {'border-radius': '18px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': '1px solid color-mix(in srgb, ' ~ pref_claim_accent ~ ' 16%, var(--divider-color))'},
                             {'background-color': 'color-mix(in srgb, var(--primary-color) 4%, var(--card-background-color))'}
@@ -677,7 +677,7 @@ views:
                       },
                       'hold_action': {'action': 'none'},
                       'styles': {
-                        'card': [{'padding': '12px 14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'margin-top': '4px'}, {'background': 'var(--success-color)'}, {'border': 'none'}],
+                        'card': [{'padding': '12px 14px'}, {'border-radius': '16px'}, {'box-shadow': 'none'}, {'margin-top': '4px'}, {'background': 'var(--success-color)'}, {'border': 'none'}],
                         'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '32px 1fr'}, {'column-gap': '12px'}, {'align-items': 'center'}],
                         'icon': [{'width': '24px'}, {'color': '#fff'}],
                         'name': [{'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '800'}, {'color': '#fff'}],
@@ -813,7 +813,7 @@ views:
               {%- if not bp_collapsed -%}
               {%- for kind in ['bonuses', 'penalties'] -%}
                 {%- set good = kind == 'bonuses' -%}
-                {%- set col = '#22c55e' if good else '#ef4444' -%}
+                {%- set col = 'var(--success-color)' if good else 'var(--error-color)' -%}
                 {%- set ns = namespace(q={}) -%}
                 {%- for h in helpers -%}
                   {%- set uname = (h.attributes.get('user_name') or '') | string -%}
@@ -1042,12 +1042,12 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '6px 10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'},
-                            {'background': 'color-mix(in srgb, #ef4444 14%, transparent)'},
-                            {'border': '1.5px solid #ef4444'}
+                            {'background': 'color-mix(in srgb, var(--error-color) 14%, transparent)'},
+                            {'border': '1.5px solid var(--error-color)'}
                           ],
                           'grid': [{'grid-template-areas': '"i n"'}, {'grid-template-columns': 'min-content min-content'}, {'column-gap': '4px'}],
-                          'icon': [{'width': '16px'}, {'color': '#ef4444'}],
-                          'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#ef4444'}]
+                          'icon': [{'width': '16px'}, {'color': 'var(--error-color)'}],
+                          'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': 'var(--error-color)'}]
                         }
                       }}
                     },
@@ -1191,11 +1191,11 @@ views:
                 {%- set pfull = state_attr(peid, 'pool_full') and ptotal > 0 -%}
                 {%- set ppct = ((ptotal / ptarget * 100) | round(0) | int) if ptarget > 0 else 0 -%}
                 {%- set pcontrib = state_attr(peid, 'pool_contributions') or {} -%}
-                {%- set pcol = '#22c55e' if pfull else pref_rp_accent -%}
+                {%- set pcol = 'var(--success-color)' if pfull else pref_rp_accent -%}
                 {%- set picon = state_attr(peid, 'icon') or 'mdi:gift-outline' -%}
                 {%- set psafe = pname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                {%- set head_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:36px;height:36px;border-radius:11px;background:" ~ pcol ~ ";display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ picon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);'>" ~ psafe ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'>" ~ (('Full · waiting for you') if pfull else (('%g' | format(premain | round(2))) ~ ' to go' if ptotal > 0 else 'Nobody has chipped in')) ~ "</div></div><span style='font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;letter-spacing:0.5px;background:color-mix(in srgb, " ~ pcol ~ " 25%, transparent);color:" ~ pcol ~ ";'>" ~ ('READY' if pfull else 'FILLING') ~ "</span></div>" -%}
-                {%- set bar_html = "<div style='height:10px;border-radius:99px;background:var(--divider-color);overflow:hidden;margin-top:2px;'><div style='height:100%;width:" ~ (ppct if ppct < 100 else 100) ~ "%;background:" ~ pcol ~ ";border-radius:99px;'></div></div><div style='display:flex;justify-content:space-between;font-size:11px;color:var(--secondary-text-color);margin-top:4px;'><span>" ~ ('%g' | format(ptotal | round(2))) ~ " of " ~ ('%g' | format(ptarget | round(2))) ~ " points</span><span>" ~ ppct ~ "%</span></div>" -%}
+                {%- set head_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:36px;height:36px;border-radius:11px;background:" ~ pcol ~ ";display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ picon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);'>" ~ psafe ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'>" ~ (('Full · waiting for you') if pfull else (('%g' | format(premain | round(2))) ~ ' to go' if ptotal > 0 else 'Nobody has chipped in')) ~ "</div></div><span style='font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:0.5px;background:color-mix(in srgb, " ~ pcol ~ " 25%, transparent);color:" ~ pcol ~ ";'>" ~ ('READY' if pfull else 'FILLING') ~ "</span></div>" -%}
+                {%- set bar_html = "<div style='height:10px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin-top:2px;'><div style='height:100%;width:" ~ (ppct if ppct < 100 else 100) ~ "%;background:" ~ pcol ~ ";border-radius:999px;'></div></div><div style='display:flex;justify-content:space-between;font-size:11px;color:var(--secondary-text-color);margin-top:4px;'><span>" ~ ('%g' | format(ptotal | round(2))) ~ " of " ~ ('%g' | format(ptarget | round(2))) ~ " points</span><span>" ~ ppct ~ "%</span></div>" -%}
                 {%- set chip_cards = namespace(c=[]) -%}
                 {%- for cname, camt in pcontrib.items() -%}
                   {%- if camt | float(0) > 0 -%}
@@ -1211,7 +1211,7 @@ views:
                         'confirmation': {'text': 'Refund ' ~ cname ~ '? Give ' ~ cname ~ ' their ' ~ ('%g' | format(camt | float(0) | round(2))) ~ ' points back from ' ~ pname ~ '. Everyone else keeps their points in the pool.'}
                       },
                       'styles': {
-                        'card': [{'padding': '6px 10px'}, {'border-radius': '99px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'min-height': 'unset'}, {'width': 'auto'}],
+                        'card': [{'padding': '6px 10px'}, {'border-radius': '999px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'min-height': 'unset'}, {'width': 'auto'}],
                         'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'white-space': 'nowrap'}]
                       }
                     }] -%}
@@ -1230,8 +1230,8 @@ views:
                       'confirmation': {'text': 'Mark ' ~ pname ~ ' as delivered? The pool is emptied so the family can save up again.'}
                     }) if pfull else {'action': 'none'},
                     'styles': {
-                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, ({'background': '#22c55e'}) if pfull else {'background': 'transparent'}, {'border': '1px solid #22c55e'} if pfull else {'border': '1px dashed var(--divider-color)'}],
-                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#04210f'} if pfull else {'color': 'var(--disabled-text-color)'}]
+                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, ({'background': 'var(--success-color)'}) if pfull else {'background': 'transparent'}, {'border': '1px solid var(--success-color)'} if pfull else {'border': '1px dashed var(--divider-color)'}],
+                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#fff'} if pfull else {'color': 'var(--disabled-text-color)'}]
                     }
                   },
                   {
@@ -1246,8 +1246,8 @@ views:
                       'confirmation': {'text': 'Cancel ' ~ pname ~ ' and give everyone their points back?'}
                     }) if ptotal > 0 else {'action': 'none'},
                     'styles': {
-                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'background': 'color-mix(in srgb, #ef4444 12%, transparent)'} if ptotal > 0 else {'background': 'transparent'}, {'border': '1.5px solid #ef4444'} if ptotal > 0 else {'border': '1px dashed var(--divider-color)'}],
-                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#ef4444'} if ptotal > 0 else {'color': 'var(--disabled-text-color)'}]
+                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'background': 'color-mix(in srgb, var(--error-color) 12%, transparent)'} if ptotal > 0 else {'background': 'transparent'}, {'border': '1.5px solid var(--error-color)'} if ptotal > 0 else {'border': '1px dashed var(--divider-color)'}],
+                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': 'var(--error-color)'} if ptotal > 0 else {'color': 'var(--disabled-text-color)'}]
                     }
                   }
                 ] -%}
@@ -1549,7 +1549,7 @@ views:
                     'styles': {
                       'card': [
                         {'padding': '10px 4px'},
-                        {'border-radius': '14px'},
+                        {'border-radius': '16px'},
                         {'box-shadow': 'none'},
                         {'border': '2px solid var(--primary-color)' if chip_is_selected else '1px solid var(--divider-color)'},
                         {'background-color': 'rgba(var(--rgb-primary-color), 0.1)' if chip_is_selected else 'var(--card-background-color)'}
@@ -1762,11 +1762,11 @@ views:
                       'label': sp.label,
                       'tap_action': sp.tap,
                       'hold_action': {'action': 'none'},
-                      'custom_fields': {'badge': ("<div style='background:#ef4444;color:#fff;border-radius:99px;font-size:11px;font-weight:800;padding:1px 7px;'>" ~ sp.badge ~ "</div>") if sp.get('badge') else ''},
+                      'custom_fields': {'badge': ("<div style='background:var(--error-color);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;'>" ~ sp.badge ~ "</div>") if sp.get('badge') else ''},
                       'styles': {
                         'card': [
                           {'padding': '12px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, ' ~ sp.color ~ ' 45%, var(--divider-color))'},
                           {'background': ('color-mix(in srgb, ' ~ sp.color ~ ' 14%, var(--card-background-color))') if sp.get('tint') else 'var(--card-background-color)'}
@@ -1841,8 +1841,8 @@ views:
                       'tap_action': {'action': 'call-service', 'service': 'choreops.manual_adjust_points', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'amount': amt, 'reason': 'Dashboard adjustment'}, 'confirmation': {'text': ('Add ' ~ amt ~ ' points to ' ~ selected_user_name ~ '?') if amt > 0 else ('Remove ' ~ (amt | abs) ~ ' points from ' ~ selected_user_name ~ '?')}},
                       'hold_action': {'action': 'none'},
                       'styles': {
-                        'card': [{'padding': '10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': ('1px solid #22c55e' if amt > 0 else '1px solid #ef4444')}],
-                        'name': [{'font-size': '14px'}, {'font-weight': '800'}, {'color': ('#22c55e' if amt > 0 else '#ef4444')}]
+                        'card': [{'padding': '10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': ('1px solid var(--success-color)' if amt > 0 else '1px solid var(--error-color)')}],
+                        'name': [{'font-size': '14px'}, {'font-weight': '800'}, {'color': ('var(--success-color)' if amt > 0 else 'var(--error-color)')}]
                       }
                     }] -%}
                   {%- endfor -%}
@@ -2685,7 +2685,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2732,7 +2732,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2779,7 +2779,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2826,7 +2826,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--error-color) 8%, var(--card-background-color))'}
@@ -2876,7 +2876,7 @@ views:
                             'card': [
                               {'width': '34px'},
                               {'height': '34px'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'box-shadow': 'none'},
                               {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                               {'background-color': 'color-mix(in srgb, var(--primary-color) 10%, var(--card-background-color))'}
@@ -2909,7 +2909,7 @@ views:
                             'card': [
                               {'width': '34px'},
                               {'height': '34px'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'box-shadow': 'none'},
                               {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))'},
                               {'background-color': 'color-mix(in srgb, var(--success-color) 10%, var(--card-background-color))'}
@@ -2925,7 +2925,7 @@ views:
                     'styles': {
                       'card': [
                         {'padding': '10px 12px'},
-                        {'border-radius': '14px'},
+                        {'border-radius': '16px'},
                         {'box-shadow': 'none'},
                         {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                         {'background-color': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'}
@@ -2991,7 +2991,7 @@ views:
                     'styles': {
                       'card': [
                         {'padding': '10px 12px'},
-                        {'border-radius': '14px'},
+                        {'border-radius': '16px'},
                         {'box-shadow': 'none'},
                         {'border': '1px solid color-mix(in srgb, var(--warning-color) 20%, var(--divider-color))'},
                         {'background-color': 'color-mix(in srgb, var(--warning-color) 10%, var(--card-background-color))'}
@@ -3078,7 +3078,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '6px 8px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                             {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -3122,7 +3122,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '6px 8px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': "1px solid color-mix(in srgb, var(--warning-color) 18%, var(--divider-color))"},
                             {'background-color': "color-mix(in srgb, var(--warning-color) 8%, var(--card-background-color))"}
@@ -3166,7 +3166,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '6px 8px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': "1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))"},
                             {'background-color': "color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))"}
@@ -3267,7 +3267,7 @@ views:
                             'styles': {
                               'card': [
                                 {'padding': '6px 8px'},
-                                {'border-radius': '14px'},
+                                {'border-radius': '16px'},
                                 {'box-shadow': 'none'},
                                 {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                                 {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -3447,18 +3447,18 @@ views:
                   {%- set all_chores_now_label = ui.get('past_prefix', 'err-past_prefix') ~ ": " ~ ui.get('now', 'err-now') -%}
                   {%- set all_chores_arrow_date_display = ("→ " ~ (as_timestamp(all_chores_date_val) | timestamp_custom('%a, %b %d %I:%M %p', true))) if all_chores_has_date else '' -%}
                   {%- set all_chores_arrow_date_label = all_chores_arrow_date_display if all_chores_has_date else ui.get('no_date_set', 'err-no_date_set') -%}
-                  {%- set all_chores_shared_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--primary-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
+                  {%- set all_chores_shared_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--primary-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
                   {%- set all_chores_push_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('shift_independent', 'err-shift_independent'), 'label': all_chores_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': integration_entry_id, 'user_names': [selected_user_name], 'after': all_chores_date_val, 'reschedule_independent': true, 'reschedule_primary_standby': false, 'reschedule_shared': false}}) if all_chores_has_date else {'action': 'none'}, 'styles': all_chores_shared_style}} -%}
                   {%- set all_chores_push_primary_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('shift_independent_primary', 'err-shift_independent_primary'), 'label': all_chores_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': integration_entry_id, 'user_names': [selected_user_name], 'after': all_chores_date_val, 'reschedule_independent': true, 'reschedule_primary_standby': true, 'reschedule_shared': false}}) if all_chores_has_date else {'action': 'none'}, 'styles': all_chores_shared_style}} -%}
                   {%- set all_chores_push_all_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-refresh', 'name': ui.get('shift_all', 'err-shift_all'), 'label': all_chores_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': integration_entry_id, 'user_names': [selected_user_name], 'after': all_chores_date_val, 'reschedule_independent': true, 'reschedule_primary_standby': true, 'reschedule_shared': true}}) if all_chores_has_date else {'action': 'none'}, 'styles': all_chores_shared_style}} -%}
-                  {%- set resume_shift_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 14%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 5%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
+                  {%- set resume_shift_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 14%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 5%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
                   {%- set resume_shift_independent_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('resume_shift_independent', 'err-resume_shift_independent'), 'label': all_chores_now_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false', 'unpause_action': 'unpause_shift_independent'}}) if all_chores_has_date else {'action': 'none'}, 'styles': resume_shift_style}} -%}
                   {%- set resume_shift_primary_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('resume_shift_independent_primary', 'err-resume_shift_independent_primary'), 'label': all_chores_now_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false', 'unpause_action': 'unpause_shift_all_primary'}}) if all_chores_has_date else {'action': 'none'}, 'styles': resume_shift_style}} -%}
                   {%- set resume_shift_all_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-refresh', 'name': ui.get('resume_shift_all', 'err-resume_shift_all'), 'label': all_chores_now_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false', 'unpause_action': 'unpause_shift_all'}}) if all_chores_has_date else {'action': 'none'}, 'styles': resume_shift_style}} -%}
                   {%- set all_chores_pick_card = {'card': {'type': 'custom:button-card', 'entity': dashboard_date_helper if all_chores_date_helper else selected_dashboard_helper, 'icon': 'mdi:calendar-search', 'show_name': False, 'show_icon': True, 'tap_action': {'action': 'more-info'} if all_chores_date_helper else {'action': 'none'}, 'styles': {'card': [{'width': '32px'}, {'height': '32px'}, {'border-radius': '8px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'background-color': 'var(--card-background-color)'}], 'icon': [{'width': '16px'}, {'color': 'var(--primary-color)'}]}}} -%}
                   {#-- Structural Layout Sections per State --#}
                   {%- if all_chores_expanded and not all_chores_is_paused -%}
-                    {%- set pause_style_mod = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--error-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--error-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
+                    {%- set pause_style_mod = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--error-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--error-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
                     {%- set all_chores_pause_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': False, 'show_state': False, 'icon': 'mdi:pause-circle', 'name': ui.get('pause', 'err-pause'), 'tap_action': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'true'}}, 'styles': pause_style_mod}} -%}
                     {%- set all_chores_until_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-clock', 'name': ui.get('pause_until', 'err-pause_until'), 'label': all_chores_arrow_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'true', 'paused_until': all_chores_date_val}}) if all_chores_has_date else {'action': 'none'}, 'styles': pause_style_mod}} -%}
                     {%- set all_chores_until_shift_independent_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('pause_until_shift_independent', 'err-pause_until_shift_independent'), 'label': all_chores_arrow_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'true', 'paused_until': all_chores_date_val, 'unpause_action': 'unpause_shift_independent'}}) if all_chores_has_date else {'action': 'none'}, 'styles': pause_style_mod}} -%}
@@ -3467,7 +3467,7 @@ views:
                     {%- set all_chores_grid_template = '"i n l controls" "div_pause div_pause div_pause div_pause" "pause_btn pause_btn until_btn until_btn" "until_shift_independent until_shift_independent until_shift_independent until_shift_independent" "until_shift_primary until_shift_primary until_shift_primary until_shift_primary" "until_shift_all until_shift_all until_shift_all until_shift_all" "div_sched div_sched div_sched div_sched" "push_btn push_btn push_primary_btn push_primary_btn" "push_all_btn push_all_btn push_all_btn push_all_btn"' -%}
                     {%- set all_chores_grid_rows = 'min-content auto auto auto auto auto auto auto auto' -%}
                   {%- elif all_chores_expanded and all_chores_is_paused -%}
-                    {%- set all_chores_resume_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:play-circle-outline', 'name': ui.get('resume', 'err-resume'), 'label': all_chores_paused_display, 'tap_action': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false'}}, 'styles': {'card': [{'height': '48px'}, {'padding': '6px 14px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n l"'}, {'grid-template-columns': '24px 1fr auto'}, {'column-gap': '8px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}], 'label': [{'justify-self': 'end'}, {'font-size': '11px'}, {'color': 'var(--secondary-text-color)'}]}}} -%}
+                    {%- set all_chores_resume_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:play-circle-outline', 'name': ui.get('resume', 'err-resume'), 'label': all_chores_paused_display, 'tap_action': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false'}}, 'styles': {'card': [{'height': '48px'}, {'padding': '6px 14px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n l"'}, {'grid-template-columns': '24px 1fr auto'}, {'column-gap': '8px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}], 'label': [{'justify-self': 'end'}, {'font-size': '11px'}, {'color': 'var(--secondary-text-color)'}]}}} -%}
                     {%- set all_chores_until_card = "" -%}
                     {%- set all_chores_grid_template = '"i n l controls" "div_pause div_pause div_pause div_pause" "resume_btn resume_btn resume_btn resume_btn" "div_resume div_resume div_resume div_resume" "resume_push_btn resume_push_btn resume_push_primary_btn resume_push_primary_btn" "resume_push_all_btn resume_push_all_btn resume_push_all_btn resume_push_all_btn" "div_sched div_sched div_sched div_sched" "push_btn push_btn push_primary_btn push_primary_btn" "push_all_btn push_all_btn push_all_btn push_all_btn"' -%}
                     {%- set all_chores_grid_rows = 'min-content auto auto auto auto auto auto auto auto' -%}
@@ -3544,7 +3544,7 @@ views:
                         'card': [
                           {'padding': '12px 14px'},
                           {'margin-top': '0px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'margin-bottom': '0px'},
                           {'border': '1px solid ' ~ ('color-mix(in srgb, var(--warning-color) 40%, var(--divider-color))' if all_chores_is_paused else 'var(--divider-color)')},
@@ -3711,7 +3711,7 @@ views:
                               'styles': {
                                 'card': [
                                   {'padding': '6px 12px'},
-                                  {'border-radius': '10px'},
+                                  {'border-radius': '12px'},
                                   {'box-shadow': 'none'},
                                   {'min-width': '90px'},
                                   {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))' if selected_chore_is_unassigned else '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'},
@@ -3839,7 +3839,7 @@ views:
                               'styles': {
                                 'card': [
                                   {'padding': '6px 12px'},
-                                  {'border-radius': '10px'},
+                                  {'border-radius': '12px'},
                                   {'box-shadow': 'none'},
                                   {'min-width': '90px'},
                                   {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))' if selected_chore_is_unassigned else '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'},
