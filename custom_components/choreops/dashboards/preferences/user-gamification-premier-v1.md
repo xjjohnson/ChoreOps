@@ -252,7 +252,7 @@ Include filters run before all other filtering (Step 0 priority). When set, only
 
 - `pref_chore_row_variant` (default: `standard`)
   - Selects which shared chore row template the Chores card uses.
-  - `standard` uses the timeline layout (`chore_row_timeline_v1`, which inherits `chore_row_v1`) with timeline group headers and a single column.
+  - `standard` uses `chore_row_v1`.
   - `kids` uses `chore_row_kids_v1`.
   - Allowed: `standard`, `kids`.
 
