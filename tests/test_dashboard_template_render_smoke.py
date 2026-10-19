@@ -68,10 +68,10 @@ def test_user_chores_lite_template_renders_without_parse_errors() -> None:
 
 def test_admin_template_renders_without_parse_errors() -> None:
     """Admin template renders and parses into a dashboard dict."""
-    template_str = _read_template("admin-shared-v1.yaml")
+    template_str = _read_template("admin-shared-family-hub-v1.yaml")
     context = dh.build_admin_dashboard_context(
         integration_entry_id="entry-123",
-        template_profile="admin-shared-v1",
+        template_profile="admin-shared-family-hub-v1",
         release_ref="0.0.1-beta.3",
         generated_at="2026-03-02T00:00:00+00:00",
     )
@@ -229,7 +229,7 @@ def _build_runtime_template_env(
 def _get_admin_filter_template(template_profile: str, marker: str) -> str:
     """Return one rendered admin auto-entities inner template by marker."""
 
-    template_str = _read_template("admin-shared-v1.yaml")
+    template_str = _read_template("admin-shared-family-hub-v1.yaml")
     context = dh.build_admin_dashboard_context(
         integration_entry_id="entry-123",
         template_profile=template_profile,
@@ -593,10 +593,10 @@ def _base_admin_system_administration_states() -> dict[str, _MockState]:
 
 def test_admin_target_selector_template_renders_as_valid_cards() -> None:
     """Shared admin target selector inner template renders valid card configs."""
-    template_str = _read_template("admin-shared-v1.yaml")
+    template_str = _read_template("admin-shared-family-hub-v1.yaml")
     context = dh.build_admin_dashboard_context(
         integration_entry_id="entry-123",
-        template_profile="admin-shared-v1",
+        template_profile="admin-shared-family-hub-v1",
         release_ref="0.0.1-beta.3",
         generated_at="2026-03-09T00:00:00+00:00",
     )
@@ -710,10 +710,10 @@ def test_admin_target_selector_template_renders_as_valid_cards() -> None:
 
 def test_admin_target_selector_template_shows_guidance_without_selection() -> None:
     """Shared admin target selector shows chooser guidance when no user is selected."""
-    template_str = _read_template("admin-shared-v1.yaml")
+    template_str = _read_template("admin-shared-family-hub-v1.yaml")
     context = dh.build_admin_dashboard_context(
         integration_entry_id="entry-123",
-        template_profile="admin-shared-v1",
+        template_profile="admin-shared-family-hub-v1",
         release_ref="0.0.1-beta.3",
         generated_at="2026-03-09T00:00:00+00:00",
     )
@@ -817,7 +817,7 @@ def test_admin_chore_management_hides_without_selected_user() -> None:
     """Shared admin chore management renders nothing when no user is selected."""
 
     chores_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+        "admin-shared-family-hub-v1", "===== CHORE MANAGEMENT ====="
     )
     mock_states = {
         "select.choreops_admin_target": _MockState(
@@ -887,7 +887,7 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
     """With nothing picked, chores appear as tappable chips instead of a dropdown."""
 
     chores_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+        "admin-shared-family-hub-v1", "===== CHORE MANAGEMENT ====="
     )
     mock_states = _base_admin_chore_management_states(
         selected_user_name="Alice",
@@ -943,7 +943,7 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
 
 def _render_chore_management(selected: str, options: list[str], items, state="pending"):
     template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+        "admin-shared-family-hub-v1", "===== CHORE MANAGEMENT ====="
     )
     mock_states = _base_admin_chore_management_states(
         selected_user_name="Alice",
@@ -1012,7 +1012,7 @@ def test_admin_chore_picker_caps_chips_and_offers_show_all() -> None:
     """Long chore lists show eight chips plus a Show all chip."""
 
     chores_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+        "admin-shared-family-hub-v1", "===== CHORE MANAGEMENT ====="
     )
     options = ["None"] + [f"Chore {i} (Alice)" for i in range(10)]
     mock_states = _base_admin_chore_management_states(
@@ -1047,7 +1047,7 @@ def test_admin_all_chores_card_only_shows_when_tile_opens_it() -> None:
     """The All chores card appears only after its Quick actions tile is toggled."""
 
     chores_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+        "admin-shared-family-hub-v1", "===== CHORE MANAGEMENT ====="
     )
     mock_states = _base_admin_chore_management_states(
         selected_user_name="Alice",
@@ -1086,7 +1086,7 @@ def test_admin_chore_management_shows_detail_for_selected_chore() -> None:
     """Expanded shared admin chore management shows detail after chore selection."""
 
     chores_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+        "admin-shared-family-hub-v1", "===== CHORE MANAGEMENT ====="
     )
     mock_states = _base_admin_chore_management_states(
         selected_user_name="Alice",
@@ -1132,7 +1132,7 @@ def test_admin_chore_management_resolves_selected_shard_backed_chore() -> None:
     """Shared admin chore management resolves selected chores from shard helpers."""
 
     chores_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+        "admin-shared-family-hub-v1", "===== CHORE MANAGEMENT ====="
     )
     mock_states = _base_admin_chore_management_states(
         selected_user_name="Alice",
@@ -1487,7 +1487,7 @@ def test_admin_family_goals_card_lists_goals_with_reset_service() -> None:
     """Family goals card lists goals from the shared helper and wires the reset service."""
 
     goals_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== FAMILY GOALS (RESET) ====="
+        "admin-shared-family-hub-v1", "===== FAMILY GOALS (RESET) ====="
     )
     mock_states = _base_admin_system_administration_states()
     mock_states["sensor.shared_admin_dashboard_helper"].attributes["ui_control"] = {
@@ -1525,7 +1525,7 @@ def _render_quick_actions(
     helper_attrs: dict[str, object] | None = None,
 ):
     template = _get_admin_filter_template(
-        "admin-shared-v1", "===== QUICK ACTIONS ====="
+        "admin-shared-family-hub-v1", "===== QUICK ACTIONS ====="
     )
     mock_states = _base_admin_chore_management_states(
         selected_user_name="Alice",
@@ -1562,7 +1562,7 @@ def test_admin_multi_card_output_is_native_parseable() -> None:
     import ast
 
     template = _get_admin_filter_template(
-        "admin-shared-v1", "===== QUICK ACTIONS ====="
+        "admin-shared-family-hub-v1", "===== QUICK ACTIONS ====="
     )
     for tab in ("chores", "system"):
         mock_states = _base_admin_chore_management_states(
@@ -1731,7 +1731,7 @@ def test_admin_reward_pools_card_lists_pools_and_refund_actions() -> None:
     """Reward pools card shows progress, approve, refund and per-person refunds."""
 
     template = _get_admin_filter_template(
-        "admin-shared-v1", "===== REWARD POOLS ====="
+        "admin-shared-family-hub-v1", "===== REWARD POOLS ====="
     )
     mock_states = _base_admin_system_administration_states()
     mock_states["sensor.shared_admin_dashboard_helper"].attributes["ui_control"] = {

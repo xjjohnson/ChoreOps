@@ -59,7 +59,7 @@ def test_admin_templates_include_required_snippet_markers() -> None:
     for marker in peruser_required_markers:
         assert marker in peruser_content
 
-    # The shared OpsCenter builds its own System tab tiles instead.
+    assert "template_shared.admin_system_administration_links_v1" in shared_content
     assert "template_shared.admin_system_administration_links_v1" in peruser_content
 
 
@@ -119,3 +119,15 @@ def test_user_chores_lite_template_uses_native_tile_contract() -> None:
     assert "perform_action': 'button.press'" in content
     assert "'action': 'more-info'" in content
     assert "custom:button-card" not in content
+
+
+def test_original_admin_shared_template_is_unchanged_from_upstream() -> None:
+    """Admin (Shared) stays identical to upstream; the redesign is Family Hub."""
+    import hashlib
+
+    content = _read_template("admin-shared-v1.yaml")
+    assert (
+        hashlib.sha256(content.encode("utf-8")).hexdigest()
+        == "223787be22c68aef3bca45ad77f8c37c0e5effafe154cddf34acd236998de066"
+    )
+    assert "admin-shared-family-hub-v1.yaml" not in content
