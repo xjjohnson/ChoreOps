@@ -1953,11 +1953,12 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert "Brush Teeth" in html
     assert "0 of 2 done" in html
     assert "3 days left" in html
-    # Milestone notches and the finish flag
-    assert ">25<" in html and ">50<" in html and ">75<" in html and "🏁" in html
-    # Both people sit at 20%; they are offset so neither avatar hides the other
-    assert html.count("calc(20% - 8px)") == 2
-    assert "margin-left:0px" in html and "margin-left:9px" in html
+    # Milestone notches (no labels, the lanes use that space) and the finish flag
+    assert html.count("width:1.5px;height:10px") == 3 and "🏁" in html
+    # Both people sit at 20%; the first is above the track and the second below,
+    # so neither avatar hides the other
+    assert html.count("calc(20% - 8px + 0px)") == 2
+    assert "top:-22px" in html and "top:7px" in html
     assert "width:20%" in html
 
 
