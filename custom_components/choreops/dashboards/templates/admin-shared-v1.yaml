@@ -79,6 +79,8 @@ views:
 
                 {%- set ns = namespace(
                   lanes=[],
+                  chore_groups=[],
+                  reward_groups=[],
                   total_chore_pending=0,
                   total_reward_pending=0,
                   pending_user_count=0,
@@ -140,64 +142,8 @@ views:
                   {%- set ns.total_reward_pending = ns.total_reward_pending + reward_count -%}
                   {%- set ns.pending_user_count = ns.pending_user_count + 1 -%}
                   {%- set combined_summary = "<div style='display:flex;flex-direction:column;align-items:flex-end;justify-content:center;line-height:1;'><span style='font-size:16px;font-weight:700;'>" ~ total_count ~ "</span><span style='margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary-text-color);'>" ~ ui.get('approvals', 'err-approvals') ~ "</span></div>" -%}
-                  {%- set header_card = {
-                    'type': 'custom:button-card',
-                    'entity': helper_entity_id,
-                    'show_name': True,
-                    'show_label': False,
-                    'show_state': False,
-                    'show_icon': True,
-                    'icon': 'mdi:account-circle',
-                    'icon_color': pref_claim_accent,
-                    'name': helper_name,
-                    'tap_action': {'action': 'none'},
-                    'hold_action': {'action': 'more-info'},
-                    'custom_fields': {
-                      'approval_count': combined_summary
-                    },
-                    'styles': {
-                      'card': [
-                        {'padding': '10px 2px 2px 2px'},
-                        {'border-radius': '0'},
-                        {'box-shadow': 'none'},
-                        {'border': 'none'},
-                        {'background': 'transparent'},
-                        {'margin-top': '14px'},
-                        {'margin-bottom': '4px'}
-                      ],
-                      'grid': [
-                        {'grid-template-areas': '"i n approval_count" "i n approval_count"'},
-                        {'grid-template-columns': '30px minmax(0, 1fr) auto'},
-                        {'grid-template-rows': 'min-content min-content'},
-                        {'column-gap': '12px'},
-                        {'row-gap': '2px'},
-                        {'align-items': 'center'}
-                      ],
-                      'name': [
-                        {'justify-self': 'start'},
-                        {'align-self': 'center'},
-                        {'font-size': '22px'},
-                        {'font-weight': '800'},
-                        {'line-height': '1.2'}
-                      ],
-                      'icon': [
-                        {'width': '20px'},
-                        {'height': '20px'},
-                        {'color': 'var(--primary-text-color)'},
-                        {'align-self': 'center'}
-                      ],
-                      'custom_fields': {
-                        'approval_count': [
-                          {'justify-self': 'end'},
-                          {'text-align': 'right'},
-                          {'line-height': '1'},
-                          {'white-space': 'nowrap'},
-                          {'padding': '4px 0 0 0'}
-                        ]
-                      }
-                    }
-                  } -%}
-                  {%- set row_ns = namespace(cards=[]) -%}
+                  
+                  {%- set row_ns = namespace(cards=[], rcards=[], c_ids=[], r_ids=[]) -%}
                   {%- for entry in pending_chore_data -%}
                     {%- set approve_eid = (entry.approve_button_eid if entry.approve_button_eid not in [None, 'None', ''] else '') | default('') -%}
                     {%- set return_eid = (entry.disapprove_button_eid if entry.disapprove_button_eid not in [None, 'None', ''] else '') | default('') -%}
@@ -348,6 +294,7 @@ views:
                           }
                         }
                       }] -%}
+                      {%- if approve_eid != '' -%}{%- set row_ns.c_ids = row_ns.c_ids + [approve_eid] -%}{%- endif -%}
                     {%- endif -%}
                   {%- endfor -%}
                   {%- for entry in pending_reward_data -%}
@@ -365,7 +312,7 @@ views:
                       {%- set meta_text = meta_text ~ ' • ' ~ ui.get('last', 'err-last') ~ ': ' ~ last_approved_display -%}
                     {%- endif -%}
                     {%- if approve_eid != '' or return_eid != '' -%}
-                      {%- set row_ns.cards = row_ns.cards + [{
+                      {%- set row_ns.rcards = row_ns.rcards + [{
                         'type': 'custom:button-card',
                         'entity': approve_eid if approve_eid != '' else return_eid,
                         'show_name': False,
@@ -432,7 +379,7 @@ views:
                         },
                         'custom_fields': {
                           'kind': "<div style='width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, " ~ pref_claim_accent ~ " 8%, transparent);border:1px solid color-mix(in srgb, " ~ pref_claim_accent ~ " 24%, transparent);'><ha-icon icon='" ~ item_icon ~ "' style='width:18px;height:18px;color:" ~ pref_claim_accent ~ ";transform:translateY(-3px);'></ha-icon></div>",
-                          'title': entry.reward_name | default('', true),
+                          'title': (entry.reward_name | default('', true)) ~ ((" <span style='font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:6px;background:color-mix(in srgb, var(--warning-color) 18%, transparent);color:var(--warning-color);white-space:nowrap;'>" ~ reward_match[0].cost ~ "</span>") if reward_match | count > 0 and reward_match[0].cost not in [none, '', 'None'] else ''),
                           'meta': meta_text,
                           'btn_return': {
                             'card': {
@@ -500,21 +447,91 @@ views:
                           }
                         }
                       }] -%}
+                      {%- if approve_eid != '' -%}{%- set row_ns.r_ids = row_ns.r_ids + [approve_eid] -%}{%- endif -%}
                     {%- endif -%}
                   {%- endfor -%}
-                  {%- set lane_card = {
-                    'type': 'vertical-stack',
-                    'cards': [
-                      header_card,
-                      {
-                        'type': 'grid',
-                        'columns': 1,
-                        'square': False,
-                        'cards': row_ns.cards
-                      }
-                    ]
-                  } -%}
-                  {%- set ns.lanes = ns.lanes + [lane_card] -%}
+                  {%- for kind in ['chores', 'rewards'] -%}
+                    {%- set k_cards = row_ns.cards if kind == 'chores' else row_ns.rcards -%}
+                    {%- set k_ids = row_ns.c_ids if kind == 'chores' else row_ns.r_ids -%}
+                    {%- if k_cards | length > 0 -%}
+                      {%- set k_noun = (ui.get('chores', 'chores') if kind == 'chores' else ui.get('rewards', 'rewards')) | lower -%}
+                      {%- set k_name_safe = helper_name | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                      {%- set who_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:28px;height:28px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:0 0 auto;'>" ~ (k_name_safe[:1] | upper) ~ "</div><div style='min-width:0;'><div style='font-size:15px;font-weight:800;line-height:1.1;'>" ~ k_name_safe ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ (k_cards | length) ~ ' ' ~ k_noun ~ "</div></div></div>" -%}
+                      {%- set approve_all_card = {
+                        'type': 'custom:button-card',
+                        'entity': k_ids[0] if k_ids | length > 0 else helper_entity_id,
+                        'show_name': True,
+                        'show_icon': False,
+                        'show_state': False,
+                        'name': (ui.get('approve_all', 'Approve all') if k_cards | length > 1 else ui.get('approve', 'Approve')),
+                        'tap_action': {
+                          'action': 'call-service',
+                          'service': 'button.press',
+                          'data': {'entity_id': k_ids},
+                          'confirmation': {'text': (ui.get('approve', 'Approve') ~ ' ' ~ (k_ids | length) ~ ' ' ~ k_noun ~ ' · ' ~ helper_name ~ '?')}
+                        } if k_ids | length > 0 else {'action': 'none'},
+                        'hold_action': {'action': 'none'},
+                        'styles': {
+                          'card': [
+                            {'padding': '5px 12px'},
+                            {'border-radius': '999px'},
+                            {'border': '1.5px solid var(--success-color)'},
+                            {'background': 'transparent'},
+                            {'box-shadow': 'none'},
+                            {'min-height': 'unset'},
+                            {'display': 'flex' if k_ids | length > 0 else 'none'}
+                          ],
+                          'name': [
+                            {'font-size': '12px'},
+                            {'font-weight': '700'},
+                            {'color': 'var(--success-color)'},
+                            {'white-space': 'nowrap'}
+                          ]
+                        }
+                      } -%}
+                      {%- set group_card = {
+                        'type': 'custom:button-card',
+                        'entity': helper_entity_id,
+                        'show_name': False,
+                        'show_icon': False,
+                        'show_label': False,
+                        'show_state': False,
+                        'tap_action': {'action': 'none'},
+                        'hold_action': {'action': 'none'},
+                        'custom_fields': {
+                          'who': who_html,
+                          'btn': {'card': approve_all_card},
+                          'rows': {'card': {'type': 'grid', 'columns': 1, 'square': False, 'cards': k_cards}}
+                        },
+                        'styles': {
+                          'card': [
+                            {'padding': '10px 10px 3px 10px'},
+                            {'border-radius': '18px'},
+                            {'box-shadow': 'none'},
+                            {'border': '1px solid color-mix(in srgb, ' ~ pref_claim_accent ~ ' 16%, var(--divider-color))'},
+                            {'background-color': 'color-mix(in srgb, var(--primary-color) 4%, var(--card-background-color))'}
+                          ],
+                          'grid': [
+                            {'grid-template-areas': '"who btn" "rows rows"'},
+                            {'grid-template-columns': 'minmax(0, 1fr) auto'},
+                            {'grid-template-rows': 'min-content min-content'},
+                            {'row-gap': '8px'},
+                            {'align-items': 'center'}
+                          ],
+                          'custom_fields': {
+                            'who': [{'justify-self': 'start'}],
+                            'btn': [{'justify-self': 'end'}],
+                            'rows': [{'width': '100%'}]
+                          }
+                        }
+                      } -%}
+                      {%- if kind == 'chores' -%}
+                        {%- set ns.chore_groups = ns.chore_groups + [group_card] -%}
+                      {%- else -%}
+                        {%- set ns.reward_groups = ns.reward_groups + [group_card] -%}
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endfor -%}
                 {%- endif -%}
                 {%- endfor -%}
 
@@ -618,9 +635,48 @@ views:
               {{ summary_card }},
               {%- if header_collapsed -%}
               {%- else -%}
-                {%- for lane in ns.lanes -%}
-                  {{ lane }},
-                {%- endfor -%}
+                {%- if total_pending > 0 -%}
+                  {%- set tile_html = namespace(v='') -%}
+                  {%- for t in [[ns.total_chore_pending, ui.get('chores', 'Chores'), pref_claim_accent], [ns.total_reward_pending, ui.get('rewards', 'Rewards'), 'var(--warning-color)'], [ns.pending_user_count, ui.get('people', 'People'), 'var(--primary-text-color)']] -%}
+                    {%- set tile_html.v = tile_html.v ~ "<div style='background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:14px;padding:10px 4px;text-align:center;'><div style='font-size:22px;font-weight:800;color:" ~ t[2] ~ ";line-height:1.1;'>" ~ t[0] ~ "</div><div style='font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.65;margin-top:2px;'>" ~ t[1] ~ "</div></div>" -%}
+                  {%- endfor -%}
+                  {{
+                    {
+                      'type': 'custom:button-card',
+                      'show_name': False,
+                      'show_icon': False,
+                      'tap_action': {'action': 'none'},
+                      'hold_action': {'action': 'none'},
+                      'custom_fields': {'tiles': "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%;'>" ~ tile_html.v ~ "</div>"},
+                      'styles': {
+                        'card': [{'padding': '0'}, {'background': 'transparent'}, {'border': 'none'}, {'box-shadow': 'none'}, {'min-height': 'unset'}, {'margin-top': '4px'}],
+                        'grid': [{'grid-template-areas': '"tiles"'}, {'grid-template-columns': '1fr'}],
+                        'custom_fields': {'tiles': [{'width': '100%'}]}
+                      }
+                    }
+                  }},
+                  {%- for section in [['chores', ui.get('chores', 'Chores'), ns.chore_groups], ['rewards', ui.get('rewards', 'Rewards'), ns.reward_groups]] -%}
+                    {%- if section[2] | length > 0 -%}
+                      {{
+                        {
+                          'type': 'custom:button-card',
+                          'name': section[1],
+                          'show_name': True,
+                          'show_icon': False,
+                          'tap_action': {'action': 'none'},
+                          'hold_action': {'action': 'none'},
+                          'styles': {
+                            'card': [{'padding': '10px 4px 0 4px'}, {'background': 'transparent'}, {'border': 'none'}, {'box-shadow': 'none'}, {'min-height': 'unset'}],
+                            'name': [{'justify-self': 'start'}, {'font-size': '11px'}, {'font-weight': '700'}, {'letter-spacing': '1px'}, {'text-transform': 'uppercase'}, {'opacity': '0.6'}]
+                          }
+                        }
+                      }},
+                      {%- for group in section[2] -%}
+                        {{ group }},
+                      {%- endfor -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                {%- endif -%}
               {%- endif -%}
               {%- endif -%}
 
