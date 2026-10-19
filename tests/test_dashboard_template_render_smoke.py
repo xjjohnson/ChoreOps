@@ -1649,6 +1649,37 @@ def _render_quick_actions(tab: str, open_state: dict[str, object] | None = None)
     return yaml.safe_load(f"[{output}]")
 
 
+def test_admin_multi_card_output_is_native_parseable() -> None:
+    """Card lists must parse as one Python literal, as Home Assistant's template
+    engine requires; stray newlines between cards turn the result into a string
+    and every card shows "Configuration error"."""
+    import ast
+
+    template = _get_admin_filter_template(
+        "admin-shared-v1", "===== QUICK ACTIONS ====="
+    )
+    for tab in ("chores", "system"):
+        mock_states = _base_admin_chore_management_states(
+            selected_user_name="Alice",
+            selected_dashboard_helper="sensor.alice_dashboard_helper",
+            chore_selector_state="None",
+            chore_items=[],
+            shared_admin_ui_control={"admin-shared": {"management-tab": tab}},
+        )
+        env, integration_entities, states, state_attr = _build_runtime_template_env(
+            mock_states
+        )
+        env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 19)
+        env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
+        env.globals["as_timestamp"] = lambda v: 0
+        output = env.from_string(template).render(
+            integration_entities=integration_entities,
+            states=states,
+            state_attr=state_attr,
+        )
+        assert len(ast.literal_eval(output.strip())) >= 2
+
+
 def test_admin_quick_actions_chores_tab_tiles_and_skip_list() -> None:
     """Chores tab shows pause/reset/shift/skip tiles and the inline skip list."""
 

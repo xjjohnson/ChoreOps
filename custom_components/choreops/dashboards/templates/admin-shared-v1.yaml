@@ -642,7 +642,7 @@ views:
                   {%- for t in [[ns.total_chore_pending, ui.get('chores', 'Chores'), pref_claim_accent], [ns.total_reward_pending, ui.get('rewards', 'Rewards'), 'var(--warning-color)'], [ns.pending_user_count, ui.get('people', 'People'), 'var(--primary-text-color)']] -%}
                     {%- set tile_html.v = tile_html.v ~ "<div style='background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:14px;padding:10px 4px;text-align:center;'><div style='font-size:22px;font-weight:800;color:" ~ t[2] ~ ";line-height:1.1;'>" ~ t[0] ~ "</div><div style='font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.65;margin-top:2px;'>" ~ t[1] ~ "</div></div>" -%}
                   {%- endfor -%}
-                  {{
+                  {{-
                     {
                       'type': 'custom:button-card',
                       'show_name': False,
@@ -658,7 +658,7 @@ views:
                     }
                   }},
                   {%- if ns.all_ids | length > 0 -%}
-                  {{
+                  {{-
                     {
                       'type': 'custom:button-card',
                       'entity': ns.all_ids[0],
@@ -688,7 +688,7 @@ views:
                   {%- endif -%}
                   {%- for section in [['chores', ui.get('chores', 'Chores'), ns.chore_groups], ['rewards', ui.get('rewards', 'Rewards'), ns.reward_groups]] -%}
                     {%- if section[2] | length > 0 -%}
-                      {{
+                      {{-
                         {
                           'type': 'custom:button-card',
                           'name': section[1],
@@ -750,7 +750,7 @@ views:
                   {%- if item is mapping and item.get('name') not in bp_names.p -%}{%- set bp_names.p = bp_names.p + [item.get('name')] -%}{%- endif -%}
                 {%- endfor -%}
               {%- endfor -%}
-              {{
+              {{-
                 {
                   'type': 'custom:button-card',
                   'show_name': true,
@@ -827,7 +827,7 @@ views:
                   {%- endfor -%}
                 {%- endfor -%}
                 {%- if ns.q | length > 0 -%}
-                  {{
+                  {{-
                     {
                       'type': 'custom:button-card',
                       'show_name': false,
@@ -872,7 +872,7 @@ views:
                         }
                       }}}) -%}
                     {%- endfor -%}
-                    {{
+                    {{-
                       {
                         'type': 'custom:button-card',
                         'show_name': false,
@@ -945,7 +945,7 @@ views:
                 {%- endfor -%}
               {%- endfor -%}
               {%- if fg.goals | length > 0 -%}
-              {{
+              {{-
                 {
                   'type': 'custom:button-card',
                   'show_name': true,
@@ -1016,7 +1016,7 @@ views:
                 {%- set gsafe = gname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                 {%- set gprogress = (gtotal ~ ' / ' ~ gtarget) if gtarget > 0 else (gtotal | string) -%}
                 {%- set gsub = gprogress ~ ((' · Level ' ~ glevel ~ ' of ' ~ (glevels | length)) if glevels | length > 0 else '') -%}
-                {{
+                {{-
                   {
                     'type': 'custom:button-card',
                     'show_name': false,
@@ -1123,7 +1123,7 @@ views:
                 {%- endif -%}
               {%- endfor -%}
               {%- if rp.pools | length > 0 -%}
-              {{
+              {{-
                 {
                   'type': 'custom:button-card',
                   'show_name': true,
@@ -1251,7 +1251,7 @@ views:
                     }
                   }
                 ] -%}
-                {{
+                {{-
                   {
                     'type': 'custom:button-card',
                     'show_name': false,
@@ -1785,13 +1785,13 @@ views:
                       }
                     }] -%}
                   {%- endfor -%}
-                  {{
+                  {{-
                     {
                       'type': 'markdown',
                       'content': '**Quick actions' ~ (' · ' ~ selected_user_name if qa_tab != 'system' else ' · everyone') ~ '**'
                     }
                   }},
-                  {{
+                  {{-
                     {
                       'type': 'grid',
                       'columns': 2,
@@ -1822,7 +1822,7 @@ views:
                     }] -%}
                   {%- endfor -%}
                   {%- if qa_skip.c | length > 0 -%}
-                  {{
+                  {{-
                     {'type': 'grid', 'columns': 2, 'square': false, 'cards': qa_skip.c}
                   }},
                   {%- endif -%}
@@ -1846,7 +1846,7 @@ views:
                       }
                     }] -%}
                   {%- endfor -%}
-                  {{
+                  {{-
                     {'type': 'grid', 'columns': 3, 'square': false, 'cards': qa_adj.c}
                   }},
                 {%- endif -%}
@@ -3510,7 +3510,7 @@ views:
                       } -%}
                     {%- endif -%}
                   {%- endif -%}
-                  {{
+                  {{-
                     {
                       'type': 'custom:button-card',
                       'entity': selected_dashboard_helper,
@@ -3676,7 +3676,7 @@ views:
                   {%- if has_chore_selector -%}
                     {%- if has_selected_chore -%}
                       {%- if has_resolved_selected_chore and chore_overview_card not in [none, None] -%}
-                    {{
+                    {{-
                       {
                         'type': 'custom:button-card',
                         'entity': chore_select_entity,
@@ -3804,7 +3804,7 @@ views:
                       }
                     }},
                       {%- else -%}
-                    {{
+                    {{-
                       {
                         'type': 'custom:button-card',
                         'entity': chore_select_entity,
@@ -3925,7 +3925,7 @@ views:
                     }},
                       {%- endif -%}
                     {%- else -%}
-                    {{
+                    {{-
                       {
                         'type': 'custom:button-card',
                         'entity': chore_select_entity,
