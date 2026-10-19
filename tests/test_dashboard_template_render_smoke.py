@@ -1462,6 +1462,12 @@ def test_user_gamification_premier_template_renders_with_button_card_templates()
     kids_row_template_str = _read_template(
         "shared/button_card_template_chore_row_kids_v1.yaml"
     )
+    timeline_row_template_str = _read_template(
+        "shared/button_card_template_chore_row_timeline_v1.yaml"
+    )
+    chore_engine_group_render_timeline = _read_template(
+        "shared/chore_engine/group_render_timeline_v1.yaml"
+    )
     template_str = dh.compile_prepared_template_assets(
         {
             "templates/user-gamification-premier-v1.yaml": template_str,
@@ -1481,6 +1487,12 @@ def test_user_gamification_premier_template_renders_with_button_card_templates()
             ),
             "templates/shared/button_card_template_chore_row_kids_v1.yaml": (
                 kids_row_template_str
+            ),
+            "templates/shared/button_card_template_chore_row_timeline_v1.yaml": (
+                timeline_row_template_str
+            ),
+            "templates/shared/chore_engine/group_render_timeline_v1.yaml": (
+                chore_engine_group_render_timeline
             ),
         }
     )["templates/user-gamification-premier-v1.yaml"]
@@ -1503,6 +1515,7 @@ def test_user_gamification_premier_template_renders_with_button_card_templates()
     assert isinstance(rendered.get("button_card_templates"), dict)
     assert "chore_row_v1" in rendered["button_card_templates"]
     assert "chore_row_kids_v1" in rendered["button_card_templates"]
+    assert "chore_row_timeline_v1" in rendered["button_card_templates"]
 
 
 def test_user_gamification_premier_template_contains_ui_control_contract() -> None:

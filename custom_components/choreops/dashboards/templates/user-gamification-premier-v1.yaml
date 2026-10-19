@@ -23,6 +23,7 @@
 button_card_templates:
   << template_shared.button_card_template_chore_row_v1 >>
   << template_shared.button_card_template_chore_row_kids_v1 >>
+  << template_shared.button_card_template_chore_row_timeline_v1 >>
 views:
   - max_columns: 2
     title: << user.name >>
@@ -345,7 +346,12 @@ views:
                     {%- if not header_collapsed -%}
                       << template_shared.chore_engine/settings_panel_v1 >>
 
-                      << template_shared.chore_engine/group_render_v1 >>
+                      {%- set chore_row_template_name = 'chore_row_kids_v1' if effective_row_variant == 'kids' else 'chore_row_timeline_v1' -%}
+                      {%- if effective_row_variant == 'kids' -%}
+                        << template_shared.chore_engine/group_render_v1 >>
+                      {%- else -%}
+                        << template_shared.chore_engine/group_render_timeline_v1 >>
+                      {%- endif -%}
                     {%- endif -%}
                   {%- endif -%}
 

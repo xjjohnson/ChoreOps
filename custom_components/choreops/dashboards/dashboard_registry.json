@@ -128,7 +128,9 @@
         "chore_engine/settings_panel_v1",
         "chore_engine/group_render_v1",
         "button_card_template_chore_row_v1",
-        "button_card_template_chore_row_kids_v1"
+        "button_card_template_chore_row_kids_v1",
+        "button_card_template_chore_row_timeline_v1",
+        "chore_engine/group_render_timeline_v1"
       ],
       "shared_fragments_optional": [],
       "dependencies": {
