@@ -79,6 +79,9 @@ views:
 
                 {%- set ns = namespace(
                   lanes=[],
+                  chore_groups=[],
+                  reward_groups=[],
+                  all_ids=[],
                   total_chore_pending=0,
                   total_reward_pending=0,
                   pending_user_count=0,
@@ -140,64 +143,8 @@ views:
                   {%- set ns.total_reward_pending = ns.total_reward_pending + reward_count -%}
                   {%- set ns.pending_user_count = ns.pending_user_count + 1 -%}
                   {%- set combined_summary = "<div style='display:flex;flex-direction:column;align-items:flex-end;justify-content:center;line-height:1;'><span style='font-size:16px;font-weight:700;'>" ~ total_count ~ "</span><span style='margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary-text-color);'>" ~ ui.get('approvals', 'err-approvals') ~ "</span></div>" -%}
-                  {%- set header_card = {
-                    'type': 'custom:button-card',
-                    'entity': helper_entity_id,
-                    'show_name': True,
-                    'show_label': False,
-                    'show_state': False,
-                    'show_icon': True,
-                    'icon': 'mdi:account-circle',
-                    'icon_color': pref_claim_accent,
-                    'name': helper_name,
-                    'tap_action': {'action': 'none'},
-                    'hold_action': {'action': 'more-info'},
-                    'custom_fields': {
-                      'approval_count': combined_summary
-                    },
-                    'styles': {
-                      'card': [
-                        {'padding': '10px 2px 2px 2px'},
-                        {'border-radius': '0'},
-                        {'box-shadow': 'none'},
-                        {'border': 'none'},
-                        {'background': 'transparent'},
-                        {'margin-top': '14px'},
-                        {'margin-bottom': '4px'}
-                      ],
-                      'grid': [
-                        {'grid-template-areas': '"i n approval_count" "i n approval_count"'},
-                        {'grid-template-columns': '30px minmax(0, 1fr) auto'},
-                        {'grid-template-rows': 'min-content min-content'},
-                        {'column-gap': '12px'},
-                        {'row-gap': '2px'},
-                        {'align-items': 'center'}
-                      ],
-                      'name': [
-                        {'justify-self': 'start'},
-                        {'align-self': 'center'},
-                        {'font-size': '22px'},
-                        {'font-weight': '800'},
-                        {'line-height': '1.2'}
-                      ],
-                      'icon': [
-                        {'width': '20px'},
-                        {'height': '20px'},
-                        {'color': 'var(--primary-text-color)'},
-                        {'align-self': 'center'}
-                      ],
-                      'custom_fields': {
-                        'approval_count': [
-                          {'justify-self': 'end'},
-                          {'text-align': 'right'},
-                          {'line-height': '1'},
-                          {'white-space': 'nowrap'},
-                          {'padding': '4px 0 0 0'}
-                        ]
-                      }
-                    }
-                  } -%}
-                  {%- set row_ns = namespace(cards=[]) -%}
+                  
+                  {%- set row_ns = namespace(cards=[], rcards=[], c_ids=[], r_ids=[]) -%}
                   {%- for entry in pending_chore_data -%}
                     {%- set approve_eid = (entry.approve_button_eid if entry.approve_button_eid not in [None, 'None', ''] else '') | default('') -%}
                     {%- set return_eid = (entry.disapprove_button_eid if entry.disapprove_button_eid not in [None, 'None', ''] else '') | default('') -%}
@@ -225,7 +172,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '9px 12px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': '1px solid color-mix(in srgb, ' ~ pref_claim_accent ~ ' 14%, var(--divider-color))'},
                             {'background-color': 'var(--card-background-color)'},
@@ -348,6 +295,7 @@ views:
                           }
                         }
                       }] -%}
+                      {%- if approve_eid != '' -%}{%- set row_ns.c_ids = row_ns.c_ids + [approve_eid] -%}{%- endif -%}
                     {%- endif -%}
                   {%- endfor -%}
                   {%- for entry in pending_reward_data -%}
@@ -365,7 +313,7 @@ views:
                       {%- set meta_text = meta_text ~ ' • ' ~ ui.get('last', 'err-last') ~ ': ' ~ last_approved_display -%}
                     {%- endif -%}
                     {%- if approve_eid != '' or return_eid != '' -%}
-                      {%- set row_ns.cards = row_ns.cards + [{
+                      {%- set row_ns.rcards = row_ns.rcards + [{
                         'type': 'custom:button-card',
                         'entity': approve_eid if approve_eid != '' else return_eid,
                         'show_name': False,
@@ -377,7 +325,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '9px 12px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': '1px solid color-mix(in srgb, ' ~ pref_claim_accent ~ ' 14%, var(--divider-color))'},
                             {'background-color': 'var(--card-background-color)'},
@@ -432,7 +380,7 @@ views:
                         },
                         'custom_fields': {
                           'kind': "<div style='width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, " ~ pref_claim_accent ~ " 8%, transparent);border:1px solid color-mix(in srgb, " ~ pref_claim_accent ~ " 24%, transparent);'><ha-icon icon='" ~ item_icon ~ "' style='width:18px;height:18px;color:" ~ pref_claim_accent ~ ";transform:translateY(-3px);'></ha-icon></div>",
-                          'title': entry.reward_name | default('', true),
+                          'title': (entry.reward_name | default('', true)) ~ ((" <span style='font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;margin-left:6px;background:color-mix(in srgb, var(--warning-color) 18%, transparent);color:var(--warning-color);white-space:nowrap;'>" ~ reward_match[0].cost ~ "</span>") if reward_match | count > 0 and reward_match[0].cost not in [none, '', 'None'] else ''),
                           'meta': meta_text,
                           'btn_return': {
                             'card': {
@@ -500,21 +448,92 @@ views:
                           }
                         }
                       }] -%}
+                      {%- if approve_eid != '' -%}{%- set row_ns.r_ids = row_ns.r_ids + [approve_eid] -%}{%- endif -%}
                     {%- endif -%}
                   {%- endfor -%}
-                  {%- set lane_card = {
-                    'type': 'vertical-stack',
-                    'cards': [
-                      header_card,
-                      {
-                        'type': 'grid',
-                        'columns': 1,
-                        'square': False,
-                        'cards': row_ns.cards
-                      }
-                    ]
-                  } -%}
-                  {%- set ns.lanes = ns.lanes + [lane_card] -%}
+                  {%- for kind in ['chores', 'rewards'] -%}
+                    {%- set k_cards = row_ns.cards if kind == 'chores' else row_ns.rcards -%}
+                    {%- set k_ids = row_ns.c_ids if kind == 'chores' else row_ns.r_ids -%}
+                    {%- if k_cards | length > 0 -%}
+                      {%- set k_noun = (ui.get('chores', 'chores') if kind == 'chores' else ui.get('rewards', 'rewards')) | lower -%}
+                      {%- set k_name_safe = helper_name | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                      {%- set who_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:28px;height:28px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:0 0 auto;'>" ~ (k_name_safe[:1] | upper) ~ "</div><div style='min-width:0;'><div style='font-size:15px;font-weight:800;line-height:1.1;'>" ~ k_name_safe ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ (k_cards | length) ~ ' ' ~ k_noun ~ "</div></div></div>" -%}
+                      {%- set approve_all_card = {
+                        'type': 'custom:button-card',
+                        'entity': k_ids[0] if k_ids | length > 0 else helper_entity_id,
+                        'show_name': True,
+                        'show_icon': False,
+                        'show_state': False,
+                        'name': (ui.get('approve_all', 'Approve all') if k_cards | length > 1 else ui.get('approve', 'Approve')),
+                        'tap_action': {
+                          'action': 'call-service',
+                          'service': 'button.press',
+                          'data': {'entity_id': k_ids},
+                          'confirmation': {'text': (ui.get('approve', 'Approve') ~ ' ' ~ (k_ids | length) ~ ' ' ~ k_noun ~ ' · ' ~ helper_name ~ '?')}
+                        } if k_ids | length > 0 else {'action': 'none'},
+                        'hold_action': {'action': 'none'},
+                        'styles': {
+                          'card': [
+                            {'padding': '5px 12px'},
+                            {'border-radius': '999px'},
+                            {'border': '1.5px solid var(--success-color)'},
+                            {'background': 'transparent'},
+                            {'box-shadow': 'none'},
+                            {'min-height': 'unset'},
+                            {'display': 'flex' if k_ids | length > 0 else 'none'}
+                          ],
+                          'name': [
+                            {'font-size': '12px'},
+                            {'font-weight': '700'},
+                            {'color': 'var(--success-color)'},
+                            {'white-space': 'nowrap'}
+                          ]
+                        }
+                      } -%}
+                      {%- set group_card = {
+                        'type': 'custom:button-card',
+                        'entity': helper_entity_id,
+                        'show_name': False,
+                        'show_icon': False,
+                        'show_label': False,
+                        'show_state': False,
+                        'tap_action': {'action': 'none'},
+                        'hold_action': {'action': 'none'},
+                        'custom_fields': {
+                          'who': who_html,
+                          'btn': {'card': approve_all_card},
+                          'rows': {'card': {'type': 'grid', 'columns': 1, 'square': False, 'cards': k_cards}}
+                        },
+                        'styles': {
+                          'card': [
+                            {'padding': '10px 10px 3px 10px'},
+                            {'border-radius': '16px'},
+                            {'box-shadow': 'none'},
+                            {'border': '1px solid color-mix(in srgb, ' ~ pref_claim_accent ~ ' 16%, var(--divider-color))'},
+                            {'background-color': 'color-mix(in srgb, var(--primary-color) 4%, var(--card-background-color))'}
+                          ],
+                          'grid': [
+                            {'grid-template-areas': '"who btn" "rows rows"'},
+                            {'grid-template-columns': 'minmax(0, 1fr) auto'},
+                            {'grid-template-rows': 'min-content min-content'},
+                            {'row-gap': '8px'},
+                            {'align-items': 'center'}
+                          ],
+                          'custom_fields': {
+                            'who': [{'justify-self': 'start'}],
+                            'btn': [{'justify-self': 'end'}],
+                            'rows': [{'width': '100%'}]
+                          }
+                        }
+                      } -%}
+                      {%- set ns.all_ids = ns.all_ids + k_ids -%}
+                      {%- if kind == 'chores' -%}
+                        {%- set ns.chore_groups = ns.chore_groups + [group_card] -%}
+                      {%- else -%}
+                        {%- set ns.reward_groups = ns.reward_groups + [group_card] -%}
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endfor -%}
                 {%- endif -%}
                 {%- endfor -%}
 
@@ -618,9 +637,77 @@ views:
               {{ summary_card }},
               {%- if header_collapsed -%}
               {%- else -%}
-                {%- for lane in ns.lanes -%}
-                  {{ lane }},
-                {%- endfor -%}
+                {%- if total_pending > 0 -%}
+                  {%- set tile_html = namespace(v='') -%}
+                  {%- for t in [[ns.total_chore_pending, ui.get('chores', 'Chores'), pref_claim_accent], [ns.total_reward_pending, ui.get('rewards', 'Rewards'), 'var(--warning-color)'], [ns.pending_user_count, ui.get('people', 'People'), 'var(--primary-text-color)']] -%}
+                    {%- set tile_html.v = tile_html.v ~ "<div style='background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:14px;padding:10px 4px;text-align:center;'><div style='font-size:22px;font-weight:800;color:" ~ t[2] ~ ";line-height:1.1;'>" ~ t[0] ~ "</div><div style='font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.65;margin-top:2px;'>" ~ t[1] ~ "</div></div>" -%}
+                  {%- endfor -%}
+                  {{
+                    {
+                      'type': 'custom:button-card',
+                      'show_name': False,
+                      'show_icon': False,
+                      'tap_action': {'action': 'none'},
+                      'hold_action': {'action': 'none'},
+                      'custom_fields': {'tiles': "<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;width:100%;'>" ~ tile_html.v ~ "</div>"},
+                      'styles': {
+                        'card': [{'padding': '0'}, {'background': 'transparent'}, {'border': 'none'}, {'box-shadow': 'none'}, {'min-height': 'unset'}, {'margin-top': '4px'}],
+                        'grid': [{'grid-template-areas': '"tiles"'}, {'grid-template-columns': '1fr'}],
+                        'custom_fields': {'tiles': [{'width': '100%'}]}
+                      }
+                    }
+                  }},
+                  {%- if ns.all_ids | length > 0 -%}
+                  {{
+                    {
+                      'type': 'custom:button-card',
+                      'entity': ns.all_ids[0],
+                      'show_name': True,
+                      'show_label': True,
+                      'show_icon': True,
+                      'show_state': False,
+                      'icon': 'mdi:check-all',
+                      'name': ui.get('approve_all', 'Approve all') ~ ' (' ~ (ns.all_ids | length) ~ ')',
+                      'label': (ns.total_chore_pending | string) ~ ' ' ~ ui.get('chores', 'Chores') | lower ~ ' · ' ~ (ns.total_reward_pending | string) ~ ' ' ~ ui.get('rewards', 'Rewards') | lower ~ ' · ' ~ (ns.pending_user_count | string) ~ ' ' ~ ui.get('people', 'people'),
+                      'tap_action': {
+                        'action': 'call-service',
+                        'service': 'button.press',
+                        'data': {'entity_id': ns.all_ids},
+                        'confirmation': {'text': ui.get('approve', 'Approve') ~ ' ' ~ (ns.all_ids | length) ~ ' pending item(s) for everyone?'}
+                      },
+                      'hold_action': {'action': 'none'},
+                      'styles': {
+                        'card': [{'padding': '12px 14px'}, {'border-radius': '16px'}, {'box-shadow': 'none'}, {'margin-top': '4px'}, {'background': 'var(--success-color)'}, {'border': 'none'}],
+                        'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '32px 1fr'}, {'column-gap': '12px'}, {'align-items': 'center'}],
+                        'icon': [{'width': '24px'}, {'color': '#fff'}],
+                        'name': [{'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '800'}, {'color': '#fff'}],
+                        'label': [{'justify-self': 'start'}, {'font-size': '11px'}, {'color': 'rgba(255,255,255,0.85)'}, {'text-transform': 'none'}]
+                      }
+                    }
+                  }},
+                  {%- endif -%}
+                  {%- for section in [['chores', ui.get('chores', 'Chores'), ns.chore_groups], ['rewards', ui.get('rewards', 'Rewards'), ns.reward_groups]] -%}
+                    {%- if section[2] | length > 0 -%}
+                      {{
+                        {
+                          'type': 'custom:button-card',
+                          'name': section[1],
+                          'show_name': True,
+                          'show_icon': False,
+                          'tap_action': {'action': 'none'},
+                          'hold_action': {'action': 'none'},
+                          'styles': {
+                            'card': [{'padding': '10px 4px 0 4px'}, {'background': 'transparent'}, {'border': 'none'}, {'box-shadow': 'none'}, {'min-height': 'unset'}],
+                            'name': [{'justify-self': 'start'}, {'font-size': '11px'}, {'font-weight': '700'}, {'letter-spacing': '1px'}, {'text-transform': 'uppercase'}, {'opacity': '0.6'}]
+                          }
+                        }
+                      }},
+                      {%- for group in section[2] -%}
+                        {{ group }},
+                      {%- endfor -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                {%- endif -%}
               {%- endif -%}
               {%- endif -%}
 
@@ -726,7 +813,7 @@ views:
               {%- if not bp_collapsed -%}
               {%- for kind in ['bonuses', 'penalties'] -%}
                 {%- set good = kind == 'bonuses' -%}
-                {%- set col = '#22c55e' if good else '#ef4444' -%}
+                {%- set col = 'var(--success-color)' if good else 'var(--error-color)' -%}
                 {%- set ns = namespace(q={}) -%}
                 {%- for h in helpers -%}
                   {%- set uname = (h.attributes.get('user_name') or '') | string -%}
@@ -824,6 +911,388 @@ views:
           card_param: cards
           filter:
             template: |-
+              {#-- ===== FAMILY GOALS (RESET) ===== --#}
+              << template_snippets.user_override_helper >>
+
+              << template_snippets.admin_setup_shared >>
+
+              {%- set pref_fg_ui_control_key_root = 'admin-shared/family-goals' -%}
+              {%- set pref_fg_default_collapsed = true -%}
+              {%- set fg_key = pref_fg_ui_control_key_root ~ '/header-collapse' -%}
+              {%- set fg_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set fg_ui = namespace(current=ui_root.shared_admin if ui_root.shared_admin is mapping else {}) -%}
+              {%- for segment in pref_fg_ui_control_key_root.split('/') -%}
+                {%- if fg_ui.current is mapping -%}
+                  {%- set fg_ui.current = fg_ui.current.get(segment, {}) -%}
+                {%- else -%}
+                  {%- set fg_ui.current = {} -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- set fg_has_override = fg_ui.current is mapping and 'header-collapse' in fg_ui.current -%}
+              {%- set fg_collapsed = fg_ui.current['header-collapse'] if fg_has_override else pref_fg_default_collapsed -%}
+              {%- set fg_collapsed = (fg_collapsed | string | lower) == 'true' -%}
+              {#-- Family goals show up in every person's achievement list; find them once by name --#}
+              {%- set fg = namespace(goals={}) -%}
+              {%- for h in helper_sensor_entities -%}
+                {%- for ach in (h.attributes.get('achievements') or []) -%}
+                  {%- set ach_eid = ach.get('eid') if ach is mapping else ach -%}
+                  {%- if ach_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(ach_eid) not in ['unknown', 'unavailable'] and state_attr(ach_eid, 'family_contributions') is defined and state_attr(ach_eid, 'family_contributions') is not none -%}
+                    {%- set ach_name = (state_attr(ach_eid, 'achievement_name') or 'Family Goal') | string -%}
+                    {%- if ach_name not in fg.goals -%}
+                      {%- set fg.goals = fg.goals | combine({ach_name: ach_eid}) -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {%- if fg.goals | length > 0 -%}
+              {{
+                {
+                  'type': 'custom:button-card',
+                  'show_name': true,
+                  'show_label': true,
+                  'show_state': false,
+                  'show_icon': true,
+                  'icon': 'mdi:flag-checkered',
+                  'name': 'Family goals',
+                  'label': (fg.goals | length) ~ (' goal' if fg.goals | length == 1 else ' goals') if fg_collapsed else 'Reset a goal to start it over',
+                  'tap_action': ({
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': fg_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'update',
+                      'key': fg_key,
+                      'value': false
+                    }
+                  } if fg_collapsed and fg_entry_id not in ['', none] else {
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': fg_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'remove',
+                      'key': fg_key
+                    }
+                  } if fg_entry_id not in ['', none] else {
+                    'action': 'none'
+                  }),
+                  'hold_action': {'action': 'none'},
+                  'custom_fields': {
+                    'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if fg_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                  },
+                  'styles': {
+                    'card': [
+                      {'margin-top': '12px'},
+                      {'padding': '14px 16px'},
+                      {'border-radius': '16px'},
+                      {'box-shadow': 'none'},
+                      {'border': '1px solid color-mix(in srgb, var(--primary-color) 14%, var(--divider-color))'},
+                      {'background-color': 'color-mix(in srgb, var(--primary-color) 14%, var(--card-background-color))'}
+                    ],
+                    'grid': [
+                      {'grid-template-areas': '"i n toggle" "i l toggle"'},
+                      {'grid-template-columns': '32px minmax(0, 1fr) min-content'},
+                      {'grid-template-rows': 'min-content min-content'},
+                      {'column-gap': '14px'},
+                      {'row-gap': '2px'},
+                      {'align-items': 'center'}
+                    ],
+                    'icon': [{'width': '24px'}, {'height': '24px'}, {'align-self': 'center'}],
+                    'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '14px'}, {'font-weight': '700'}, {'line-height': '1.2'}, {'text-transform': 'uppercase'}],
+                    'label': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'opacity': '0.7'}],
+                    'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                  }
+                }
+              }},
+              {%- if not fg_collapsed -%}
+              {%- for gname, geid in fg.goals.items() -%}
+                {%- set gtotal = state_attr(geid, 'family_total') | float(0) | round(0) | int -%}
+                {%- set glevels = (state_attr(geid, 'family_levels') or []) | map('float', 0) | list -%}
+                {%- set glevel = state_attr(geid, 'family_level') | int(0) -%}
+                {%- set gnext = state_attr(geid, 'family_next_target') | float(0) -%}
+                {%- set gtarget = (gnext if gnext > 0 else (state_attr(geid, 'target_value') | float(0))) | round(0) | int -%}
+                {%- set gicon = state_attr(geid, 'icon') or 'mdi:trophy' -%}
+                {%- set gsafe = gname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {%- set gprogress = (gtotal ~ ' / ' ~ gtarget) if gtarget > 0 else (gtotal | string) -%}
+                {%- set gsub = gprogress ~ ((' · Level ' ~ glevel ~ ' of ' ~ (glevels | length)) if glevels | length > 0 else '') -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'none'},
+                    'custom_fields': {
+                      'label': "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:34px;height:34px;border-radius:11px;background:var(--primary-color);display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ gicon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);white-space:normal;'>" ~ gsafe ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);'>" ~ gsub ~ "</div></div></div>",
+                      'reset': {'card': {
+                        'type': 'custom:button-card',
+                        'name': 'Reset',
+                        'icon': 'mdi:restart',
+                        'show_name': true,
+                        'show_icon': true,
+                        'tap_action': {
+                          'action': 'call-service',
+                          'service': 'choreops.reset_family_goal',
+                          'data': {
+                            'achievement_name': gname,
+                            'config_entry_id': fg_entry_id
+                          },
+                          'confirmation': {'text': 'Reset ' ~ gname ~ '? Progress and awards start over from zero. Points already paid are not taken back.'}
+                        },
+                        'styles': {
+                          'card': [
+                            {'padding': '6px 10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'},
+                            {'background': 'color-mix(in srgb, var(--error-color) 14%, transparent)'},
+                            {'border': '1.5px solid var(--error-color)'}
+                          ],
+                          'grid': [{'grid-template-areas': '"i n"'}, {'grid-template-columns': 'min-content min-content'}, {'column-gap': '4px'}],
+                          'icon': [{'width': '16px'}, {'color': 'var(--error-color)'}],
+                          'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': 'var(--error-color)'}]
+                        }
+                      }}
+                    },
+                    'styles': {
+                      'card': [
+                        {'background': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'},
+                        {'border': '1px solid var(--divider-color)'},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'padding': '8px 12px'},
+                        {'min-height': 'unset'}
+                      ],
+                      'grid': [
+                        {'grid-template-areas': '"label reset"'},
+                        {'grid-template-columns': '1fr auto'},
+                        {'column-gap': '8px'},
+                        {'align-items': 'center'}
+                      ],
+                      'custom_fields': {'label': [{'justify-self': 'start'}, {'min-width': '0'}]}
+                    }
+                  }
+                }},
+              {%- endfor -%}
+              {%- endif -%}
+              {%- endif -%}
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== REWARD POOLS ===== --#}
+              << template_snippets.user_override_helper >>
+
+              << template_snippets.admin_setup_shared >>
+
+              {%- set pref_rp_ui_control_key_root = 'admin-shared/reward-pools' -%}
+              {%- set pref_rp_default_collapsed = true -%}
+              {%- set pref_rp_accent = '#8b5cf6' -%}
+              {%- set rp_key = pref_rp_ui_control_key_root ~ '/header-collapse' -%}
+              {%- set rp_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set rp_ui = namespace(current=ui_root.shared_admin if ui_root.shared_admin is mapping else {}) -%}
+              {%- for segment in pref_rp_ui_control_key_root.split('/') -%}
+                {%- if rp_ui.current is mapping -%}
+                  {%- set rp_ui.current = rp_ui.current.get(segment, {}) -%}
+                {%- else -%}
+                  {%- set rp_ui.current = {} -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- set rp_has_override = rp_ui.current is mapping and 'header-collapse' in rp_ui.current -%}
+              {%- set rp_collapsed = rp_ui.current['header-collapse'] if rp_has_override else pref_rp_default_collapsed -%}
+              {%- set rp_collapsed = (rp_collapsed | string | lower) == 'true' -%}
+              {#-- Pooled rewards appear in every person's reward list; find each one once by name --#}
+              {%- set rp = namespace(pools={}) -%}
+              {%- for h in helper_sensor_entities -%}
+                {%- for rw in (h.attributes.get('rewards') or []) -%}
+                  {%- set rw_eid = rw.get('eid') if rw is mapping else rw -%}
+                  {%- if rw_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(rw_eid) not in ['unknown', 'unavailable'] and state_attr(rw_eid, 'pooled') -%}
+                    {%- set rw_name = (rw.get('name') if rw is mapping else none) or state_attr(rw_eid, 'reward_name') or 'Family reward' -%}
+                    {%- if rw_name not in rp.pools -%}
+                      {%- set rp.pools = rp.pools | combine({rw_name: rw_eid}) -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {%- set rp_ready = namespace(n=0) -%}
+              {%- for pn, pe in rp.pools.items() -%}
+                {%- if state_attr(pe, 'pool_full') and (state_attr(pe, 'pool_total') | float(0)) > 0 -%}
+                  {%- set rp_ready.n = rp_ready.n + 1 -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- if rp.pools | length > 0 -%}
+              {{
+                {
+                  'type': 'custom:button-card',
+                  'show_name': true,
+                  'show_label': true,
+                  'show_state': false,
+                  'show_icon': true,
+                  'icon': 'mdi:gift-outline',
+                  'name': 'Reward pools',
+                  'label': ((rp.pools | length) ~ (' pool' if rp.pools | length == 1 else ' pools') ~ ((' · ' ~ rp_ready.n ~ ' ready') if rp_ready.n > 0 else '')) if rp_collapsed else 'Approve, refund or fix contributions',
+                  'tap_action': ({
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': rp_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'update',
+                      'key': rp_key,
+                      'value': false
+                    }
+                  } if rp_collapsed and rp_entry_id not in ['', none] else {
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': rp_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'remove',
+                      'key': rp_key
+                    }
+                  } if rp_entry_id not in ['', none] else {
+                    'action': 'none'
+                  }),
+                  'hold_action': {'action': 'none'},
+                  'custom_fields': {
+                    'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if rp_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                  },
+                  'styles': {
+                    'card': [
+                      {'margin-top': '12px'},
+                      {'padding': '14px 16px'},
+                      {'border-radius': '16px'},
+                      {'box-shadow': 'none'},
+                      {'border': '1px solid color-mix(in srgb, ' ~ pref_rp_accent ~ ' 30%, var(--divider-color))'},
+                      {'background-color': 'color-mix(in srgb, ' ~ pref_rp_accent ~ ' 14%, var(--card-background-color))'}
+                    ],
+                    'grid': [
+                      {'grid-template-areas': '"i n toggle" "i l toggle"'},
+                      {'grid-template-columns': '32px minmax(0, 1fr) min-content'},
+                      {'grid-template-rows': 'min-content min-content'},
+                      {'column-gap': '14px'},
+                      {'row-gap': '2px'},
+                      {'align-items': 'center'}
+                    ],
+                    'icon': [{'width': '24px'}, {'height': '24px'}, {'align-self': 'center'}],
+                    'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '14px'}, {'font-weight': '700'}, {'line-height': '1.2'}, {'text-transform': 'uppercase'}],
+                    'label': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'opacity': '0.7'}],
+                    'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                  }
+                }
+              }},
+              {%- if not rp_collapsed -%}
+              {%- for pname, peid in rp.pools.items() -%}
+                {%- set ptotal = state_attr(peid, 'pool_total') | float(0) -%}
+                {%- set premain = state_attr(peid, 'pool_remaining') | float(0) -%}
+                {%- set ptarget = ptotal + premain -%}
+                {%- set pfull = state_attr(peid, 'pool_full') and ptotal > 0 -%}
+                {%- set ppct = ((ptotal / ptarget * 100) | round(0) | int) if ptarget > 0 else 0 -%}
+                {%- set pcontrib = state_attr(peid, 'pool_contributions') or {} -%}
+                {%- set pcol = 'var(--success-color)' if pfull else pref_rp_accent -%}
+                {%- set picon = state_attr(peid, 'icon') or 'mdi:gift-outline' -%}
+                {%- set psafe = pname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {%- set head_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:36px;height:36px;border-radius:11px;background:" ~ pcol ~ ";display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ picon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);'>" ~ psafe ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'>" ~ (('Full · waiting for you') if pfull else (('%g' | format(premain | round(2))) ~ ' to go' if ptotal > 0 else 'Nobody has chipped in')) ~ "</div></div><span style='font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:0.5px;background:color-mix(in srgb, " ~ pcol ~ " 25%, transparent);color:" ~ pcol ~ ";'>" ~ ('READY' if pfull else 'FILLING') ~ "</span></div>" -%}
+                {%- set bar_html = "<div style='height:10px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin-top:2px;'><div style='height:100%;width:" ~ (ppct if ppct < 100 else 100) ~ "%;background:" ~ pcol ~ ";border-radius:999px;'></div></div><div style='display:flex;justify-content:space-between;font-size:11px;color:var(--secondary-text-color);margin-top:4px;'><span>" ~ ('%g' | format(ptotal | round(2))) ~ " of " ~ ('%g' | format(ptarget | round(2))) ~ " points</span><span>" ~ ppct ~ "%</span></div>" -%}
+                {%- set chip_cards = namespace(c=[]) -%}
+                {%- for cname, camt in pcontrib.items() -%}
+                  {%- if camt | float(0) > 0 -%}
+                    {%- set chip_cards.c = chip_cards.c + [{
+                      'type': 'custom:button-card',
+                      'name': cname ~ ' ' ~ ('%g' | format(camt | float(0) | round(2))) ~ '  ↩',
+                      'show_name': true,
+                      'show_icon': false,
+                      'tap_action': {
+                        'action': 'call-service',
+                        'service': 'choreops.refund_reward_pool',
+                        'data': {'config_entry_id': rp_entry_id, 'reward_name': pname, 'user_name': cname},
+                        'confirmation': {'text': 'Refund ' ~ cname ~ '? Give ' ~ cname ~ ' their ' ~ ('%g' | format(camt | float(0) | round(2))) ~ ' points back from ' ~ pname ~ '. Everyone else keeps their points in the pool.'}
+                      },
+                      'styles': {
+                        'card': [{'padding': '6px 10px'}, {'border-radius': '999px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'min-height': 'unset'}, {'width': 'auto'}],
+                        'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'white-space': 'nowrap'}]
+                      }
+                    }] -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {%- set act_cards = [
+                  {
+                    'type': 'custom:button-card',
+                    'name': '✔ Approve · delivered',
+                    'show_name': true,
+                    'show_icon': false,
+                    'tap_action': ({
+                      'action': 'call-service',
+                      'service': 'choreops.approve_reward_pool',
+                      'data': {'config_entry_id': rp_entry_id, 'reward_name': pname},
+                      'confirmation': {'text': 'Mark ' ~ pname ~ ' as delivered? The pool is emptied so the family can save up again.'}
+                    }) if pfull else {'action': 'none'},
+                    'styles': {
+                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, ({'background': 'var(--success-color)'}) if pfull else {'background': 'transparent'}, {'border': '1px solid var(--success-color)'} if pfull else {'border': '1px dashed var(--divider-color)'}],
+                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#fff'} if pfull else {'color': 'var(--disabled-text-color)'}]
+                    }
+                  },
+                  {
+                    'type': 'custom:button-card',
+                    'name': '↩ Refund all',
+                    'show_name': true,
+                    'show_icon': false,
+                    'tap_action': ({
+                      'action': 'call-service',
+                      'service': 'choreops.refund_reward_pool',
+                      'data': {'config_entry_id': rp_entry_id, 'reward_name': pname},
+                      'confirmation': {'text': 'Cancel ' ~ pname ~ ' and give everyone their points back?'}
+                    }) if ptotal > 0 else {'action': 'none'},
+                    'styles': {
+                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'background': 'color-mix(in srgb, var(--error-color) 12%, transparent)'} if ptotal > 0 else {'background': 'transparent'}, {'border': '1.5px solid var(--error-color)'} if ptotal > 0 else {'border': '1px dashed var(--divider-color)'}],
+                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': 'var(--error-color)'} if ptotal > 0 else {'color': 'var(--disabled-text-color)'}]
+                    }
+                  }
+                ] -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'none'},
+                    'custom_fields': {
+                      'head': head_html,
+                      'bar': bar_html,
+                      'chips': {'card': {'type': 'grid', 'columns': 2, 'square': false, 'cards': chip_cards.c}} if chip_cards.c | length > 0 else '',
+                      'acts': {'card': {'type': 'grid', 'columns': 2, 'square': false, 'cards': act_cards}}
+                    },
+                    'styles': {
+                      'card': [
+                        {'background': 'linear-gradient(135deg, color-mix(in srgb, ' ~ pcol ~ ' 14%, transparent), var(--card-background-color))' if pfull else 'var(--card-background-color)'},
+                        {'border': '1px solid ' ~ (pcol if pfull else 'var(--divider-color)')},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'padding': '12px'},
+                        {'min-height': 'unset'}
+                      ],
+                      'grid': [
+                        {'grid-template-areas': '"head" "bar" "chips" "acts"'},
+                        {'grid-template-columns': '1fr'},
+                        {'row-gap': '8px'}
+                      ],
+                      'custom_fields': {'head': [{'width': '100%'}], 'bar': [{'width': '100%'}], 'chips': [{'width': '100%'}], 'acts': [{'width': '100%'}]}
+                    }
+                  }
+                }},
+              {%- endfor -%}
+              {%- endif -%}
+              {%- endif -%}
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
               {#-- ===== MANAGEMENT ===== --#}
 
               << template_snippets.meta_stamp >>
@@ -835,7 +1304,7 @@ views:
 
               {%- set pref_selector_ui_control_key_root = 'admin-shared/admin-target-selector' -%}
 
-              {%- set pref_selector_default_header_collapsed = true -%}
+              {%- set pref_selector_default_header_collapsed = false -%}
 
               {%- set pref_selector_primary_tint_mix_pct = 14 -%}
 
@@ -858,7 +1327,7 @@ views:
                 {%- set pref_selector_ui_control_key_root_segments = ['admin-shared', 'admin-target-selector'] -%}
               {%- endif -%}
               {%- set pref_selector_ui_control_key_root = pref_selector_ui_control_key_root_segments | join('/') -%}
-              {%- set pref_selector_default_header_collapsed = (pref_selector_default_header_collapsed | default('true') | string | lower) == 'true' -%}
+              {%- set pref_selector_default_header_collapsed = (pref_selector_default_header_collapsed | default('false') | string | lower) == 'true' -%}
               {%- set pref_selector_primary_tint_mix_pct = pref_selector_primary_tint_mix_pct | int(default=14) -%}
               {%- set pref_selector_show_header_background = (pref_selector_show_header_background | default('true') | string | lower) == 'true' -%}
               {%- set pref_selector_show_header_thin_border = (pref_selector_show_header_thin_border | default('true') | string | lower) == 'true' -%}
@@ -943,16 +1412,7 @@ views:
                       'ui_control_target': 'shared_admin',
                       'ui_control_action': 'update',
                       'key': ui_control_key_header_collapsed,
-                      'value': false
-                    }
-                  } if header_collapsed and integration_entry_id not in ['', none] else {
-                    'action': 'call-service',
-                    'service': 'choreops.manage_ui_control',
-                    'data': {
-                      'config_entry_id': integration_entry_id,
-                      'ui_control_target': 'shared_admin',
-                      'ui_control_action': 'remove',
-                      'key': ui_control_key_header_collapsed
+                      'value': not header_collapsed
                     }
                   } if integration_entry_id not in ['', none] else {
                     'action': 'none'
@@ -1065,45 +1525,38 @@ views:
                 {%- for helper_state in helper_sensor_entities -%}
                   {%- set helper_name = helper_state.attributes.user_name | default(helper_state.name, true) -%}
                   {%- set chip_is_selected = helper_name == selected_user_name -%}
+                  {%- set chip_pts_eid = (helper_state.attributes.get('core_sensors') or {}).get('points_eid') -%}
+                  {%- set chip_pts = (states(chip_pts_eid) | float(default=0) | round(0) | int) if chip_pts_eid else none -%}
                   {%- set chip_card = {
                     'type': 'custom:button-card',
                     'entity': admin_selector_eid,
                     'show_name': True,
-                    'show_label': False,
+                    'show_label': chip_pts is not none,
                     'show_state': False,
-                    'show_icon': False,
+                    'show_icon': True,
+                    'icon': 'mdi:account-circle',
                     'name': helper_name,
-                    'tap_action': {'action': 'none'} if chip_is_selected else {
-                      'action': 'multi-actions',
-                      'actions': [
-                        {
-                          'action': 'call-service',
-                          'service': 'select.select_option',
-                          'data': {
-                            'entity_id': admin_selector_eid,
-                            'option': helper_name
-                          }
-                        },
-                        {
-                          'action': 'call-service',
-                          'service': 'choreops.manage_ui_control',
-                          'data': {
-                            'config_entry_id': integration_entry_id,
-                            'ui_control_target': 'shared_admin',
-                            'ui_control_action': 'remove',
-                            'key': ui_control_key_header_collapsed
-                          }
-                        }
-                      ]
+                    'label': (chip_pts | string ~ ' pts') if chip_pts is not none else '',
+                    'tap_action': {
+                      'action': 'call-service',
+                      'service': 'select.select_option',
+                      'data': {
+                        'entity_id': admin_selector_eid,
+                        'option': 'None' if chip_is_selected else helper_name
+                      }
                     },
                     'hold_action': {'action': 'more-info'},
                     'styles': {
                       'card': [
-                        {'padding': '10px'},
-                        {'border-radius': '12px'},
+                        {'padding': '10px 4px'},
+                        {'border-radius': '16px'},
                         {'box-shadow': 'none'},
                         {'border': '2px solid var(--primary-color)' if chip_is_selected else '1px solid var(--divider-color)'},
                         {'background-color': 'rgba(var(--rgb-primary-color), 0.1)' if chip_is_selected else 'var(--card-background-color)'}
+                      ],
+                      'icon': [
+                        {'width': '34px'},
+                        {'color': 'var(--primary-color)' if chip_is_selected else 'var(--secondary-text-color)'}
                       ],
                       'name': [
                         {'font-size': '13px'},
@@ -1111,6 +1564,10 @@ views:
                         {'overflow': 'hidden'},
                         {'text-overflow': 'ellipsis'},
                         {'white-space': 'nowrap'}
+                      ],
+                      'label': [
+                        {'font-size': '11px'},
+                        {'color': 'var(--secondary-text-color)'}
                       ]
                     }
                   } -%}
@@ -1119,18 +1576,283 @@ views:
 
                 {#-- 6. Render --#}
 
+                {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+                {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+                {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
+                {%- set tab_ns = namespace(cards=[]) -%}
+                {%- for tab_key, tab_icon, tab_label in [('chores', 'mdi:broom', ui.get('chores', 'Chores')), ('economy', 'mdi:star-circle-outline', ui.get('economy', 'Economy')), ('system', 'mdi:cog-outline', ui.get('system', 'System'))] -%}
+                  {%- set tab_active = mgmt_tab == tab_key -%}
+                  {%- set tab_ns.cards = tab_ns.cards + [{
+                    'type': 'custom:button-card',
+                    'entity': admin_selector_eid,
+                    'show_name': True,
+                    'show_label': False,
+                    'show_state': False,
+                    'show_icon': True,
+                    'icon': tab_icon,
+                    'name': tab_label,
+                    'tap_action': {
+                      'action': 'call-service',
+                      'service': 'choreops.manage_ui_control',
+                      'data': {
+                        'config_entry_id': integration_entry_id,
+                        'ui_control_target': 'shared_admin',
+                        'ui_control_action': 'update',
+                        'key': 'admin-shared/management-tab',
+                        'value': tab_key
+                      }
+                    },
+                    'hold_action': {'action': 'none'},
+                    'styles': {
+                      'card': [
+                        {'padding': '8px 4px'},
+                        {'border-radius': '12px'},
+                        {'box-shadow': 'none'},
+                        {'border': '2px solid var(--primary-color)' if tab_active else '1px solid var(--divider-color)'},
+                        {'background-color': 'var(--primary-color)' if tab_active else 'var(--card-background-color)'}
+                      ],
+                      'icon': [
+                        {'width': '20px'},
+                        {'color': 'var(--text-primary-color)' if tab_active else 'var(--secondary-text-color)'}
+                      ],
+                      'name': [
+                        {'font-size': '13px'},
+                        {'font-weight': '700'},
+                        {'color': 'var(--text-primary-color)' if tab_active else 'var(--primary-text-color)'}
+                      ]
+                    }
+                  }] -%}
+                {%- endfor -%}
+
                 {{ selector_summary_card }},
                 {%- if header_collapsed -%}
                 {%- else -%}
                 {{ {
                   'type': 'grid',
-                  'columns': pref_selector_column_count,
+                  'columns': (ns.chips | length) if (ns.chips | length) in [2, 3, 4] else pref_selector_column_count,
                   'square': False,
-                  'cards': [none_chip] + ns.chips
+                  'cards': ns.chips
                 } }},
+                {%- if has_selected_user -%}
+                {{ {
+                  'type': 'grid',
+                  'columns': 3,
+                  'square': False,
+                  'cards': tab_ns.cards
+                } }},
+                {%- endif -%}
                 {%- endif -%}
               {%- endif -%}
 
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== QUICK ACTIONS ===== --#}
+              << template_snippets.user_override_helper >>
+
+              << template_snippets.admin_setup_shared >>
+
+              {%- set qa_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set qa_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+              {%- set qa_admin = qa_sa.get('admin-shared', {}) -%}
+              {%- set qa_admin = qa_admin if qa_admin is mapping else {} -%}
+              {%- set qa_tab = (qa_admin.get('management-tab', 'chores')) | string -%}
+              {%- set qa_open = qa_admin.get('quick-actions', {}) -%}
+              {%- set qa_open = qa_open if qa_open is mapping else {} -%}
+              {%- set qa_ok = has_selected_user and has_selected_dashboard_helper and qa_entry_id not in ['', none] -%}
+              {%- if qa_ok -%}
+                {#-- Gather this person's chores (same sources the Management card uses) --#}
+                {%- set qa_chores = namespace(items=state_attr(selected_dashboard_helper, 'chores') | default([], true)) -%}
+                {%- set qa_helpers = state_attr(selected_dashboard_helper, 'dashboard_helpers') or {} -%}
+                {%- set qa_chore_eids = qa_helpers.get('chore_helper_eids', []) if qa_helpers is mapping else [] -%}
+                {%- if qa_chore_eids is iterable and qa_chore_eids is not string -%}
+                  {%- for qa_eid in qa_chore_eids | list -%}
+                    {%- if qa_eid not in ['', none, 'None'] and states(qa_eid) not in ['unknown', 'unavailable'] -%}
+                      {%- set qa_chores.items = qa_chores.items + (state_attr(qa_eid, 'chores') | default([], true)) -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                {%- endif -%}
+                {%- set qa_overdue = qa_chores.items | selectattr('state', 'eq', 'overdue') | list -%}
+                {%- set qa_paused = state_attr(selected_dashboard_helper, 'chores_paused') | bool(false) -%}
+                {%- set qa_paused_until = state_attr(selected_dashboard_helper, 'chores_paused_until') -%}
+                {%- set qa_gam = state_attr(selected_dashboard_helper, 'gamification_enabled') | default(false, true) -%}
+                {%- set qa_specs = namespace(items=[]) -%}
+
+                {%- if qa_tab == 'chores' -%}
+                  {%- set qa_reset_actions = namespace(a=[]) -%}
+                  {%- for oc in qa_overdue -%}
+                    {%- set qa_reset_actions.a = qa_reset_actions.a + [{'action': 'call-service', 'service': 'choreops.reset_overdue_chores', 'data': {'config_entry_id': qa_entry_id, 'chore_name': oc.name, 'user_name': selected_user_name}}] -%}
+                  {%- endfor -%}
+                  {%- set qa_specs.items = [
+                    {
+                      'icon': 'mdi:play-circle-outline' if qa_paused else 'mdi:pause-circle-outline',
+                      'name': 'Resume chores' if qa_paused else 'Pause chores',
+                      'label': ('Paused' ~ ((' · back ' ~ (as_timestamp(qa_paused_until) | timestamp_custom('%a %I:%M %p', true))) if qa_paused_until not in ['', none, 'None', 'unknown', 'unavailable'] else '')) if qa_paused else 'Stops overdue stats',
+                      'color': 'var(--warning-color)' if qa_paused else 'var(--primary-color)',
+                      'tint': qa_paused,
+                      'tap': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'paused': not qa_paused}, 'confirmation': {'text': ('Resume chores for ' ~ selected_user_name ~ '?') if qa_paused else ('Pause chores for ' ~ selected_user_name ~ '?')}}
+                    },
+                    {
+                      'icon': 'mdi:restore-alert',
+                      'name': 'Reset overdue',
+                      'label': (qa_overdue | length | string) ~ ' overdue' if qa_overdue | length > 0 else 'Nothing overdue',
+                      'color': 'var(--warning-color)',
+                      'tint': qa_overdue | length > 0,
+                      'badge': (qa_overdue | length | string) if qa_overdue | length > 0 else '',
+                      'tap': {'action': 'multi-actions', 'actions': qa_reset_actions.a, 'confirmation': {'text': 'Reset ' ~ (qa_overdue | length) ~ ' overdue chore(s) for ' ~ selected_user_name ~ ' back to pending?'}} if qa_overdue | length > 0 else {'action': 'none'}
+                    },
+                    {
+                      'icon': 'mdi:calendar-arrow-right',
+                      'name': 'Shift dates',
+                      'label': 'Move due dates forward',
+                      'color': 'var(--primary-color)',
+                      'tap': {'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': qa_entry_id, 'after': now().isoformat(), 'user_names': [selected_user_name]}, 'confirmation': {'text': 'Move ' ~ selected_user_name ~ '\'s due dates forward to after now?'}}
+                    },
+                    {
+                      'icon': 'mdi:skip-next-circle-outline',
+                      'name': 'Skip next due',
+                      'label': 'Hide list' if qa_open.get('skip-open', false) else 'Pick a chore to skip',
+                      'color': 'var(--primary-color)',
+                      'tint': qa_open.get('skip-open', false),
+                      'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/skip-open', 'value': not (qa_open.get('skip-open', false) | bool(false))}}
+                    }
+                  ] -%}
+                {%- elif qa_tab == 'economy' and qa_gam -%}
+                  {%- set qa_specs.items = [
+                    {
+                      'icon': 'mdi:plus-minus-variant',
+                      'name': 'Adjust points',
+                      'label': 'Hide amounts' if qa_open.get('adjust-open', false) else 'Pick an amount',
+                      'color': 'var(--primary-color)',
+                      'tint': qa_open.get('adjust-open', false),
+                      'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/adjust-open', 'value': not (qa_open.get('adjust-open', false) | bool(false))}}
+                    }
+                  ] -%}
+                {%- elif qa_tab == 'system' -%}
+                  {%- set qa_specs.items = [
+                    {
+                      'icon': 'mdi:restore',
+                      'name': 'Reset all to pending',
+                      'label': 'Everyone · clears claims and approvals',
+                      'color': 'var(--error-color)',
+                      'tint': true,
+                      'tap': {'action': 'call-service', 'service': 'choreops.reset_chores_to_pending_state', 'data': {'config_entry_id': qa_entry_id}, 'confirmation': {'text': 'Reset EVERY chore for EVERYONE to pending? This clears all claims and approvals.'}}
+                    }
+                  ] -%}
+                {%- endif -%}
+
+                {%- if qa_specs.items | length > 0 -%}
+                  {%- set qa_cards = namespace(c=[]) -%}
+                  {%- for sp in qa_specs.items -%}
+                    {%- set qa_cards.c = qa_cards.c + [{
+                      'type': 'custom:button-card',
+                      'entity': admin_selector_eid,
+                      'show_name': true,
+                      'show_label': true,
+                      'show_state': false,
+                      'show_icon': true,
+                      'icon': sp.icon,
+                      'name': sp.name,
+                      'label': sp.label,
+                      'tap_action': sp.tap,
+                      'hold_action': {'action': 'none'},
+                      'custom_fields': {'badge': ("<div style='background:var(--error-color);color:#fff;border-radius:999px;font-size:11px;font-weight:800;padding:1px 7px;'>" ~ sp.badge ~ "</div>") if sp.get('badge') else ''},
+                      'styles': {
+                        'card': [
+                          {'padding': '12px'},
+                          {'border-radius': '16px'},
+                          {'box-shadow': 'none'},
+                          {'border': '1px solid color-mix(in srgb, ' ~ sp.color ~ ' 45%, var(--divider-color))'},
+                          {'background': ('color-mix(in srgb, ' ~ sp.color ~ ' 14%, var(--card-background-color))') if sp.get('tint') else 'var(--card-background-color)'}
+                        ],
+                        'grid': [
+                          {'grid-template-areas': '"i n badge" "i l badge"'},
+                          {'grid-template-columns': '32px minmax(0, 1fr) auto'},
+                          {'column-gap': '10px'},
+                          {'row-gap': '1px'},
+                          {'align-items': 'center'}
+                        ],
+                        'icon': [{'width': '24px'}, {'color': sp.color}],
+                        'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}, {'text-align': 'left'}],
+                        'label': [{'justify-self': 'start'}, {'font-size': '11px'}, {'opacity': '0.65'}, {'text-align': 'left'}, {'white-space': 'normal'}],
+                        'custom_fields': {'badge': [{'justify-self': 'end'}, {'align-self': 'start'}]}
+                      }
+                    }] -%}
+                  {%- endfor -%}
+                  {{
+                    {
+                      'type': 'markdown',
+                      'content': '**Quick actions' ~ (' · ' ~ selected_user_name if qa_tab != 'system' else ' · everyone') ~ '**'
+                    }
+                  }},
+                  {{
+                    {
+                      'type': 'grid',
+                      'columns': 2,
+                      'square': false,
+                      'cards': qa_cards.c
+                    }
+                  }},
+                {%- endif -%}
+
+                {#-- Inline pick-lists --#}
+                {%- if qa_tab == 'chores' and qa_open.get('skip-open', false) -%}
+                  {%- set qa_skip = namespace(c=[]) -%}
+                  {%- for ch in qa_chores.items -%}
+                    {%- set qa_skip.c = qa_skip.c + [{
+                      'type': 'custom:button-card',
+                      'entity': admin_selector_eid,
+                      'show_name': true,
+                      'show_icon': false,
+                      'show_label': false,
+                      'show_state': false,
+                      'name': ch.name,
+                      'tap_action': {'action': 'call-service', 'service': 'choreops.skip_chore_due_date', 'data': {'config_entry_id': qa_entry_id, 'chore_name': ch.name, 'user_name': selected_user_name}, 'confirmation': {'text': 'Skip the next due date for ' ~ ch.name ~ ' (' ~ selected_user_name ~ ')?'}},
+                      'hold_action': {'action': 'none'},
+                      'styles': {
+                        'card': [{'padding': '10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}],
+                        'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'white-space': 'normal'}]
+                      }
+                    }] -%}
+                  {%- endfor -%}
+                  {%- if qa_skip.c | length > 0 -%}
+                  {{
+                    {'type': 'grid', 'columns': 2, 'square': false, 'cards': qa_skip.c}
+                  }},
+                  {%- endif -%}
+                {%- endif -%}
+                {%- if qa_tab == 'economy' and qa_gam and qa_open.get('adjust-open', false) -%}
+                  {%- set qa_adj = namespace(c=[]) -%}
+                  {%- for amt in [-10, -5, -1, 1, 5, 10] -%}
+                    {%- set qa_adj.c = qa_adj.c + [{
+                      'type': 'custom:button-card',
+                      'entity': admin_selector_eid,
+                      'show_name': true,
+                      'show_icon': false,
+                      'show_label': false,
+                      'show_state': false,
+                      'name': ('+' ~ amt) if amt > 0 else (amt | string),
+                      'tap_action': {'action': 'call-service', 'service': 'choreops.manual_adjust_points', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'amount': amt, 'reason': 'Dashboard adjustment'}, 'confirmation': {'text': ('Add ' ~ amt ~ ' points to ' ~ selected_user_name ~ '?') if amt > 0 else ('Remove ' ~ (amt | abs) ~ ' points from ' ~ selected_user_name ~ '?')}},
+                      'hold_action': {'action': 'none'},
+                      'styles': {
+                        'card': [{'padding': '10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': ('1px solid var(--success-color)' if amt > 0 else '1px solid var(--error-color)')}],
+                        'name': [{'font-size': '14px'}, {'font-weight': '800'}, {'color': ('var(--success-color)' if amt > 0 else 'var(--error-color)')}]
+                      }
+                    }] -%}
+                  {%- endfor -%}
+                  {{
+                    {'type': 'grid', 'columns': 3, 'square': false, 'cards': qa_adj.c}
+                  }},
+                {%- endif -%}
+              {%- elif qa_tab == 'system' and qa_entry_id not in ['', none] -%}
+                {#-- No person needed for the family-wide reset --#}
+              {%- endif -%}
         - type: custom:auto-entities
           card:
             type: grid
@@ -1278,7 +2000,10 @@ views:
                 {%- set has_selected_chore_sensor = selected_chore_sensor not in ['', None, 'None'] and states(selected_chore_sensor) not in ['unknown', 'unavailable'] -%}
                 {%- set has_resolved_selected_chore = has_selected_chore and has_selected_chore_sensor -%}
                 {%- set header_collapsed = selected_user_ui_root.current['header-collapse'] if has_header_collapsed_override else pref_chore_management_default_header_collapsed -%}
-                {%- set header_collapsed = (header_collapsed | string | lower) == 'true' -%}
+                {%- set header_collapsed = false -%}
+                {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+                {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+                {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
                 {%- set management_label_html = (
                   "<span style='color:var(--secondary-text-color);'>" ~ ui.get('manage_for', 'Manage for') ~ ":</span> <span style='font-weight:700;color:var(--primary-text-color);'>" ~ (selected_user_name | e) ~ "</span>"
                 ) if has_selected_user else '' -%}
@@ -1960,7 +2685,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2007,7 +2732,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2054,7 +2779,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2101,7 +2826,7 @@ views:
                       'styles': {
                         'card': [
                           {'padding': '10px 8px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'},
                           {'background-color': 'color-mix(in srgb, var(--error-color) 8%, var(--card-background-color))'}
@@ -2151,7 +2876,7 @@ views:
                             'card': [
                               {'width': '34px'},
                               {'height': '34px'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'box-shadow': 'none'},
                               {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                               {'background-color': 'color-mix(in srgb, var(--primary-color) 10%, var(--card-background-color))'}
@@ -2184,7 +2909,7 @@ views:
                             'card': [
                               {'width': '34px'},
                               {'height': '34px'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'box-shadow': 'none'},
                               {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))'},
                               {'background-color': 'color-mix(in srgb, var(--success-color) 10%, var(--card-background-color))'}
@@ -2200,7 +2925,7 @@ views:
                     'styles': {
                       'card': [
                         {'padding': '10px 12px'},
-                        {'border-radius': '14px'},
+                        {'border-radius': '16px'},
                         {'box-shadow': 'none'},
                         {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                         {'background-color': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'}
@@ -2266,7 +2991,7 @@ views:
                     'styles': {
                       'card': [
                         {'padding': '10px 12px'},
-                        {'border-radius': '14px'},
+                        {'border-radius': '16px'},
                         {'box-shadow': 'none'},
                         {'border': '1px solid color-mix(in srgb, var(--warning-color) 20%, var(--divider-color))'},
                         {'background-color': 'color-mix(in srgb, var(--warning-color) 10%, var(--card-background-color))'}
@@ -2353,7 +3078,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '6px 8px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                             {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2397,7 +3122,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '6px 8px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': "1px solid color-mix(in srgb, var(--warning-color) 18%, var(--divider-color))"},
                             {'background-color': "color-mix(in srgb, var(--warning-color) 8%, var(--card-background-color))"}
@@ -2441,7 +3166,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '6px 8px'},
-                            {'border-radius': '14px'},
+                            {'border-radius': '16px'},
                             {'box-shadow': 'none'},
                             {'border': "1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))"},
                             {'background-color': "color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))"}
@@ -2542,7 +3267,7 @@ views:
                             'styles': {
                               'card': [
                                 {'padding': '6px 8px'},
-                                {'border-radius': '14px'},
+                                {'border-radius': '16px'},
                                 {'box-shadow': 'none'},
                                 {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'},
                                 {'background-color': 'color-mix(in srgb, var(--primary-color) 8%, var(--card-background-color))'}
@@ -2699,8 +3424,7 @@ views:
 
               {#-- 6. Render Logic --#}
 
-              {%- if has_selected_dashboard_helper -%}
-                {{ management_summary_card }},
+              {%- if has_selected_dashboard_helper and has_selected_user and mgmt_tab == 'chores' -%}
                 {#-- ===== ALL CHORES ACTIONS ===== --#}
                 {%- if not header_collapsed and has_selected_user -%}
                   {#-- All Chores card (unified pause + reschedule) --#}
@@ -2723,18 +3447,18 @@ views:
                   {%- set all_chores_now_label = ui.get('past_prefix', 'err-past_prefix') ~ ": " ~ ui.get('now', 'err-now') -%}
                   {%- set all_chores_arrow_date_display = ("→ " ~ (as_timestamp(all_chores_date_val) | timestamp_custom('%a, %b %d %I:%M %p', true))) if all_chores_has_date else '' -%}
                   {%- set all_chores_arrow_date_label = all_chores_arrow_date_display if all_chores_has_date else ui.get('no_date_set', 'err-no_date_set') -%}
-                  {%- set all_chores_shared_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--primary-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
+                  {%- set all_chores_shared_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--primary-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--primary-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
                   {%- set all_chores_push_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('shift_independent', 'err-shift_independent'), 'label': all_chores_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': integration_entry_id, 'user_names': [selected_user_name], 'after': all_chores_date_val, 'reschedule_independent': true, 'reschedule_primary_standby': false, 'reschedule_shared': false}}) if all_chores_has_date else {'action': 'none'}, 'styles': all_chores_shared_style}} -%}
                   {%- set all_chores_push_primary_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('shift_independent_primary', 'err-shift_independent_primary'), 'label': all_chores_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': integration_entry_id, 'user_names': [selected_user_name], 'after': all_chores_date_val, 'reschedule_independent': true, 'reschedule_primary_standby': true, 'reschedule_shared': false}}) if all_chores_has_date else {'action': 'none'}, 'styles': all_chores_shared_style}} -%}
                   {%- set all_chores_push_all_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-refresh', 'name': ui.get('shift_all', 'err-shift_all'), 'label': all_chores_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': integration_entry_id, 'user_names': [selected_user_name], 'after': all_chores_date_val, 'reschedule_independent': true, 'reschedule_primary_standby': true, 'reschedule_shared': true}}) if all_chores_has_date else {'action': 'none'}, 'styles': all_chores_shared_style}} -%}
-                  {%- set resume_shift_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 14%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 5%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
+                  {%- set resume_shift_style = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 14%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 5%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}, {'color': 'var(--primary-text-color)'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
                   {%- set resume_shift_independent_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('resume_shift_independent', 'err-resume_shift_independent'), 'label': all_chores_now_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false', 'unpause_action': 'unpause_shift_independent'}}) if all_chores_has_date else {'action': 'none'}, 'styles': resume_shift_style}} -%}
                   {%- set resume_shift_primary_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('resume_shift_independent_primary', 'err-resume_shift_independent_primary'), 'label': all_chores_now_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false', 'unpause_action': 'unpause_shift_all_primary'}}) if all_chores_has_date else {'action': 'none'}, 'styles': resume_shift_style}} -%}
                   {%- set resume_shift_all_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-refresh', 'name': ui.get('resume_shift_all', 'err-resume_shift_all'), 'label': all_chores_now_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false', 'unpause_action': 'unpause_shift_all'}}) if all_chores_has_date else {'action': 'none'}, 'styles': resume_shift_style}} -%}
                   {%- set all_chores_pick_card = {'card': {'type': 'custom:button-card', 'entity': dashboard_date_helper if all_chores_date_helper else selected_dashboard_helper, 'icon': 'mdi:calendar-search', 'show_name': False, 'show_icon': True, 'tap_action': {'action': 'more-info'} if all_chores_date_helper else {'action': 'none'}, 'styles': {'card': [{'width': '32px'}, {'height': '32px'}, {'border-radius': '8px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'background-color': 'var(--card-background-color)'}], 'icon': [{'width': '16px'}, {'color': 'var(--primary-color)'}]}}} -%}
                   {#-- Structural Layout Sections per State --#}
                   {%- if all_chores_expanded and not all_chores_is_paused -%}
-                    {%- set pause_style_mod = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--error-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--error-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
+                    {%- set pause_style_mod = {'card': [{'height': '48px'}, {'padding': '6px 12px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--error-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '24px 1fr'}, {'grid-template-rows': '1fr auto'}, {'column-gap': '8px'}, {'row-gap': '1px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--error-color)'}], 'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'font-weight': '600'}, {'line-height': '1.2'}], 'label': [{'justify-self': 'start'}, {'font-size': '10px'}, {'color': 'var(--secondary-text-color)'}]} -%}
                     {%- set all_chores_pause_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': False, 'show_state': False, 'icon': 'mdi:pause-circle', 'name': ui.get('pause', 'err-pause'), 'tap_action': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'true'}}, 'styles': pause_style_mod}} -%}
                     {%- set all_chores_until_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-clock', 'name': ui.get('pause_until', 'err-pause_until'), 'label': all_chores_arrow_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'true', 'paused_until': all_chores_date_val}}) if all_chores_has_date else {'action': 'none'}, 'styles': pause_style_mod}} -%}
                     {%- set all_chores_until_shift_independent_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:calendar-sync-outline', 'name': ui.get('pause_until_shift_independent', 'err-pause_until_shift_independent'), 'label': all_chores_arrow_date_label, 'tap_action': ({'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'true', 'paused_until': all_chores_date_val, 'unpause_action': 'unpause_shift_independent'}}) if all_chores_has_date else {'action': 'none'}, 'styles': pause_style_mod}} -%}
@@ -2743,7 +3467,7 @@ views:
                     {%- set all_chores_grid_template = '"i n l controls" "div_pause div_pause div_pause div_pause" "pause_btn pause_btn until_btn until_btn" "until_shift_independent until_shift_independent until_shift_independent until_shift_independent" "until_shift_primary until_shift_primary until_shift_primary until_shift_primary" "until_shift_all until_shift_all until_shift_all until_shift_all" "div_sched div_sched div_sched div_sched" "push_btn push_btn push_primary_btn push_primary_btn" "push_all_btn push_all_btn push_all_btn push_all_btn"' -%}
                     {%- set all_chores_grid_rows = 'min-content auto auto auto auto auto auto auto auto' -%}
                   {%- elif all_chores_expanded and all_chores_is_paused -%}
-                    {%- set all_chores_resume_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:play-circle-outline', 'name': ui.get('resume', 'err-resume'), 'label': all_chores_paused_display, 'tap_action': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false'}}, 'styles': {'card': [{'height': '48px'}, {'padding': '6px 14px'}, {'border-radius': '10px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n l"'}, {'grid-template-columns': '24px 1fr auto'}, {'column-gap': '8px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}], 'label': [{'justify-self': 'end'}, {'font-size': '11px'}, {'color': 'var(--secondary-text-color)'}]}}} -%}
+                    {%- set all_chores_resume_card = {'card': {'type': 'custom:button-card', 'show_name': True, 'show_icon': True, 'show_label': True, 'show_state': False, 'icon': 'mdi:play-circle-outline', 'name': ui.get('resume', 'err-resume'), 'label': all_chores_paused_display, 'tap_action': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': integration_entry_id, 'user_name': selected_user_name, 'paused': 'false'}}, 'styles': {'card': [{'height': '48px'}, {'padding': '6px 14px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))'}, {'background-color': 'color-mix(in srgb, var(--success-color) 8%, var(--card-background-color))'}], 'grid': [{'grid-template-areas': '"i n l"'}, {'grid-template-columns': '24px 1fr auto'}, {'column-gap': '8px'}, {'align-items': 'center'}], 'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--success-color)'}], 'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}], 'label': [{'justify-self': 'end'}, {'font-size': '11px'}, {'color': 'var(--secondary-text-color)'}]}}} -%}
                     {%- set all_chores_until_card = "" -%}
                     {%- set all_chores_grid_template = '"i n l controls" "div_pause div_pause div_pause div_pause" "resume_btn resume_btn resume_btn resume_btn" "div_resume div_resume div_resume div_resume" "resume_push_btn resume_push_btn resume_push_primary_btn resume_push_primary_btn" "resume_push_all_btn resume_push_all_btn resume_push_all_btn resume_push_all_btn" "div_sched div_sched div_sched div_sched" "push_btn push_btn push_primary_btn push_primary_btn" "push_all_btn push_all_btn push_all_btn push_all_btn"' -%}
                     {%- set all_chores_grid_rows = 'min-content auto auto auto auto auto auto auto auto' -%}
@@ -2820,7 +3544,7 @@ views:
                         'card': [
                           {'padding': '12px 14px'},
                           {'margin-top': '0px'},
-                          {'border-radius': '14px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'margin-bottom': '0px'},
                           {'border': '1px solid ' ~ ('color-mix(in srgb, var(--warning-color) 40%, var(--divider-color))' if all_chores_is_paused else 'var(--divider-color)')},
@@ -2987,7 +3711,7 @@ views:
                               'styles': {
                                 'card': [
                                   {'padding': '6px 12px'},
-                                  {'border-radius': '10px'},
+                                  {'border-radius': '12px'},
                                   {'box-shadow': 'none'},
                                   {'min-width': '90px'},
                                   {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))' if selected_chore_is_unassigned else '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'},
@@ -3115,7 +3839,7 @@ views:
                               'styles': {
                                 'card': [
                                   {'padding': '6px 12px'},
-                                  {'border-radius': '10px'},
+                                  {'border-radius': '12px'},
                                   {'box-shadow': 'none'},
                                   {'min-width': '90px'},
                                   {'border': '1px solid color-mix(in srgb, var(--success-color) 18%, var(--divider-color))' if selected_chore_is_unassigned else '1px solid color-mix(in srgb, var(--error-color) 18%, var(--divider-color))'},
@@ -3373,6 +4097,10 @@ views:
                 {%- set points_total_display = states(points_sensor) if has_points_sensor and states(points_sensor) not in ['unknown', 'unavailable', 'None', ''] else '0' -%}
                 {%- set header_collapsed = selected_user_ui_root.current['header-collapse'] if has_header_collapsed_override else pref_economy_management_default_header_collapsed -%}
                 {%- set header_collapsed = (header_collapsed | string | lower) == 'true' -%}
+                {%- set header_collapsed = false -%}
+                {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+                {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+                {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
                 {%- set economy_label = ui.get('manage_for', 'Manage for') if has_selected_user else ui.get('select_user_first', 'err-select_user_first') -%}
                 {%- set economy_label_html = (
                   "<span style='color:var(--secondary-text-color);'>" ~ ui.get('manage_for', 'Manage for') ~ ":</span> <span style='font-weight:700;color:var(--primary-text-color);'>" ~ (selected_user_name | e) ~ "</span>"
@@ -4305,8 +5033,7 @@ views:
 
               {#-- 6. Render Logic --#}
 
-              {%- if has_selected_dashboard_helper and selected_gamification_enabled -%}
-                {{ economy_summary_card }},
+              {%- if has_selected_dashboard_helper and selected_gamification_enabled and has_selected_user and mgmt_tab == 'economy' -%}
                 {%- if not header_collapsed and has_points_sensor -%}
                   {{ economy_detail_card }},
                 {%- endif -%}
@@ -4337,4 +5064,9 @@ views:
 
               << template_snippets.admin_validation_missing_selector >>
 
-              << template_shared.admin_system_administration_links_v1 >>
+              {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+              {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+              {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
+              {%- if (not has_selected_user) or mgmt_tab == 'system' -%}
+                            << template_shared.admin_system_administration_links_v1 >>
+              {%- endif -%}

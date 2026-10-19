@@ -588,3 +588,30 @@ async def test_approve_button_confirms_full_pool_and_disapprove_refuses(
 
     assert _pool(scenario_full, reward_id) == {}
     assert _points(scenario_full, zoe) == 0.0
+
+
+async def test_refund_single_contributor_leaves_the_rest_in_the_pool(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Refunding one person returns only their share and keeps the others."""
+    rm = scenario_full.coordinator.reward_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    reward_id = _make_pool(scenario_full)
+    _set_points(scenario_full, zoe, 50.0)
+    _set_points(scenario_full, max_, 50.0)
+
+    await rm.contribute_to_pool(zoe, reward_id, 25.0)
+    await rm.contribute_to_pool(max_, reward_id, 10.0)
+    await hass.async_block_till_done()
+
+    assert await rm.refund_pool(reward_id, zoe) == {zoe: 25.0}
+    await hass.async_block_till_done()
+
+    assert _points(scenario_full, zoe) == 50.0
+    assert _points(scenario_full, max_) == 40.0
+    assert _pool(scenario_full, reward_id) == {max_: 10.0}
+    # Refunding someone who has nothing in the pool is a no-op
+    assert await rm.refund_pool(reward_id, zoe) == {}
+    assert _pool(scenario_full, reward_id) == {max_: 10.0}

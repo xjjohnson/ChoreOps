@@ -1058,6 +1058,11 @@ def build_user_assignment_profile(
                 const.DATA_USER_CURRENT_STREAK,
                 0,
             )
+        if const.DATA_USER_CAUGHT_UP_STREAK in existing:
+            assignee_data[const.DATA_USER_CAUGHT_UP_STREAK] = existing.get(
+                const.DATA_USER_CAUGHT_UP_STREAK,
+                {},
+            )
         if const.DATA_USER_LAST_STREAK_DATE in existing:
             assignee_data[const.DATA_USER_LAST_STREAK_DATE] = existing.get(
                 const.DATA_USER_LAST_STREAK_DATE,

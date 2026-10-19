@@ -5119,6 +5119,56 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         """Return a simple helper state for dashboard availability checks."""
         return "available"
 
+    @staticmethod
+    def _build_caught_up_streak(assignee_info: dict[str, Any]) -> dict[str, Any]:
+        """Return the person's "All Caught Up" day streak for dashboards."""
+        streak = assignee_info.get(const.DATA_USER_CAUGHT_UP_STREAK) or {}
+        count = int(streak.get("count", 0))
+        today_counted = str(streak.get("last_day", "")) == dt_today_local().isoformat()
+        return {
+            "count": count,
+            "best": int(streak.get("best", 0)),
+            "today_counted": today_counted,
+        }
+
+    @staticmethod
+    def _build_recent_activity(
+        assignee_info: dict[str, Any], limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """Return the newest point-ledger entries for dashboard display.
+
+        Args:
+            assignee_info: The assignee's stored data (holds the point ledger).
+            limit: How many entries to return, newest first.
+
+        Returns:
+            Small list of dicts with timestamp, amount, source label and item name.
+        """
+        ledger = assignee_info.get(const.DATA_USER_LEDGER, [])
+        if not isinstance(ledger, list):
+            return []
+        recent: list[dict[str, Any]] = []
+        for raw_entry in reversed(ledger):
+            if not isinstance(raw_entry, dict):
+                continue
+            source = str(
+                raw_entry.get(const.DATA_LEDGER_SOURCE, const.POINTS_SOURCE_OTHER)
+            )
+            recent.append(
+                {
+                    "timestamp": raw_entry.get(const.DATA_LEDGER_TIMESTAMP, ""),
+                    "amount": raw_entry.get(const.DATA_LEDGER_AMOUNT, 0.0),
+                    "source": source,
+                    "source_label": const.LEDGER_SOURCE_LABELS.get(
+                        source, const.LEDGER_SOURCE_LABELS[const.POINTS_SOURCE_OTHER]
+                    ),
+                    "item_name": raw_entry.get(const.DATA_LEDGER_ITEM_NAME, ""),
+                }
+            )
+            if len(recent) >= limit:
+                break
+        return recent
+
     def _build_core_sensors(self, entity_registry) -> dict[str, str | None]:
         """Build core sensor entity IDs for dashboard use.
 
@@ -5582,6 +5632,8 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             "challenges": challenges_attr,
             "points_buttons": points_buttons_attr,
             "pending_approvals": pending_approvals,
+            "recent_activity": self._build_recent_activity(assignee_info),
+            "caught_up_streak": self._build_caught_up_streak(assignee_info),
             "core_sensors": core_sensors,
             const.ATTR_DASHBOARD_CONFIG: dashboard_config,
             "dashboard_helpers": dashboard_helpers,

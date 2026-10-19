@@ -52,3 +52,37 @@ async def test_pending_approvals_button_entity_ids_populated(
     """
     # Verify integration loaded successfully
     assert init_integration is not None
+
+
+def test_recent_activity_returns_newest_five_ledger_entries() -> None:
+    """Dashboard helper exposes the newest ledger entries, newest first."""
+    from custom_components.choreops import const
+    from custom_components.choreops.sensor import AssigneeDashboardHelperSensor
+
+    ledger = [
+        {
+            const.DATA_LEDGER_TIMESTAMP: f"2026-10-0{i}T10:00:00",
+            const.DATA_LEDGER_AMOUNT: float(i),
+            const.DATA_LEDGER_SOURCE: const.POINTS_SOURCE_CHORES,
+            const.DATA_LEDGER_ITEM_NAME: f"Chore {i}",
+        }
+        for i in range(1, 8)
+    ]
+    ledger.append(
+        {
+            const.DATA_LEDGER_TIMESTAMP: "2026-10-09T10:00:00",
+            const.DATA_LEDGER_AMOUNT: -2.0,
+            const.DATA_LEDGER_SOURCE: const.POINTS_SOURCE_PENALTIES,
+            const.DATA_LEDGER_ITEM_NAME: "Late",
+        }
+    )
+    recent = AssigneeDashboardHelperSensor._build_recent_activity(
+        {const.DATA_USER_LEDGER: ledger}
+    )
+
+    assert len(recent) == 5
+    assert recent[0]["item_name"] == "Late"
+    assert recent[0]["source_label"] == "Penalty"
+    assert recent[0]["amount"] == -2.0
+    assert recent[1]["item_name"] == "Chore 7"
+    assert AssigneeDashboardHelperSensor._build_recent_activity({}) == []

@@ -683,3 +683,44 @@ async def test_active_streak_needs_everyone_every_day(
     assert gm.get_family_achievement_total(goal_id) == 2
     assert _awarded(scenario_full, goal_id, zoe)
     assert _awarded(scenario_full, goal_id, max_)
+
+
+async def test_assignee_caught_up_streak_counts_breaks_and_tracks_best(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A person's own caught-up streak counts once a day and breaks on overdue."""
+    gm = scenario_full.coordinator.gamification_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    info = scenario_full.coordinator.assignees_data[zoe]
+
+    def snap(open_: int, done: int, *, overdue=False, missed=False) -> None:
+        gm._assignee_caught_up_snapshot = lambda *a, **k: {
+            "open": open_,
+            "done": done,
+            "overdue": overdue,
+            "missed": missed,
+        }
+
+    snap(1, 2)
+    assert not gm._update_assignee_caught_up_streak(zoe)
+
+    snap(0, 3)
+    assert gm._update_assignee_caught_up_streak(zoe)
+    assert not gm._update_assignee_caught_up_streak(zoe)  # once per day
+    assert info[const.DATA_USER_CAUGHT_UP_STREAK]["count"] == 1
+
+    info[const.DATA_USER_CAUGHT_UP_STREAK]["last_day"] = "2000-01-01"
+    assert gm._update_assignee_caught_up_streak(zoe)
+    assert info[const.DATA_USER_CAUGHT_UP_STREAK]["count"] == 2
+    assert info[const.DATA_USER_CAUGHT_UP_STREAK]["best"] == 2
+
+    info[const.DATA_USER_CAUGHT_UP_STREAK]["last_day"] = "2000-01-01"
+    snap(1, 0, overdue=True)
+    assert gm._update_assignee_caught_up_streak(zoe)
+    assert info[const.DATA_USER_CAUGHT_UP_STREAK]["count"] == 0
+    assert info[const.DATA_USER_CAUGHT_UP_STREAK]["best"] == 2
+
+    # Neutral day (nothing due, nothing done) changes nothing.
+    snap(0, 0)
+    assert not gm._update_assignee_caught_up_streak(zoe)

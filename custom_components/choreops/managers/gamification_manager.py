@@ -876,6 +876,9 @@ class GamificationManager(BaseManager):
             )
             return
 
+        if self._update_assignee_caught_up_streak(assignee_id):
+            self.coordinator._persist_and_update()
+
         # Get badge data from coordinator
         badges_data = self.coordinator.badges_data
 
@@ -3201,47 +3204,95 @@ class GamificationManager(BaseManager):
         actionable for the person today (the due-today summary) plus anything
         claimed but not yet approved. Overdue chores also block the day.
         """
+        return {
+            assignee_id: self._assignee_caught_up_snapshot(
+                assignee_id, last_day, today_iso
+            )
+            for assignee_id in self._get_family_assigned_ids(achievement_data)
+        }
+
+    def _assignee_caught_up_snapshot(
+        self, assignee_id: str, last_day: str, today_iso: str
+    ) -> dict[str, int | bool]:
+        """Return one person's open/done chore counts for today."""
         stats = self.coordinator.statistics_manager
         chore_manager = self.coordinator.chore_manager
-        result: dict[str, dict[str, int | bool]] = {}
-        for assignee_id in self._get_family_assigned_ids(achievement_data):
-            chore_ids = [
-                str(chore_id)
-                for chore_id in self.coordinator.assignees_data[assignee_id].get(
-                    const.DATA_USER_CHORE_DATA, {}
-                )
-                if chore_id in self.coordinator.chores_data
-            ]
-            open_count = 0
-            overdue_count = 0
-            for chore_id in chore_ids:
-                context = chore_manager.get_chore_status_context(assignee_id, chore_id)
-                state = context.get(const.CHORE_CTX_STATE)
-                if state == const.CHORE_STATE_OVERDUE:
-                    overdue_count += 1
-                elif state == const.CHORE_STATE_CLAIMED or (
-                    chore_manager.chore_counts_toward_due_today_summary(
-                        assignee_id,
-                        chore_id,
-                        status_context=context,
-                        local_today_iso=today_iso,
-                    )
-                ):
-                    open_count += 1
-            today_stats = stats.get_badge_scoped_today_stats(
-                assignee_id, chore_ids, today_iso=today_iso
+        chore_ids = [
+            str(chore_id)
+            for chore_id in self.coordinator.assignees_data[assignee_id].get(
+                const.DATA_USER_CHORE_DATA, {}
             )
-            result[assignee_id] = {
-                "open": open_count,
-                "done": int(today_stats.get("today_approved", 0)),
-                "overdue": overdue_count > 0,
-                "missed": stats.has_missed_occurrence_since_advance(
-                    chore_ids,
-                    last_update_day_iso=last_day,
-                    today_iso=today_iso,
-                ),
+            if chore_id in self.coordinator.chores_data
+        ]
+        open_count = 0
+        overdue_count = 0
+        for chore_id in chore_ids:
+            context = chore_manager.get_chore_status_context(assignee_id, chore_id)
+            state = context.get(const.CHORE_CTX_STATE)
+            if state == const.CHORE_STATE_OVERDUE:
+                overdue_count += 1
+            elif state == const.CHORE_STATE_CLAIMED or (
+                chore_manager.chore_counts_toward_due_today_summary(
+                    assignee_id,
+                    chore_id,
+                    status_context=context,
+                    local_today_iso=today_iso,
+                )
+            ):
+                open_count += 1
+        today_stats = stats.get_badge_scoped_today_stats(
+            assignee_id, chore_ids, today_iso=today_iso
+        )
+        return {
+            "open": open_count,
+            "done": int(today_stats.get("today_approved", 0)),
+            "overdue": overdue_count > 0,
+            "missed": stats.has_missed_occurrence_since_advance(
+                chore_ids,
+                last_update_day_iso=last_day,
+                today_iso=today_iso,
+            ),
+        }
+
+    def _update_assignee_caught_up_streak(self, assignee_id: str) -> bool:
+        """Advance or break one person's "All Caught Up" day streak.
+
+        A day counts once everything due is approved, something was done, and
+        nothing is overdue. Days with nothing due are neutral. An overdue or
+        missed scheduled chore ends the streak. Safe to call repeatedly: a day
+        is only counted once.
+
+        Returns:
+            True when stored streak state changed.
+        """
+        assignee_info = self.coordinator.assignees_data.get(assignee_id)
+        if assignee_info is None:
+            return False
+        today_iso = dt_today_iso()
+        streak = assignee_info.get(const.DATA_USER_CAUGHT_UP_STREAK) or {}
+        count = int(streak.get("count", 0))
+        best = int(streak.get("best", 0))
+        last_day = str(streak.get("last_day", ""))
+        if last_day == today_iso:
+            return False
+
+        snap = self._assignee_caught_up_snapshot(assignee_id, last_day, today_iso)
+        changed = False
+        if count > 0 and (snap["missed"] or snap["overdue"]):
+            count = 0
+            changed = True
+        if int(snap["done"]) > 0 and int(snap["open"]) == 0 and not snap["overdue"]:
+            count += 1
+            best = max(best, count)
+            last_day = today_iso
+            changed = True
+        if changed:
+            assignee_info[const.DATA_USER_CAUGHT_UP_STREAK] = {  # type: ignore[typeddict-unknown-key]
+                "count": count,
+                "last_day": last_day,
+                "best": best,
             }
-        return result
+        return changed
 
     def get_family_caught_up_status(self, achievement_id: str) -> dict[str, str]:
         """Return today's per-person caught-up progress as readable text.

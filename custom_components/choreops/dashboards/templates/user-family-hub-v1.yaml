@@ -25,7 +25,7 @@ button_card_templates:
   << template_shared.button_card_template_chore_row_kids_v1 >>
   << template_shared.button_card_template_chore_row_timeline_v1 >>
 views:
-  - max_columns: 2
+  - max_columns: 3
     title: << user.name >>
     path: family-hub-<< user.slug >>
     subview: true
@@ -149,6 +149,15 @@ views:
                       {%- set status_text = ui.get('all_caught_up', 'All Caught Up!') -%}
                     {%- endif -%}
 
+                    {%- set cu = state_attr(dashboard_helper, 'caught_up_streak') or {} -%}
+                    {%- set cu_n = cu.get('count', 0) | int(0) -%}
+                    {%- set cu_best = cu.get('best', 0) | int(0) -%}
+                    {%- set cu_open = (overdue_now + due_today_open) > 0 -%}
+                    {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue_now > 0 -%}
+                    {%- set cu_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
+                    {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' (at risk)' if (cu_open and cu_n > 0) else '') -%}
+                    {%- set streak_chip = ("<span style='display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ cu_col ~ "; background: color-mix(in srgb, " ~ cu_col ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'><ha-icon icon='mdi:fire' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ cu_col ~ "; display: block;'></ha-icon><span>" ~ cu_txt ~ "</span></span>") if (cu_n > 0 or cu_broken) else '' -%}
+                    {%- set streak_note = ("<div style='font-size: 11px; opacity: 0.65; margin-top: 8px;'>" ~ (('Streak ended. ') if cu_broken else '') ~ 'Best: ' ~ (cu_best | string) ~ (' days' if cu_best != 1 else ' day') ~ "</div>") if cu_best > 0 else '' -%}
                     {%- set name_safe = name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                     {%- set hour_now = now().hour -%}
                     {%- if hour_now < 12 -%}
@@ -184,7 +193,8 @@ views:
                       ~ "</div>"
                       ~ right_col
                       ~ "</div>"
-                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ "</div>"
+                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ streak_chip ~ "</div>"
+                      ~ streak_note
                       ~ "</div>"
                     -%}
 
@@ -199,7 +209,7 @@ views:
                         'styles': {
                           'card': [
                             {'padding': '16px'},
-                            {'border-radius': '18px'},
+                            {'border-radius': '16px'},
                             {'border': '1px solid color-mix(in srgb, var(--primary-color) 25%, var(--divider-color))' if pref_show_header_thin_border else 'none'},
                             {'background': ('linear-gradient(135deg, color-mix(in srgb, var(--primary-color) ' ~ (pref_primary_tint_mix_pct * 3 // 2)|string ~ '%, var(--card-background-color)), color-mix(in srgb, var(--primary-color) ' ~ (pref_primary_tint_mix_pct // 3)|string ~ '%, var(--card-background-color)))') if pref_show_header_background else 'transparent'},
                             {'box-shadow': 'none'}
@@ -620,13 +630,13 @@ views:
                             {%- set fpv = ((fl[fpi] | round(0) | int) if (fcnt > 1 and fpi >= 0) else 0) -%}
                             {%- set fsp = [fwt - fpv, 1] | max -%}
                             {%- set fpc = (([[ftot - fpv, 0] | max, fsp] | min / fsp) * 100) | round(1) -%}
-                            {%- set fac = '#22c55e' if fdn else '#8b5cf6' -%}
+                            {%- set fac = 'var(--success-color)' if fdn else '#8b5cf6' -%}
                             {%- set fac2 = '#86efac' if fdn else '#ec4899' -%}
                             {%- set fnm = (achievement_attrs.get('achievement_name') or achievement.get('name') or ui.get('achievements', 'err-achievements')) | string | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set fpp = namespace(v='') -%}
                             {%- if fcnt > 1 -%}
                               {%- for lv in fl -%}
-                                {%- set fpp.v = fpp.v ~ "<div style='flex:1;height:4px;border-radius:999px;background:" ~ ('#22c55e' if loop.index <= felv else ('#8b5cf6' if loop.index == felv + 1 else 'var(--divider-color)')) ~ ";'></div>" -%}
+                                {%- set fpp.v = fpp.v ~ "<div style='flex:1;height:4px;border-radius:999px;background:" ~ ('var(--success-color)' if loop.index <= felv else ('#8b5cf6' if loop.index == felv + 1 else 'var(--divider-color)')) ~ ";'></div>" -%}
                               {%- endfor -%}
                             {%- endif -%}
                             {%- set fchip = ('✓ ALL ' ~ fcnt if fdn else 'LV ' ~ (felv + 1) ~ '/' ~ fcnt) if fcnt > 1 else '' -%}
@@ -925,7 +935,7 @@ views:
                               {'background': ('color-mix(in srgb, var(--primary-color) ' ~ pref_primary_tint_mix_pct|string ~ '%, var(--card-background-color))') if pref_show_header_background else 'transparent'},
                               {'box-shadow': 'none'},
                               {'border': '1px solid color-mix(in srgb, var(--primary-color) ' ~ pref_primary_tint_mix_pct|string ~ '%, var(--divider-color))' if pref_show_header_thin_border else 'none'},
-                              {'border-radius': '18px'},
+                              {'border-radius': '16px'},
                               {'padding': '16px'},
                               {'overflow': 'hidden'},
                               {'position': 'relative'},
@@ -1228,7 +1238,7 @@ views:
                               {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
                               {'border-left': '3px solid var(--primary-color)'},
                               {'border-bottom': '3px solid var(--primary-color)'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'padding': '10px 12px'},
                               {'min-height': 'unset'},
                               {'margin-top': '5px'},
@@ -1644,6 +1654,9 @@ views:
                     {%- endif -%}
                   {%- endif -%}
 
+    - type: grid
+      column_span: 1
+      cards:
         - type: grid
           square: false
           columns: 1
@@ -1973,7 +1986,7 @@ views:
                               {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
                               {'border-left': '3px solid var(--primary-color)'},
                               {'border-bottom': '3px solid var(--primary-color)'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'padding': '10px 12px'},
                               {'min-height': 'unset'},
                               {'margin-top': '5px'},
@@ -2598,7 +2611,7 @@ views:
                               {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
                               {'border-left': '3px solid var(--primary-color)'},
                               {'border-bottom': '3px solid var(--primary-color)'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'padding': '10px 12px'},
                               {'min-height': 'unset'},
                               {'margin-top': '5px'},
@@ -2958,7 +2971,7 @@ views:
                               {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
                               {'border-left': '3px solid var(--primary-color)'},
                               {'border-bottom': '3px solid var(--primary-color)'},
-                              {'border-radius': '10px'},
+                              {'border-radius': '12px'},
                               {'padding': '10px 12px'},
                               {'min-height': 'unset'},
                               {'margin-top': '5px'},
@@ -3065,7 +3078,7 @@ views:
                             {%- set togo = [ftarget - ftotal, 0] | max -%}
                             {%- set ftop = (fshares.values() | map('float', 0) | list | max) if fshares else 0 -%}
                             {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
-                            {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
+                            {%- set accent = 'var(--success-color)' if fdone else '#8b5cf6' -%}
                             {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
                             {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ('STREAK RESET · LEVELS RESET' if streak_reset else 'NEW PERIOD · LEVELS RESET') ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
                             {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
@@ -3086,14 +3099,14 @@ views:
                                   {%- set p = pts | float(0) | round(0) | int -%}
                                   {%- set p_ok = p >= wtarget -%}
                                   {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;'>" ~ ("<ha-icon icon='mdi:check-bold' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" if p_ok else p) ~ "</span>" ~ pname_safe ~ "<span style='opacity:0.6;font-weight:600;'>" ~ p ~ "/" ~ wtarget ~ "</span></div>" -%}
+                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('var(--success-color)' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;'>" ~ ("<ha-icon icon='mdi:check-bold' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" if p_ok else p) ~ "</span>" ~ pname_safe ~ "<span style='opacity:0.6;font-weight:600;'>" ~ p ~ "/" ~ wtarget ~ "</span></div>" -%}
                                 {%- endfor -%}
                               {%- elif ftype == 'family_caught_up_days' -%}
                                 {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
                                 {%- for pname, ptxt in cstat.items() -%}
                                   {%- set p_ok = (ptxt | string).startswith('0 still') -%}
                                   {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
+                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('var(--success-color)' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
                                 {%- endfor -%}
                               {%- endif -%}
                               {#-- Level track: one node per level, green line fills as levels are reached --#}
@@ -3107,7 +3120,7 @@ views:
                                   {%- if loop.index0 >= wstart and loop.index0 < wstart + wcnt -%}
                                   {%- set n_reached = fdone or loop.index <= elevel -%}
                                   {%- set n_cur = (not fdone) and loop.index == elevel + 1 -%}
-                                  {%- set n_col = '#22c55e' if n_reached else ('#8b5cf6' if n_cur else 'var(--divider-color)') -%}
+                                  {%- set n_col = 'var(--success-color)' if n_reached else ('#8b5cf6' if n_cur else 'var(--divider-color)') -%}
                                   {%- set n_rw = (frewards[loop.index0] | round(0) | int) if loop.index0 < (frewards | length) else 0 -%}
                                   {%- set nodes.v = nodes.v ~ "<div style='position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;'><div style='width:34px;height:34px;border-radius:50%;border:3px solid " ~ n_col ~ ";background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ ('mdi:check' if n_reached else 'mdi:star') ~ "' style='width:17px;height:17px;--mdc-icon-size:17px;color:" ~ n_col ~ ";display:block;'></ha-icon></div><div style='font-size:11px;font-weight:800;margin-top:4px;color:" ~ ('var(--primary-text-color)' if n_cur else 'var(--secondary-text-color)') ~ ";'>" ~ (lv | round(0) | int) ~ funit ~ "</div>" ~ ("<div style='font-size:10px;color:var(--secondary-text-color);'>+" ~ n_rw ~ " ⭐</div>" if n_rw > 0 else '') ~ "</div>" -%}
                                   {%- endif -%}
@@ -3119,7 +3132,7 @@ views:
                                 ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
                                 ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
                                 ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
-                                ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:#22c55e;'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
+                                ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:var(--success-color);'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
                                 ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
                                 ~ (("<div style='text-align:center;'>" ~ mult_html ~ "</div>") if mult_html else '')
                                 ~ rec_html
@@ -3293,5 +3306,84 @@ views:
                           {%- endfor -%}
                         {%- endif -%}
                       {%- endif -%}
+                    {%- endif -%}
+                  {%- endif -%}
+        - type: grid
+          square: false
+          columns: 1
+          grid_options:
+            columns: full
+          cards:
+            - type: custom:auto-entities
+              show_empty: false
+              card:
+                square: false
+                type: grid
+                columns: 1
+              card_param: cards
+              filter:
+                template: |-
+                  {#-- ===== RECENT ACTIVITY CARD ===== --#}
+
+                  << template_snippets.meta_stamp >>
+
+
+                  {#-- 1. User Configuration --#}
+
+                  << template_snippets.user_override_helper >>
+
+                  {%- set pref_activity_count = 5 -%}  {#-- How many recent events to show. Allowed: 1-5. --#}
+
+                  {#-- 2. Dynamic Lookups & Validations --#}
+
+                  {%- set pref_activity_count = [[pref_activity_count | int(default=5), 1] | max, 5] | min -%}
+                  << template_snippets.user_setup >>
+
+                  << template_snippets.user_validation >>
+
+                  {%- if not skip_render -%}
+
+                    {#-- 3. Collect Data --#}
+                    {%- set items = (state_attr(dashboard_helper, 'recent_activity') or [])[:pref_activity_count] -%}
+                    {%- set dashboard_helpers = state_attr(dashboard_helper, 'dashboard_helpers') or {} -%}
+                    {%- set translation_sensor = dashboard_helpers.get('translation_sensor_eid') -%}
+                    {%- set ui = (state_attr(translation_sensor, 'ui_translations') if translation_sensor else {}) or {} -%}
+                    {%- set icons = {'chores': 'mdi:check-circle-outline', 'rewards': 'mdi:gift-outline', 'bonuses': 'mdi:plus-circle-outline', 'penalties': 'mdi:alert-circle-outline', 'badges': 'mdi:medal-outline', 'achievements': 'mdi:trophy-outline', 'challenges': 'mdi:flag-checkered', 'manual': 'mdi:pencil-circle-outline'} -%}
+
+                    {#-- 4. Build Display --#}
+                    {%- if items | length > 0 -%}
+                      {%- set rows = namespace(v='') -%}
+                      {%- for it in items -%}
+                        {%- set amt = it.get('amount', 0) | float(0) -%}
+                        {%- set when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
+                        {%- set days = (now().date() - when.date()).days if when else -1 -%}
+                        {%- set when_txt = ('' if when is none else (('Today ' ~ when.strftime('%-I:%M %p')) if days == 0 else ('Yesterday' if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
+                        {%- set nm = ((it.get('item_name') or it.get('source_label') or 'Activity') | string) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set lbl = (it.get('source_label') or '') | string -%}
+                        {%- set col = 'var(--success-color)' if amt >= 0 else 'var(--error-color)' -%}
+                        {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><ha-icon icon='" ~ icons.get(it.get('source', ''), 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:var(--secondary-text-color);flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ lbl ~ (' · ' if lbl and when_txt else '') ~ when_txt ~ "</div></div><div style='font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ "</div></div>" -%}
+                      {%- endfor -%}
+                      {%- set html = "<div style='width:100%;text-align:left;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px;'>" ~ ui.get('recent_activity', 'Recent activity') ~ "</div>" ~ rows.v ~ "</div>" -%}
+                      {{
+                        {
+                          'type': 'custom:button-card',
+                          'show_name': false,
+                          'show_icon': false,
+                          'tap_action': {'action': 'none'},
+                          'hold_action': {'action': 'none'},
+                          'custom_fields': {'content': html},
+                          'styles': {
+                            'card': [
+                              {'padding': '12px'},
+                              {'border-radius': '16px'},
+                              {'box-shadow': 'none'},
+                              {'border': '1px solid var(--divider-color)'},
+                              {'background': 'var(--card-background-color)'}
+                            ],
+                            'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                            'custom_fields': {'content': [{'width': '100%'}]}
+                          }
+                        }
+                      }},
                     {%- endif -%}
                   {%- endif -%}

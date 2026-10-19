@@ -1249,6 +1249,8 @@ DATA_USER_LEDGER: Final = "ledger"
 
 DATA_USER_CURRENT_STREAK: Final = "current_streak"
 DATA_USER_LAST_STREAK_DATE: Final = "last_date"
+# Per-person "All Caught Up" day streak: {count, last_day, best}
+DATA_USER_CAUGHT_UP_STREAK: Final = "caught_up_streak"
 DATA_USER_PENALTY_APPLIES: Final = "penalty_applies"
 
 # ——————————————————————————————————————————————
