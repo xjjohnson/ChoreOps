@@ -28,6 +28,7 @@ views:
   - max_columns: 2
     title: << user.name >>
     path: family-hub-<< user.slug >>
+    subview: true
     type: sections
     sections:
     - type: grid
