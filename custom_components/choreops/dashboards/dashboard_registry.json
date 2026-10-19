@@ -262,6 +262,41 @@
       }
     },
     {
+      "template_id": "admin-shared-family-hub-v1",
+      "display_name": "Admin (Family Hub)",
+      "description": "OpsCenter for the Family Hub: compact shared admin with approvals, management tabs, quick actions, family goals and reward pools",
+      "audience": "approver",
+      "category": "admin",
+      "lifecycle_state": "active",
+      "min_integration_version": "1.5.0",
+      "maintainer": "xjjohnson",
+      "source": {
+        "type": "vendored",
+        "path": "templates/admin-shared-family-hub-v1.yaml"
+      },
+      "shared_contract_version": 1,
+      "shared_fragments_required": [],
+      "shared_fragments_optional": [],
+      "dependencies": {
+        "required": [
+          {
+            "id": "ha-card:auto-entities",
+            "name": "Auto-Entities",
+            "url": "https://github.com/thomasloven/lovelace-auto-entities"
+          },
+          {
+            "id": "ha-card:button-card",
+            "name": "Button Card",
+            "url": "https://github.com/custom-cards/button-card"
+          }
+        ],
+        "recommended": []
+      },
+      "preferences": {
+        "doc_asset_path": "preferences/admin-shared-family-hub-v1.md"
+      }
+    },
+    {
       "template_id": "admin-peruser-v1",
       "display_name": "Admin (Per User)",
       "description": "Modern admin dashboard with fixed per-user approval workspace",
