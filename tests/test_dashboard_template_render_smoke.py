@@ -1848,3 +1848,76 @@ def test_family_home_summary_leaderboard_and_streak_cards() -> None:
     dad = next(c for c in people if "Dad" in c["custom_fields"]["content"])
     assert "12 days" in lily["custom_fields"]["content"]
     assert "mdi:fire" not in dad["custom_fields"]["content"]
+
+
+def test_family_hub_recent_activity_card_renders_rows() -> None:
+    """Recent activity card lists the helper's latest ledger entries."""
+    import datetime as _dt
+
+    template_str = _read_template("user-family-hub-v1.yaml")
+    context = dh.build_dashboard_context(
+        "Lily",
+        assignee_id="user-lily",
+        integration_entry_id="entry-123",
+        template_profile="user-family-hub-v1",
+        release_ref="0.0.1-beta.3",
+        generated_at="2026-10-19T00:00:00+00:00",
+    )
+    rendered = builder.render_dashboard_template(template_str, context)
+    assert rendered["views"][0]["max_columns"] == 3
+    assert len(rendered["views"][0]["sections"]) == 3
+    tpl = None
+    for section in rendered["views"][0]["sections"]:
+        for outer in section["cards"]:
+            for card in outer.get("cards", []):
+                if "RECENT ACTIVITY CARD" in str(card.get("filter", {}).get("template", "")):
+                    tpl = card["filter"]["template"]
+    assert tpl is not None
+    assert rendered["views"][0]["sections"][-1]["cards"][-1]["cards"][0][
+        "filter"
+    ]["template"] == tpl
+
+    mock_states = {
+        "sensor.lily_helper": _MockState(
+            entity_id="sensor.lily_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "dashboard_lookup_key": "entry-123:user-lily",
+                "user_name": "Lily",
+                "dashboard_helpers": {},
+                "recent_activity": [
+                    {
+                        "timestamp": "2026-10-19T12:10:00",
+                        "amount": 10.0,
+                        "source": "chores",
+                        "source_label": "Chore",
+                        "item_name": "Dishes",
+                    },
+                    {
+                        "timestamp": "2026-10-18T09:00:00",
+                        "amount": -2.0,
+                        "source": "penalties",
+                        "source_label": "Penalty",
+                        "item_name": "Late",
+                    },
+                ],
+            },
+            name="Lily helper",
+        )
+    }
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    env.globals["now"] = lambda: _dt.datetime(2026, 10, 19, 13, 0)
+    env.globals["as_datetime"] = lambda v: _dt.datetime.fromisoformat(str(v))
+    env.filters["as_local"] = lambda v: v
+    output = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    parsed = yaml.safe_load(f"[{output}]")
+    html = parsed[0]["custom_fields"]["content"]
+    assert "Dishes" in html and "+10" in html and "Today" in html
+    assert "Late" in html and "Yesterday" in html and "-2" in html
