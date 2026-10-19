@@ -1611,3 +1611,67 @@ def test_admin_family_goals_card_lists_goals_with_reset_service() -> None:
     }
     assert "confirmation" in reset_tap
     assert "4 / 10" in parsed[1]["custom_fields"]["label"]
+
+
+def _render_quick_actions(tab: str, open_state: dict[str, object] | None = None):
+    template = _get_admin_filter_template(
+        "admin-shared-v1", "===== QUICK ACTIONS ====="
+    )
+    mock_states = _base_admin_chore_management_states(
+        selected_user_name="Alice",
+        selected_dashboard_helper="sensor.alice_dashboard_helper",
+        chore_selector_state="None",
+        chore_items=[
+            {"name": "Wash Dishes", "eid": "sensor.alice_chore_wash", "state": "overdue"},
+            {"name": "Feed Dog", "eid": "sensor.alice_chore_dog", "state": "pending"},
+        ],
+        shared_admin_ui_control={
+            "admin-shared": {"management-tab": tab, "quick-actions": open_state or {}}
+        },
+    )
+    mock_states["sensor.alice_dashboard_helper"].attributes["gamification_enabled"] = True
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 19, 12, 0)
+    env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
+    env.globals["as_timestamp"] = lambda v: 0
+    output = env.from_string(template).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    return yaml.safe_load(f"[{output}]")
+
+
+def test_admin_quick_actions_chores_tab_tiles_and_skip_list() -> None:
+    """Chores tab shows pause/reset/shift/skip tiles and the inline skip list."""
+
+    parsed = _render_quick_actions("chores", {"skip-open": True})
+    tiles = parsed[1]["cards"]
+    assert [t["name"] for t in tiles] == [
+        "Pause chores",
+        "Reset overdue",
+        "Shift dates",
+        "Skip next due",
+    ]
+    assert tiles[0]["tap_action"]["data"]["paused"] is True
+    reset = tiles[1]["tap_action"]
+    assert reset["action"] == "multi-actions"
+    assert reset["actions"][0]["data"]["chore_name"] == "Wash Dishes"
+    assert tiles[2]["tap_action"]["service"] == "choreops.reschedule_chores_after"
+    skip_names = [c["name"] for c in parsed[2]["cards"]]
+    assert "Feed Dog" in skip_names
+
+
+def test_admin_quick_actions_economy_and_system_tabs() -> None:
+    """Economy tab shows point amounts; system tab shows the family-wide reset."""
+
+    eco = _render_quick_actions("economy", {"adjust-open": True})
+    assert eco[1]["cards"][0]["name"] == "Adjust points"
+    assert [c["name"] for c in eco[2]["cards"]] == ["-10", "-5", "-1", "+1", "+5", "+10"]
+
+    system = _render_quick_actions("system")
+    assert system[1]["cards"][0]["tap_action"]["service"] == (
+        "choreops.reset_chores_to_pending_state"
+    )

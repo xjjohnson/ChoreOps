@@ -1403,6 +1403,215 @@ views:
               {%- endif -%}
 
         - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== QUICK ACTIONS ===== --#}
+              << template_snippets.user_override_helper >>
+
+              << template_snippets.admin_setup_shared >>
+
+              {%- set qa_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set qa_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+              {%- set qa_admin = qa_sa.get('admin-shared', {}) -%}
+              {%- set qa_admin = qa_admin if qa_admin is mapping else {} -%}
+              {%- set qa_tab = (qa_admin.get('management-tab', 'chores')) | string -%}
+              {%- set qa_open = qa_admin.get('quick-actions', {}) -%}
+              {%- set qa_open = qa_open if qa_open is mapping else {} -%}
+              {%- set qa_ok = has_selected_user and has_selected_dashboard_helper and qa_entry_id not in ['', none] -%}
+              {%- if qa_ok -%}
+                {#-- Gather this person's chores (same sources the Management card uses) --#}
+                {%- set qa_chores = namespace(items=state_attr(selected_dashboard_helper, 'chores') | default([], true)) -%}
+                {%- set qa_helpers = state_attr(selected_dashboard_helper, 'dashboard_helpers') or {} -%}
+                {%- set qa_chore_eids = qa_helpers.get('chore_helper_eids', []) if qa_helpers is mapping else [] -%}
+                {%- if qa_chore_eids is iterable and qa_chore_eids is not string -%}
+                  {%- for qa_eid in qa_chore_eids | list -%}
+                    {%- if qa_eid not in ['', none, 'None'] and states(qa_eid) not in ['unknown', 'unavailable'] -%}
+                      {%- set qa_chores.items = qa_chores.items + (state_attr(qa_eid, 'chores') | default([], true)) -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                {%- endif -%}
+                {%- set qa_overdue = qa_chores.items | selectattr('state', 'eq', 'overdue') | list -%}
+                {%- set qa_paused = state_attr(selected_dashboard_helper, 'chores_paused') | bool(false) -%}
+                {%- set qa_paused_until = state_attr(selected_dashboard_helper, 'chores_paused_until') -%}
+                {%- set qa_gam = state_attr(selected_dashboard_helper, 'gamification_enabled') | default(false, true) -%}
+                {%- set qa_specs = namespace(items=[]) -%}
+
+                {%- if qa_tab == 'chores' -%}
+                  {%- set qa_reset_actions = namespace(a=[]) -%}
+                  {%- for oc in qa_overdue -%}
+                    {%- set qa_reset_actions.a = qa_reset_actions.a + [{'action': 'call-service', 'service': 'choreops.reset_overdue_chores', 'data': {'config_entry_id': qa_entry_id, 'chore_name': oc.name, 'user_name': selected_user_name}}] -%}
+                  {%- endfor -%}
+                  {%- set qa_specs.items = [
+                    {
+                      'icon': 'mdi:play-circle-outline' if qa_paused else 'mdi:pause-circle-outline',
+                      'name': 'Resume chores' if qa_paused else 'Pause chores',
+                      'label': ('Paused' ~ ((' · back ' ~ (as_timestamp(qa_paused_until) | timestamp_custom('%a %I:%M %p', true))) if qa_paused_until not in ['', none, 'None', 'unknown', 'unavailable'] else '')) if qa_paused else 'Stops overdue stats',
+                      'color': 'var(--warning-color)' if qa_paused else 'var(--primary-color)',
+                      'tint': qa_paused,
+                      'tap': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'paused': not qa_paused}, 'confirmation': {'text': ('Resume chores for ' ~ selected_user_name ~ '?') if qa_paused else ('Pause chores for ' ~ selected_user_name ~ '?')}}
+                    },
+                    {
+                      'icon': 'mdi:restore-alert',
+                      'name': 'Reset overdue',
+                      'label': (qa_overdue | length | string) ~ ' overdue' if qa_overdue | length > 0 else 'Nothing overdue',
+                      'color': 'var(--warning-color)',
+                      'tint': qa_overdue | length > 0,
+                      'badge': (qa_overdue | length | string) if qa_overdue | length > 0 else '',
+                      'tap': {'action': 'multi-actions', 'actions': qa_reset_actions.a, 'confirmation': {'text': 'Reset ' ~ (qa_overdue | length) ~ ' overdue chore(s) for ' ~ selected_user_name ~ ' back to pending?'}} if qa_overdue | length > 0 else {'action': 'none'}
+                    },
+                    {
+                      'icon': 'mdi:calendar-arrow-right',
+                      'name': 'Shift dates',
+                      'label': 'Move due dates forward',
+                      'color': 'var(--primary-color)',
+                      'tap': {'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': qa_entry_id, 'after': now().isoformat(), 'user_names': [selected_user_name]}, 'confirmation': {'text': 'Move ' ~ selected_user_name ~ '\'s due dates forward to after now?'}}
+                    },
+                    {
+                      'icon': 'mdi:skip-next-circle-outline',
+                      'name': 'Skip next due',
+                      'label': 'Hide list' if qa_open.get('skip-open', false) else 'Pick a chore to skip',
+                      'color': 'var(--primary-color)',
+                      'tint': qa_open.get('skip-open', false),
+                      'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/skip-open', 'value': not (qa_open.get('skip-open', false) | bool(false))}}
+                    }
+                  ] -%}
+                {%- elif qa_tab == 'economy' and qa_gam -%}
+                  {%- set qa_specs.items = [
+                    {
+                      'icon': 'mdi:plus-minus-variant',
+                      'name': 'Adjust points',
+                      'label': 'Hide amounts' if qa_open.get('adjust-open', false) else 'Pick an amount',
+                      'color': 'var(--primary-color)',
+                      'tint': qa_open.get('adjust-open', false),
+                      'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/adjust-open', 'value': not (qa_open.get('adjust-open', false) | bool(false))}}
+                    }
+                  ] -%}
+                {%- elif qa_tab == 'system' -%}
+                  {%- set qa_specs.items = [
+                    {
+                      'icon': 'mdi:restore',
+                      'name': 'Reset all to pending',
+                      'label': 'Everyone · clears claims and approvals',
+                      'color': 'var(--error-color)',
+                      'tint': true,
+                      'tap': {'action': 'call-service', 'service': 'choreops.reset_chores_to_pending_state', 'data': {'config_entry_id': qa_entry_id}, 'confirmation': {'text': 'Reset EVERY chore for EVERYONE to pending? This clears all claims and approvals.'}}
+                    }
+                  ] -%}
+                {%- endif -%}
+
+                {%- if qa_specs.items | length > 0 -%}
+                  {%- set qa_cards = namespace(c=[]) -%}
+                  {%- for sp in qa_specs.items -%}
+                    {%- set qa_cards.c = qa_cards.c + [{
+                      'type': 'custom:button-card',
+                      'entity': admin_selector_eid,
+                      'show_name': true,
+                      'show_label': true,
+                      'show_state': false,
+                      'show_icon': true,
+                      'icon': sp.icon,
+                      'name': sp.name,
+                      'label': sp.label,
+                      'tap_action': sp.tap,
+                      'hold_action': {'action': 'none'},
+                      'custom_fields': {'badge': ("<div style='background:#ef4444;color:#fff;border-radius:99px;font-size:11px;font-weight:800;padding:1px 7px;'>" ~ sp.badge ~ "</div>") if sp.get('badge') else ''},
+                      'styles': {
+                        'card': [
+                          {'padding': '12px'},
+                          {'border-radius': '14px'},
+                          {'box-shadow': 'none'},
+                          {'border': '1px solid color-mix(in srgb, ' ~ sp.color ~ ' 45%, var(--divider-color))'},
+                          {'background': ('color-mix(in srgb, ' ~ sp.color ~ ' 14%, var(--card-background-color))') if sp.get('tint') else 'var(--card-background-color)'}
+                        ],
+                        'grid': [
+                          {'grid-template-areas': '"i n badge" "i l badge"'},
+                          {'grid-template-columns': '32px minmax(0, 1fr) auto'},
+                          {'column-gap': '10px'},
+                          {'row-gap': '1px'},
+                          {'align-items': 'center'}
+                        ],
+                        'icon': [{'width': '24px'}, {'color': sp.color}],
+                        'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}, {'text-align': 'left'}],
+                        'label': [{'justify-self': 'start'}, {'font-size': '11px'}, {'opacity': '0.65'}, {'text-align': 'left'}, {'white-space': 'normal'}],
+                        'custom_fields': {'badge': [{'justify-self': 'end'}, {'align-self': 'start'}]}
+                      }
+                    }] -%}
+                  {%- endfor -%}
+                  {{
+                    {
+                      'type': 'markdown',
+                      'content': '**Quick actions' ~ (' · ' ~ selected_user_name if qa_tab != 'system' else ' · everyone') ~ '**'
+                    }
+                  }},
+                  {{
+                    {
+                      'type': 'grid',
+                      'columns': 2,
+                      'square': false,
+                      'cards': qa_cards.c
+                    }
+                  }},
+                {%- endif -%}
+
+                {#-- Inline pick-lists --#}
+                {%- if qa_tab == 'chores' and qa_open.get('skip-open', false) -%}
+                  {%- set qa_skip = namespace(c=[]) -%}
+                  {%- for ch in qa_chores.items -%}
+                    {%- set qa_skip.c = qa_skip.c + [{
+                      'type': 'custom:button-card',
+                      'entity': admin_selector_eid,
+                      'show_name': true,
+                      'show_icon': false,
+                      'show_label': false,
+                      'show_state': false,
+                      'name': ch.name,
+                      'tap_action': {'action': 'call-service', 'service': 'choreops.skip_chore_due_date', 'data': {'config_entry_id': qa_entry_id, 'chore_name': ch.name, 'user_name': selected_user_name}, 'confirmation': {'text': 'Skip the next due date for ' ~ ch.name ~ ' (' ~ selected_user_name ~ ')?'}},
+                      'hold_action': {'action': 'none'},
+                      'styles': {
+                        'card': [{'padding': '10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}],
+                        'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'white-space': 'normal'}]
+                      }
+                    }] -%}
+                  {%- endfor -%}
+                  {%- if qa_skip.c | length > 0 -%}
+                  {{
+                    {'type': 'grid', 'columns': 2, 'square': false, 'cards': qa_skip.c}
+                  }},
+                  {%- endif -%}
+                {%- endif -%}
+                {%- if qa_tab == 'economy' and qa_gam and qa_open.get('adjust-open', false) -%}
+                  {%- set qa_adj = namespace(c=[]) -%}
+                  {%- for amt in [-10, -5, -1, 1, 5, 10] -%}
+                    {%- set qa_adj.c = qa_adj.c + [{
+                      'type': 'custom:button-card',
+                      'entity': admin_selector_eid,
+                      'show_name': true,
+                      'show_icon': false,
+                      'show_label': false,
+                      'show_state': false,
+                      'name': ('+' ~ amt) if amt > 0 else (amt | string),
+                      'tap_action': {'action': 'call-service', 'service': 'choreops.manual_adjust_points', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'amount': amt, 'reason': 'Dashboard adjustment'}, 'confirmation': {'text': ('Add ' ~ amt ~ ' points to ' ~ selected_user_name ~ '?') if amt > 0 else ('Remove ' ~ (amt | abs) ~ ' points from ' ~ selected_user_name ~ '?')}},
+                      'hold_action': {'action': 'none'},
+                      'styles': {
+                        'card': [{'padding': '10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': ('1px solid #22c55e' if amt > 0 else '1px solid #ef4444')}],
+                        'name': [{'font-size': '14px'}, {'font-weight': '800'}, {'color': ('#22c55e' if amt > 0 else '#ef4444')}]
+                      }
+                    }] -%}
+                  {%- endfor -%}
+                  {{
+                    {'type': 'grid', 'columns': 3, 'square': false, 'cards': qa_adj.c}
+                  }},
+                {%- endif -%}
+              {%- elif qa_tab == 'system' and qa_entry_id not in ['', none] -%}
+                {#-- No person needed for the family-wide reset --#}
+              {%- endif -%}
+        - type: custom:auto-entities
           card:
             type: grid
             square: false
