@@ -1,0 +1,105 @@
+type: custom:auto-entities
+card:
+  type: grid
+  columns: 1
+  square: false
+card_param: cards
+filter:
+  template: |-
+    {%- set helpers = integration_entities('choreops')
+      | select('search', '^sensor\\.')
+      | list
+      | expand
+      | selectattr('attributes.purpose', 'defined')
+      | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+      | list -%}
+    {%- for kind in ['bonuses', 'penalties'] -%}
+      {%- set good = kind == 'bonuses' -%}
+      {%- set col = '#22c55e' if good else '#ef4444' -%}
+      {%- set ns = namespace(q={}) -%}
+      {%- for h in helpers -%}
+        {%- set uname = (h.attributes.get('user_name') or '') | string -%}
+        {%- for item in (h.attributes.get(kind) or []) -%}
+          {%- if item is mapping and item.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] -%}
+            {%- set iname = (item.get('name') or '') | string | trim -%}
+            {%- set cur = ns.q.get(iname, {'name': iname, 'points': (item.get('points', 0) | float(default=0)) | abs, 'icon': (item.get('icon') or state_attr(item.get('eid'), 'icon') or ('mdi:gift' if good else 'mdi:alert-octagon-outline')) | string, 'people': []}) -%}
+            {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'eid': item.get('eid')}]}) -%}
+            {%- set ns.q = ns.q | combine({iname: cur}) -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endfor -%}
+      {%- if ns.q | length > 0 -%}
+        {{
+          {
+            'type': 'custom:button-card',
+            'show_name': false,
+            'show_icon': false,
+            'tap_action': {'action': 'none'},
+            'custom_fields': {'content': "<div style='text-align:left;font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:" ~ col ~ ";margin:8px 2px 0 2px;'>" ~ ('Bonuses' if good else 'Penalties') ~ "</div>"},
+            'styles': {
+              'card': [{'background': 'transparent'}, {'box-shadow': 'none'}, {'border': 'none'}, {'padding': '0px'}, {'min-height': 'unset'}],
+              'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+              'custom_fields': {'content': [{'width': '100%'}]}
+            }
+          }
+        }},
+        {%- for iname, q in ns.q.items() | sort(attribute='1.points', reverse=true) -%}
+          {%- set qname = q.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+          {%- set pts_txt = ('%g' | format(q.points)) -%}
+          {%- set label = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:34px;height:34px;border-radius:11px;background:" ~ col ~ ";display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:19px;height:19px;--mdc-icon-size:19px;color:#fff;display:block;'></ha-icon></div><div style='min-width:0;'><div style='font-size:14px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ qname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'><b style='color:" ~ col ~ ";'>" ~ ('+' if good else '−') ~ pts_txt ~ "</b> ⭐ · tap a name to apply</div></div></div>" -%}
+          {%- set fields = namespace(d={'label': label}, areas='label', cols='1fr') -%}
+          {%- for pp in q.people -%}
+            {%- set key = 'p' ~ loop.index -%}
+            {%- set fields.areas = fields.areas ~ ' ' ~ key -%}
+            {%- set fields.cols = fields.cols ~ ' 30px' -%}
+            {%- set fields.d = fields.d | combine({key: {'card': {
+              'type': 'custom:button-card',
+              'name': (pp.u[:1] | upper),
+              'show_name': true,
+              'show_icon': false,
+              'tap_action': {
+                'action': 'call-service',
+                'service': 'button.press',
+                'target': {'entity_id': pp.eid},
+                'confirmation': {'text': (('Apply ' ~ q.name ~ ' to ' ~ pp.u ~ '?'))}
+              },
+              'styles': {
+                'card': [
+                  {'width': '30px'}, {'height': '30px'}, {'min-height': '30px'}, {'padding': '0px'},
+                  {'border-radius': '50%'}, {'box-shadow': 'none'},
+                  {'background': 'color-mix(in srgb, ' ~ col ~ ' 22%, transparent)'},
+                  {'border': '1.5px solid ' ~ col}
+                ],
+                'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': 'var(--primary-text-color)'}]
+              }
+            }}}) -%}
+          {%- endfor -%}
+          {{
+            {
+              'type': 'custom:button-card',
+              'show_name': false,
+              'show_icon': false,
+              'tap_action': {'action': 'none'},
+              'custom_fields': fields.d,
+              'styles': {
+                'card': [
+                  {'background': 'linear-gradient(90deg, color-mix(in srgb, ' ~ col ~ ' 18%, transparent), color-mix(in srgb, ' ~ col ~ ' 5%, transparent))'},
+                  {'border': '1px solid color-mix(in srgb, ' ~ col ~ ' 40%, transparent)'},
+                  {'border-radius': '16px'},
+                  {'box-shadow': 'none'},
+                  {'padding': '8px 12px'},
+                  {'min-height': 'unset'}
+                ],
+                'grid': [
+                  {'grid-template-areas': '"' ~ fields.areas ~ '"'},
+                  {'grid-template-columns': fields.cols},
+                  {'column-gap': '5px'},
+                  {'align-items': 'center'}
+                ],
+                'custom_fields': {'label': [{'justify-self': 'start'}, {'min-width': '0'}]}
+              }
+            }
+          }},
+        {%- endfor -%}
+      {%- endif -%}
+    {%- endfor -%}

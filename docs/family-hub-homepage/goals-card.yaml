@@ -1,0 +1,98 @@
+type: custom:auto-entities
+card:
+  type: grid
+  columns: 2
+  square: false
+card_param: cards
+filter:
+  template: |-
+    {%- set pref_urgent_days = 3 -%}
+    {%- set pref_dashboard_path = '' -%}  {#-- Optional: your dashboard URL path (for example 'dashboard-choreops'). Leave empty to use paths relative to this dashboard. --#}
+    {%- set helpers = integration_entities('choreops')
+      | select('search', '^sensor\\.')
+      | list
+      | expand
+      | selectattr('attributes.purpose', 'defined')
+      | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+      | list -%}
+    {%- set today = now().strftime('%Y-%m-%d') -%}
+    {%- set ns = namespace(q={}) -%}
+    {%- for h in helpers -%}
+      {%- set uname = (h.attributes.get('user_name') or '') | string -%}
+      {%- for badge in (h.attributes.get('badges') or []) -%}
+        {%- if badge is mapping and badge.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] and (badge.get('badge_type') | string | lower) in ['periodic', 'daily', 'special_occasion'] -%}
+          {%- set be = badge.get('eid') -%}
+          {%- set ba = states[be].attributes | default({}, true) -%}
+          {%- set rs = ba.get('reset_schedule') if ba.get('reset_schedule') is mapping else {} -%}
+          {%- set bname = (ba.get('badge_name') or badge.get('name') or state_attr(be, 'friendly_name') or '') | string -%}
+          {%- set status = (ba.get('status') or badge.get('status') or 'in_progress') | string | lower -%}
+          {%- set prog = states(be) | float(default=0) -%}
+          {%- set prog = 0 if prog < 0 else (100 if prog > 100 else prog) -%}
+          {%- set earned = status in ['earned', 'completed'] -%}
+          {%- set b_end = ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', '') -%}
+          {%- set b_start = ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', '') -%}
+          {%- set dl = (((as_timestamp(b_end ~ 'T12:00:00') - as_timestamp(today ~ 'T12:00:00')) / 86400) | round(0) | int) if b_end | length > 0 else 999 -%}
+          {%- set cur = ns.q.get(bname, {'name': bname, 'icon': (ba.get('icon') or 'mdi:medal-outline') | string, 'left': dl, 'future': (b_start | length > 0 and b_start > today), 'people': []}) -%}
+          {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'p': prog, 'e': earned}]}) -%}
+          {%- set ns.q = ns.q | combine({bname: cur}) -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endfor -%}
+    {%- set items = namespace(l=[]) -%}
+    {%- for qn, q in ns.q.items() -%}
+      {%- set top = (q.people | map(attribute='p') | list | max) if q.people else 0 -%}
+      {%- set alldone = q.people | length > 0 and (q.people | selectattr('e') | list | length) == (q.people | length) -%}
+      {%- set items.l = items.l + [q | combine({'top': top, 'alldone': alldone, 'key': [(1 if alldone else 0), (1 if q.left >= 999 else 0), (q.left if q.left < 999 else 0), (100 - top), qn | lower]})] -%}
+    {%- endfor -%}
+    {%- for q in items.l | sort(attribute='key') -%}
+      {%- set acc = '#22c55e' if q.alldone else '#8b5cf6' -%}
+      {%- set acc2 = '#86efac' if q.alldone else '#ec4899' -%}
+      {%- set urgent = (not q.alldone) and q.left >= 0 and q.left <= pref_urgent_days -%}
+      {%- set tcol = 'var(--warning-color)' if urgent else 'var(--secondary-text-color)' -%}
+      {%- set ttxt = ('Ends today' if q.left == 0 else ('1 day left' if q.left == 1 else (q.left ~ ' days left'))) if (q.left < 999 and q.left >= 0) else 'no end' -%}
+      {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>no end</span>") -%}
+      {%- set av = namespace(v='') -%}
+      {%- for pp in q.people -%}
+        {%- set lead = pp.p > 0 and pp.p == q.top -%}
+        {%- set pc = '#22c55e' if pp.e else ('var(--warning-color)' if lead else 'var(--primary-color)') -%}
+        {%- set nm = pp.u | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+        {%- set av.v = av.v ~ "<div style='margin-left:-4px;border:2px solid var(--card-background-color);border-radius:50%;'><div style='width:18px;height:18px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
+      {%- endfor -%}
+      {%- set lead_user = (q.people | sort(attribute='p', reverse=true) | map(attribute='u') | first) | default('', true) -%}
+      {%- set nav_path = ((('/' ~ pref_dashboard_path ~ '/') if pref_dashboard_path else '') ~ 'family-hub-' ~ (lead_user | slugify)) -%}
+      {%- set qname = q.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+      {%- set html = "<div style='position:relative;overflow:hidden;border-radius:16px;text-align:left;border:1px solid " ~ (('var(--warning-color)') if urgent else (acc ~ '55')) ~ ";'>"
+        ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ (100 if q.alldone else (q.top | round(0) | int)) ~ "%;background:linear-gradient(90deg,color-mix(in srgb," ~ acc ~ " 34%,transparent),color-mix(in srgb," ~ acc ~ " 10%,transparent));'></div>"
+        ~ "<div style='position:relative;display:flex;flex-direction:column;gap:6px;padding:9px 10px;'>"
+        ~ "<div style='display:flex;align-items:center;gap:8px;'><div style='width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg," ~ acc ~ "," ~ acc2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#fff;display:block;'></ha-icon></div>"
+        ~ "<div style='flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.15;color:var(--primary-text-color);'>" ~ qname ~ "</div></div>"
+        ~ "<div style='display:flex;align-items:center;justify-content:space-between;'><div style='display:flex;padding-left:4px;'>" ~ av.v ~ "</div>"
+        ~ "<div style='text-align:right;'><b style='font-size:13px;color:var(--primary-text-color);'>" ~ ('✓' if q.alldone else ((q.top | round(0) | int) ~ '%')) ~ "</b><div>" ~ clock ~ "</div></div></div>"
+        ~ "</div></div>" -%}
+      {{
+        {
+          'type': 'custom:button-card',
+          'show_name': false,
+          'show_icon': false,
+          'tap_action': {'action': 'navigate', 'navigation_path': nav_path} if lead_user else {'action': 'none'},
+          'hold_action': {'action': 'none'},
+          'custom_fields': {'content': html},
+          'styles': {
+            'card': [
+              {'background': 'transparent'},
+              {'box-shadow': 'none'},
+              {'border': 'none'},
+              {'padding': '0px'},
+              {'min-height': 'unset'}
+            ],
+            'grid': [
+              {'grid-template-areas': '"content"'},
+              {'grid-template-columns': '1fr'}
+            ],
+            'custom_fields': {
+              'content': [{'width': '100%'}]
+            }
+          }
+        }
+      }},
+    {%- endfor -%}
