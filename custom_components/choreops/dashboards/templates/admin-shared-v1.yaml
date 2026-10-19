@@ -3732,6 +3732,35 @@ views:
                     }
                   }},
                 {%- endif -%}
+                {%- set chore_change_card = {
+                  'type': 'custom:button-card',
+                  'entity': chore_select_entity if chore_select_entity not in ['', None, 'None'] else selected_dashboard_helper,
+                  'icon': 'mdi:swap-horizontal',
+                  'show_name': True,
+                  'show_label': False,
+                  'show_state': False,
+                  'show_icon': True,
+                  'name': 'Change chore',
+                  'tap_action': {'action': 'call-service', 'service': 'select.select_option', 'data': {'entity_id': chore_select_entity, 'option': 'None'}},
+                  'styles': {
+                    'card': [
+                      {'padding': '6px 12px'},
+                      {'border-radius': '12px'},
+                      {'box-shadow': 'none'},
+                      {'border': '1px solid var(--divider-color)'},
+                      {'background-color': 'color-mix(in srgb, var(--secondary-background-color) 70%, var(--card-background-color))'}
+                    ],
+                    'grid': [
+                      {'grid-template-areas': '"i n"'},
+                      {'grid-template-columns': 'min-content min-content'},
+                      {'column-gap': '6px'},
+                      {'align-items': 'center'},
+                      {'justify-content': 'start'}
+                    ],
+                    'icon': [{'width': '16px'}, {'color': 'var(--primary-color)'}],
+                    'name': [{'font-size': '12px'}, {'font-weight': '600'}, {'white-space': 'nowrap'}]
+                  }
+                } -%}
                 {#-- ===== PER-CHORE CONTROLS ===== --#}
                 {%- if not header_collapsed -%}
                   {%- if has_chore_selector -%}
@@ -3800,19 +3829,7 @@ views:
                               }
                             }
                           },
-                          'entity_select': {
-                            'card': {
-                              'type': 'entities',
-                              'entities': [
-                                {
-                                  'entity': chore_select_entity,
-                                  'name': ' '
-                                }
-                              ],
-                              'state_color': False,
-                              'show_header_toggle': False
-                            }
-                          },
+                          'entity_select': {'card': chore_change_card},
                           'overview': {
                             'card': chore_overview_card
                           }
@@ -3928,19 +3945,7 @@ views:
                               }
                             }
                           },
-                          'entity_select': {
-                            'card': {
-                              'type': 'entities',
-                              'entities': [
-                                {
-                                  'entity': chore_select_entity,
-                                  'name': ' '
-                                }
-                              ],
-                              'state_color': False,
-                              'show_header_toggle': False
-                            }
-                          }
+                          'entity_select': {'card': chore_change_card}
                         },
                         'styles': {
                           'card': [
@@ -3986,6 +3991,150 @@ views:
                     }},
                       {%- endif -%}
                     {%- else -%}
+                    {%- set cp_opts = (state_attr(chore_select_entity, 'options') or []) | reject('in', ['None', '──────────']) | list -%}
+                    {%- set cp_all = (mgmt_sa_admin.get('quick-actions', {}) if mgmt_sa_admin is mapping else {}).get('picker-all', false) | bool(false) -%}
+                    {%- set cp_limit = 8 -%}
+                    {%- set cp_show = cp_opts if cp_all else cp_opts[:cp_limit] -%}
+                    {%- set cp_cards = namespace(items=[]) -%}
+                    {%- for cp_opt in cp_show -%}
+                      {%- set cp_off = cp_opt.startswith('⊘ ') -%}
+                      {%- set cp_core = cp_opt.removeprefix('⊘ ').split(' (')[0] | trim -%}
+                      {%- set cp_row = namespace(state='', eid='') -%}
+                      {%- for cp_item in helper_chore_items -%}
+                        {%- if cp_row.eid == '' and (cp_item.name | default('', true) | string | trim) == cp_core -%}
+                          {%- set cp_row.state = cp_item.state | default('', true) | string -%}
+                          {%- set cp_row.eid = cp_item.eid | default('', true) | string -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- set cp_state_key = 'completed' if cp_row.state in ['approved', 'already_approved'] else 'completed_in_part' if cp_row.state == 'approved_in_part' else cp_row.state -%}
+                      {%- set cp_color = 'var(--disabled-text-color)' if cp_off else ('var(--primary-color)' if cp_state_key in ['pending', ''] else status_color_map.get(cp_state_key, 'var(--primary-color)')) -%}
+                      {%- set cp_due = state_attr(cp_row.eid, 'due_date') if cp_row.eid != '' else none -%}
+                      {%- set cp_due_txt = (as_timestamp(cp_due) | timestamp_custom('%a %I:%M %p', true)) if cp_due not in [none, '', 'None', 'unknown', 'unavailable'] else '' -%}
+                      {%- set cp_status = (ui.get('not_assigned', 'Not assigned')) if cp_off else (status_map.get(cp_state_key, cp_state_key | title) if cp_state_key != '' else '') -%}
+                      {%- set cp_label = cp_status ~ (' · ' ~ cp_due_txt if cp_due_txt != '' and not cp_off else '') -%}
+                      {%- set cp_cards.items = cp_cards.items + [{
+                        'type': 'custom:button-card',
+                        'entity': chore_select_entity,
+                        'show_name': True,
+                        'show_label': True,
+                        'show_state': False,
+                        'show_icon': False,
+                        'name': ('⊘ ' if cp_off else '') ~ cp_core,
+                        'label': cp_label if cp_label | trim != '' else ' ',
+                        'custom_fields': {
+                          'dot': "<div style='width:10px;height:10px;border-radius:50%;background:" ~ cp_color ~ ";'></div>"
+                        },
+                        'tap_action': {'action': 'call-service', 'service': 'select.select_option', 'data': {'entity_id': chore_select_entity, 'option': cp_opt}},
+                        'hold_action': {'action': 'more-info'},
+                        'styles': {
+                          'card': [
+                            {'padding': '9px 10px'},
+                            {'border-radius': '12px'},
+                            {'box-shadow': 'none'},
+                            {'border': '1px solid var(--divider-color)'},
+                            {'background-color': 'var(--card-background-color)'},
+                            {'opacity': '0.6' if cp_off else '1'}
+                          ],
+                          'grid': [
+                            {'grid-template-areas': '"dot n" "dot l"'},
+                            {'grid-template-columns': '14px minmax(0, 1fr)'},
+                            {'column-gap': '8px'},
+                            {'row-gap': '1px'},
+                            {'align-items': 'center'}
+                          ],
+                          'name': [
+                            {'justify-self': 'start'},
+                            {'font-size': '13px'},
+                            {'font-weight': '700'},
+                            {'white-space': 'nowrap'},
+                            {'overflow': 'hidden'},
+                            {'text-overflow': 'ellipsis'},
+                            {'max-width': '100%'}
+                          ],
+                          'label': [
+                            {'justify-self': 'start'},
+                            {'font-size': '11px'},
+                            {'color': 'var(--secondary-text-color)'},
+                            {'white-space': 'nowrap'},
+                            {'overflow': 'hidden'},
+                            {'text-overflow': 'ellipsis'},
+                            {'max-width': '100%'}
+                          ],
+                          'custom_fields': {'dot': [{'justify-self': 'center'}]}
+                        }
+                      }] -%}
+                    {%- endfor -%}
+                    {%- if cp_opts | length > cp_limit -%}
+                      {%- set cp_cards.items = cp_cards.items + [{
+                        'type': 'custom:button-card',
+                        'entity': chore_select_entity,
+                        'show_name': True,
+                        'show_label': False,
+                        'show_state': False,
+                        'show_icon': True,
+                        'icon': 'mdi:chevron-up' if cp_all else 'mdi:chevron-down',
+                        'name': 'Show fewer' if cp_all else ('Show all ' ~ (cp_opts | length)),
+                        'tap_action': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': integration_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/picker-all', 'value': not cp_all}},
+                        'styles': {
+                          'card': [
+                            {'padding': '9px 10px'},
+                            {'border-radius': '12px'},
+                            {'box-shadow': 'none'},
+                            {'border': '1px dashed var(--divider-color)'},
+                            {'background-color': 'transparent'}
+                          ],
+                          'grid': [
+                            {'grid-template-areas': '"i n"'},
+                            {'grid-template-columns': '18px 1fr'},
+                            {'column-gap': '6px'},
+                            {'align-items': 'center'}
+                          ],
+                          'icon': [{'width': '16px'}, {'color': 'var(--primary-color)'}],
+                          'name': [{'justify-self': 'start'}, {'font-size': '12px'}, {'font-weight': '600'}, {'color': 'var(--primary-color)'}]
+                        }
+                      }] -%}
+                    {%- endif -%}
+                    {%- if cp_opts | length > 0 -%}
+                    {{-
+                      {
+                        'type': 'vertical-stack',
+                        'cards': [
+                          {
+                            'type': 'custom:button-card',
+                            'entity': chore_select_entity,
+                            'show_name': True,
+                            'show_label': True,
+                            'show_state': False,
+                            'show_icon': True,
+                            'icon': 'mdi:clipboard-text-search-outline',
+                            'name': ui.get('chores', 'Chores'),
+                            'label': ui.get('choose_chore_for_admin_actions', 'err-choose_chore_for_admin_actions'),
+                            'tap_action': {'action': 'none'},
+                            'hold_action': {'action': 'more-info'},
+                            'styles': {
+                              'card': [
+                                {'padding': '10px 14px 4px 14px'},
+                                {'box-shadow': 'none'},
+                                {'border': 'none'},
+                                {'background-color': 'transparent'}
+                              ],
+                              'grid': [
+                                {'grid-template-areas': '"i n" "i l"'},
+                                {'grid-template-columns': '26px minmax(0, 1fr)'},
+                                {'column-gap': '10px'},
+                                {'row-gap': '2px'},
+                                {'align-items': 'center'}
+                              ],
+                              'icon': [{'width': '20px'}, {'height': '20px'}, {'color': 'var(--primary-color)'}],
+                              'name': [{'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '700'}],
+                              'label': [{'justify-self': 'start'}, {'font-size': '12px'}, {'color': 'var(--secondary-text-color)'}, {'white-space': 'normal'}]
+                            }
+                          },
+                          {'type': 'grid', 'columns': 2, 'square': False, 'cards': cp_cards.items}
+                        ]
+                      }
+                    }},
+                    {%- else -%}
                     {{-
                       {
                         'type': 'custom:button-card',
@@ -3997,21 +4146,6 @@ views:
                         'icon': 'mdi:clipboard-search-outline',
                         'name': ui.get('select_chore_to_manage', 'err-select_chore_to_manage'),
                         'tap_action': {'action': 'more-info'},
-                        'custom_fields': {
-                          'entity_select': {
-                            'card': {
-                              'type': 'entities',
-                              'entities': [
-                                {
-                                  'entity': chore_select_entity,
-                                  'name': ' '
-                                }
-                              ],
-                              'state_color': False,
-                              'show_header_toggle': False
-                            }
-                          }
-                        },
                         'styles': {
                           'card': [
                             {'padding': '10px 14px'},
@@ -4019,37 +4153,11 @@ views:
                             {'box-shadow': 'none'},
                             {'border': '1px solid var(--divider-color)'},
                             {'background-color': 'var(--card-background-color)'}
-                          ],
-                          'grid': [
-                            {'grid-template-areas': '"i n" "entity_select entity_select"'},
-                            {'grid-template-columns': '26px minmax(0, 1fr)'},
-                            {'grid-template-rows': 'min-content min-content'},
-                            {'column-gap': '10px'},
-                            {'row-gap': '3px'},
-                            {'align-items': 'center'}
-                          ],
-                          'icon': [
-                            {'width': '20px'},
-                            {'height': '20px'},
-                            {'transform': 'translateY(-3px)'},
-                            {'color': 'var(--primary-color)'}
-                          ],
-                          'name': [
-                            {'justify-self': 'start'},
-                            {'font-size': '14px'},
-                            {'font-weight': '700'},
-                            {'line-height': '1.2'}
-                          ],
-                          'custom_fields': {
-                            'entity_select': [
-                              {'width': '100%'},
-                              {'padding-top': '8px'},
-                              {'padding-bottom': '4px'}
-                            ]
-                          }
+                          ]
                         }
                       }
                     }},
+                    {%- endif -%}
                     {%- endif -%}
                   {%- else -%}
                     {{ chore_selector_error_card }},

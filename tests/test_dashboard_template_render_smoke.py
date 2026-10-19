@@ -259,6 +259,7 @@ def _base_admin_chore_management_states(
     shared_admin_ui_control: dict[str, object] | None = None,
     chore_sensor_state: str = "pending",
     chore_sensor_attributes: dict[str, object] | None = None,
+    chore_select_options: list[str] | None = None,
 ) -> dict[str, _MockState]:
     """Build minimal states for the admin chore-management filter tests."""
 
@@ -322,6 +323,11 @@ def _base_admin_chore_management_states(
             attributes={
                 "purpose": "purpose_select_user_chores",
                 "user_name": "Alice",
+                **(
+                    {"options": chore_select_options}
+                    if chore_select_options is not None
+                    else {}
+                ),
             },
             name="Alice Chores",
         ),
@@ -878,7 +884,7 @@ def test_admin_chore_management_hides_without_selected_user() -> None:
 
 
 def test_admin_chore_management_shows_selector_when_expanded() -> None:
-    """Expanded shared admin chore management shows the chore selector."""
+    """With nothing picked, chores appear as tappable chips instead of a dropdown."""
 
     chores_template = _get_admin_filter_template(
         "admin-shared-v1", "===== CHORE MANAGEMENT ====="
@@ -891,16 +897,26 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
             {
                 "name": "Wash Dishes",
                 "eid": "sensor.alice_chore_wash_dishes",
-                "state": "pending",
-            }
+                "state": "overdue",
+            },
+            {"name": "Feed Dog", "eid": "sensor.alice_chore_dog", "state": "pending"},
         ],
         selected_user_ui_control={
             "admin-shared": {"chore-management": {"header-collapse": False}}
         },
+        chore_select_options=[
+            "None",
+            "Feed Dog (Alice)",
+            "Wash Dishes (Alice)",
+            "──────────",
+            "⊘ Laundry",
+        ],
     )
     env, integration_entities, states, state_attr = _build_runtime_template_env(
         mock_states
     )
+    env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
+    env.globals["as_timestamp"] = lambda v: 0
 
     output = env.from_string(chores_template).render(
         integration_entities=integration_entities,
@@ -909,11 +925,55 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
     )
     parsed = yaml.safe_load(f"[{output}]")
 
-    assert isinstance(parsed, list)
     assert len(parsed) == 1
-    assert parsed[0]["type"] == "custom:button-card"
-    assert parsed[0]["name"] == "Select chore to manage"
-    assert parsed[0]["entity"] == "select.alice_chores"
+    assert parsed[0]["type"] == "vertical-stack"
+    grid = parsed[0]["cards"][1]
+    assert grid["type"] == "grid" and grid["columns"] == 2
+    names = [c["name"] for c in grid["cards"]]
+    assert names == ["Feed Dog", "Wash Dishes", "⊘ Laundry"]
+    tap = grid["cards"][1]["tap_action"]
+    assert tap["service"] == "select.select_option"
+    assert tap["data"] == {
+        "entity_id": "select.alice_chores",
+        "option": "Wash Dishes (Alice)",
+    }
+    assert "Overdue" in grid["cards"][1]["label"] or "overdue" in grid["cards"][1]["label"]
+    assert "err-" not in grid["cards"][2]["label"] or "Not assigned" in grid["cards"][2]["label"]
+
+
+def test_admin_chore_picker_caps_chips_and_offers_show_all() -> None:
+    """Long chore lists show eight chips plus a Show all chip."""
+
+    chores_template = _get_admin_filter_template(
+        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+    )
+    options = ["None"] + [f"Chore {i} (Alice)" for i in range(10)]
+    mock_states = _base_admin_chore_management_states(
+        selected_user_name="Alice",
+        selected_dashboard_helper="sensor.alice_dashboard_helper",
+        chore_selector_state="None",
+        chore_items=[],
+        selected_user_ui_control={
+            "admin-shared": {"chore-management": {"header-collapse": False}}
+        },
+        chore_select_options=options,
+    )
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
+    env.globals["as_timestamp"] = lambda v: 0
+    output = env.from_string(chores_template).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    cards = yaml.safe_load(f"[{output}]")[0]["cards"][1]["cards"]
+    assert len(cards) == 9
+    assert cards[-1]["name"] == "Show all 10"
+    assert cards[-1]["tap_action"]["data"]["key"] == (
+        "admin-shared/quick-actions/picker-all"
+    )
 
 
 def test_admin_all_chores_card_only_shows_when_tile_opens_it() -> None:
@@ -995,6 +1055,10 @@ def test_admin_chore_management_shows_detail_for_selected_chore() -> None:
     assert overview is not None
     assert overview.get("entity") == "sensor.alice_chore_wash_dishes"
     assert overview.get("name") == "Wash Dishes"
+    change = parsed[0]["custom_fields"]["entity_select"]["card"]
+    assert change["name"] == "Change chore"
+    assert change["tap_action"]["service"] == "select.select_option"
+    assert change["tap_action"]["data"]["option"] == "None"
 
 
 def test_admin_chore_management_resolves_selected_shard_backed_chore() -> None:
