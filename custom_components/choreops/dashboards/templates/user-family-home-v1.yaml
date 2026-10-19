@@ -1,5 +1,5 @@
 <#-- ============================================= --#>
-<#-- ChoreOps Dashboard Template - ADMIN Style --#>
+<#-- ChoreOps Dashboard Template - FAMILY HOME --#>
 <#-- Template Schema Version: 1                --#>
 <#-- ============================================= --#>
 <#--                                             --#>
@@ -9,12 +9,12 @@
 <#-- of that person (family-hub-<name>).         --#>
 <#-- OUTPUT: Full dashboard document with root keys --#>
 <#--                                             --#>
-<#-- No injection needed                         --#>
+<#-- Injection variables: << user.name >>, << user.slug >> --#>
 <#-- ============================================= --#>
 
 views:
 - title: Home
-  path: home
+  path: home-<< user.slug >>
   sections:
     - type: grid
       cards:
@@ -80,9 +80,8 @@ views:
                   ~ "<div style='flex:1;min-width:0;'><div style='font-size:9px;font-weight:700;opacity:.65;text-transform:uppercase;letter-spacing:.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ greet ~ "</div>"
                   ~ "<div style='font-size:16px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div></div>"
                   ~ pts_html ~ "</div>"
-                  ~ "<div style='display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:8px;'>" ~ rank_html
+                  ~ "<div style='display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;margin-top:8px;'>" ~ rank_html
                   ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:" ~ sc ~ ";background:color-mix(in srgb," ~ sc ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='" ~ si ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ st ~ "</span></div>"
-                  ~ "<ha-icon icon='mdi:chevron-right' style='position:absolute;right:0;bottom:0;width:18px;height:18px;--mdc-icon-size:18px;opacity:.5;'></ha-icon>"
                   ~ "</div>" -%}
                 {{
                   {
@@ -246,8 +245,11 @@ views:
                   | map(attribute='entity_id')
                   | list -%}
               {#-- Goals that track people (day streaks, everyone-contributes) go first, then the scoreboards --#}
-              {%- set fsort = namespace(top=[], rest=[]) -%}
+              {%- set fsort = namespace(top=[], rest=[], seen=[]) -%}
               {%- for fe0 in family_sensors -%}
+                {%- set fkey = (state_attr(fe0, 'achievement_name') or fe0) | string -%}
+                {%- if fkey in fsort.seen -%}{%- continue -%}{%- endif -%}
+                {%- set fsort.seen = fsort.seen + [fkey] -%}
                 {%- if (state_attr(fe0, 'type') or '') | string | lower in ['family_caught_up_days', 'family_active_days', 'family_everyone_contributes'] -%}
                   {%- set fsort.top = fsort.top + [fe0] -%}
                 {%- else -%}
