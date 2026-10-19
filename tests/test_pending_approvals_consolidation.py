@@ -86,3 +86,40 @@ def test_recent_activity_returns_newest_five_ledger_entries() -> None:
     assert recent[0]["amount"] == -2.0
     assert recent[1]["item_name"] == "Chore 7"
     assert AssigneeDashboardHelperSensor._build_recent_activity({}) == []
+
+
+def test_shared_admin_helper_lists_family_goals() -> None:
+    """Family goals are exposed straight from storage for the OpsCenter reset card."""
+    from types import SimpleNamespace
+
+    from custom_components.choreops import const
+    from custom_components.choreops.sensor import SystemDashboardHelperSensor
+
+    achievements = {
+        "a1": {
+            const.DATA_ACHIEVEMENT_TYPE: const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+            const.DATA_ACHIEVEMENT_NAME: "Pizza Night",
+            const.DATA_ACHIEVEMENT_TARGET_VALUE: 10,
+        },
+        "a2": {
+            const.DATA_ACHIEVEMENT_TYPE: "chore_total",
+            const.DATA_ACHIEVEMENT_NAME: "Personal",
+        },
+    }
+    fake = SimpleNamespace(
+        coordinator=SimpleNamespace(
+            achievements_data=achievements,
+            gamification_manager=SimpleNamespace(
+                get_family_achievement_total=lambda _id: 4.0
+            ),
+        )
+    )
+    goals = SystemDashboardHelperSensor._build_family_goals(fake)  # type: ignore[arg-type]
+    assert goals == [
+        {
+            "name": "Pizza Night",
+            "type": const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+            "total": 4.0,
+            "target": 10.0,
+        }
+    ]
