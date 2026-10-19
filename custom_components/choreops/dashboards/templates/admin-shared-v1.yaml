@@ -1051,6 +1051,217 @@ views:
           card_param: cards
           filter:
             template: |-
+              {#-- ===== REWARD POOLS ===== --#}
+              << template_snippets.user_override_helper >>
+
+              << template_snippets.admin_setup_shared >>
+
+              {%- set pref_rp_ui_control_key_root = 'admin-shared/reward-pools' -%}
+              {%- set pref_rp_default_collapsed = true -%}
+              {%- set pref_rp_accent = '#8b5cf6' -%}
+              {%- set rp_key = pref_rp_ui_control_key_root ~ '/header-collapse' -%}
+              {%- set rp_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set rp_ui = namespace(current=ui_root.shared_admin if ui_root.shared_admin is mapping else {}) -%}
+              {%- for segment in pref_rp_ui_control_key_root.split('/') -%}
+                {%- if rp_ui.current is mapping -%}
+                  {%- set rp_ui.current = rp_ui.current.get(segment, {}) -%}
+                {%- else -%}
+                  {%- set rp_ui.current = {} -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- set rp_has_override = rp_ui.current is mapping and 'header-collapse' in rp_ui.current -%}
+              {%- set rp_collapsed = rp_ui.current['header-collapse'] if rp_has_override else pref_rp_default_collapsed -%}
+              {%- set rp_collapsed = (rp_collapsed | string | lower) == 'true' -%}
+              {#-- Pooled rewards appear in every person's reward list; find each one once by name --#}
+              {%- set rp = namespace(pools={}) -%}
+              {%- for h in helper_sensor_entities -%}
+                {%- for rw in (h.attributes.get('rewards') or []) -%}
+                  {%- set rw_eid = rw.get('eid') if rw is mapping else rw -%}
+                  {%- if rw_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(rw_eid) not in ['unknown', 'unavailable'] and state_attr(rw_eid, 'pooled') -%}
+                    {%- set rw_name = (rw.get('name') if rw is mapping else none) or state_attr(rw_eid, 'reward_name') or 'Family reward' -%}
+                    {%- if rw_name not in rp.pools -%}
+                      {%- set rp.pools = rp.pools | combine({rw_name: rw_eid}) -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {%- set rp_ready = namespace(n=0) -%}
+              {%- for pn, pe in rp.pools.items() -%}
+                {%- if state_attr(pe, 'pool_full') and (state_attr(pe, 'pool_total') | float(0)) > 0 -%}
+                  {%- set rp_ready.n = rp_ready.n + 1 -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- if rp.pools | length > 0 -%}
+              {{
+                {
+                  'type': 'custom:button-card',
+                  'show_name': true,
+                  'show_label': true,
+                  'show_state': false,
+                  'show_icon': true,
+                  'icon': 'mdi:gift-outline',
+                  'name': 'Reward pools',
+                  'label': ((rp.pools | length) ~ (' pool' if rp.pools | length == 1 else ' pools') ~ ((' · ' ~ rp_ready.n ~ ' ready') if rp_ready.n > 0 else '')) if rp_collapsed else 'Approve, refund or fix contributions',
+                  'tap_action': ({
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': rp_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'update',
+                      'key': rp_key,
+                      'value': false
+                    }
+                  } if rp_collapsed and rp_entry_id not in ['', none] else {
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': rp_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'remove',
+                      'key': rp_key
+                    }
+                  } if rp_entry_id not in ['', none] else {
+                    'action': 'none'
+                  }),
+                  'hold_action': {'action': 'none'},
+                  'custom_fields': {
+                    'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if rp_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                  },
+                  'styles': {
+                    'card': [
+                      {'margin-top': '12px'},
+                      {'padding': '14px 16px'},
+                      {'border-radius': '16px'},
+                      {'box-shadow': 'none'},
+                      {'border': '1px solid color-mix(in srgb, ' ~ pref_rp_accent ~ ' 30%, var(--divider-color))'},
+                      {'background-color': 'color-mix(in srgb, ' ~ pref_rp_accent ~ ' 14%, var(--card-background-color))'}
+                    ],
+                    'grid': [
+                      {'grid-template-areas': '"i n toggle" "i l toggle"'},
+                      {'grid-template-columns': '32px minmax(0, 1fr) min-content'},
+                      {'grid-template-rows': 'min-content min-content'},
+                      {'column-gap': '14px'},
+                      {'row-gap': '2px'},
+                      {'align-items': 'center'}
+                    ],
+                    'icon': [{'width': '24px'}, {'height': '24px'}, {'align-self': 'center'}],
+                    'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '14px'}, {'font-weight': '700'}, {'line-height': '1.2'}, {'text-transform': 'uppercase'}],
+                    'label': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'opacity': '0.7'}],
+                    'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                  }
+                }
+              }},
+              {%- if not rp_collapsed -%}
+              {%- for pname, peid in rp.pools.items() -%}
+                {%- set ptotal = state_attr(peid, 'pool_total') | float(0) -%}
+                {%- set premain = state_attr(peid, 'pool_remaining') | float(0) -%}
+                {%- set ptarget = ptotal + premain -%}
+                {%- set pfull = state_attr(peid, 'pool_full') and ptotal > 0 -%}
+                {%- set ppct = ((ptotal / ptarget * 100) | round(0) | int) if ptarget > 0 else 0 -%}
+                {%- set pcontrib = state_attr(peid, 'pool_contributions') or {} -%}
+                {%- set pcol = '#22c55e' if pfull else pref_rp_accent -%}
+                {%- set picon = state_attr(peid, 'icon') or 'mdi:gift-outline' -%}
+                {%- set psafe = pname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {%- set head_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:36px;height:36px;border-radius:11px;background:" ~ pcol ~ ";display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ picon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);'>" ~ psafe ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'>" ~ (('Full · waiting for you') if pfull else (('%g' | format(premain | round(2))) ~ ' to go' if ptotal > 0 else 'Nobody has chipped in')) ~ "</div></div><span style='font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;letter-spacing:0.5px;background:color-mix(in srgb, " ~ pcol ~ " 25%, transparent);color:" ~ pcol ~ ";'>" ~ ('READY' if pfull else 'FILLING') ~ "</span></div>" -%}
+                {%- set bar_html = "<div style='height:10px;border-radius:99px;background:var(--divider-color);overflow:hidden;margin-top:2px;'><div style='height:100%;width:" ~ (ppct if ppct < 100 else 100) ~ "%;background:" ~ pcol ~ ";border-radius:99px;'></div></div><div style='display:flex;justify-content:space-between;font-size:11px;color:var(--secondary-text-color);margin-top:4px;'><span>" ~ ('%g' | format(ptotal | round(2))) ~ " of " ~ ('%g' | format(ptarget | round(2))) ~ " points</span><span>" ~ ppct ~ "%</span></div>" -%}
+                {%- set chip_cards = namespace(c=[]) -%}
+                {%- for cname, camt in pcontrib.items() -%}
+                  {%- if camt | float(0) > 0 -%}
+                    {%- set chip_cards.c = chip_cards.c + [{
+                      'type': 'custom:button-card',
+                      'name': cname ~ ' ' ~ ('%g' | format(camt | float(0) | round(2))) ~ '  ↩',
+                      'show_name': true,
+                      'show_icon': false,
+                      'tap_action': {
+                        'action': 'call-service',
+                        'service': 'choreops.refund_reward_pool',
+                        'data': {'config_entry_id': rp_entry_id, 'reward_name': pname, 'user_name': cname},
+                        'confirmation': {'text': 'Refund ' ~ cname ~ '? Give ' ~ cname ~ ' their ' ~ ('%g' | format(camt | float(0) | round(2))) ~ ' points back from ' ~ pname ~ '. Everyone else keeps their points in the pool.'}
+                      },
+                      'styles': {
+                        'card': [{'padding': '6px 10px'}, {'border-radius': '99px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'min-height': 'unset'}, {'width': 'auto'}],
+                        'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'white-space': 'nowrap'}]
+                      }
+                    }] -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {%- set act_cards = [
+                  {
+                    'type': 'custom:button-card',
+                    'name': '✔ Approve · delivered',
+                    'show_name': true,
+                    'show_icon': false,
+                    'tap_action': ({
+                      'action': 'call-service',
+                      'service': 'choreops.approve_reward_pool',
+                      'data': {'config_entry_id': rp_entry_id, 'reward_name': pname},
+                      'confirmation': {'text': 'Mark ' ~ pname ~ ' as delivered? The pool is emptied so the family can save up again.'}
+                    }) if pfull else {'action': 'none'},
+                    'styles': {
+                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, ({'background': '#22c55e'}) if pfull else {'background': 'transparent'}, {'border': '1px solid #22c55e'} if pfull else {'border': '1px dashed var(--divider-color)'}],
+                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#04210f'} if pfull else {'color': 'var(--disabled-text-color)'}]
+                    }
+                  },
+                  {
+                    'type': 'custom:button-card',
+                    'name': '↩ Refund all',
+                    'show_name': true,
+                    'show_icon': false,
+                    'tap_action': ({
+                      'action': 'call-service',
+                      'service': 'choreops.refund_reward_pool',
+                      'data': {'config_entry_id': rp_entry_id, 'reward_name': pname},
+                      'confirmation': {'text': 'Cancel ' ~ pname ~ ' and give everyone their points back?'}
+                    }) if ptotal > 0 else {'action': 'none'},
+                    'styles': {
+                      'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'background': 'color-mix(in srgb, #ef4444 12%, transparent)'} if ptotal > 0 else {'background': 'transparent'}, {'border': '1.5px solid #ef4444'} if ptotal > 0 else {'border': '1px dashed var(--divider-color)'}],
+                      'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#ef4444'} if ptotal > 0 else {'color': 'var(--disabled-text-color)'}]
+                    }
+                  }
+                ] -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'none'},
+                    'custom_fields': {
+                      'head': head_html,
+                      'bar': bar_html,
+                      'chips': {'card': {'type': 'grid', 'columns': 2, 'square': false, 'cards': chip_cards.c}} if chip_cards.c | length > 0 else '',
+                      'acts': {'card': {'type': 'grid', 'columns': 2, 'square': false, 'cards': act_cards}}
+                    },
+                    'styles': {
+                      'card': [
+                        {'background': 'linear-gradient(135deg, color-mix(in srgb, ' ~ pcol ~ ' 14%, transparent), var(--card-background-color))' if pfull else 'var(--card-background-color)'},
+                        {'border': '1px solid ' ~ (pcol if pfull else 'var(--divider-color)')},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'padding': '12px'},
+                        {'min-height': 'unset'}
+                      ],
+                      'grid': [
+                        {'grid-template-areas': '"head" "bar" "chips" "acts"'},
+                        {'grid-template-columns': '1fr'},
+                        {'row-gap': '8px'}
+                      ],
+                      'custom_fields': {'head': [{'width': '100%'}], 'bar': [{'width': '100%'}], 'chips': [{'width': '100%'}], 'acts': [{'width': '100%'}]}
+                    }
+                  }
+                }},
+              {%- endfor -%}
+              {%- endif -%}
+              {%- endif -%}
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
               {#-- ===== MANAGEMENT ===== --#}
 
               << template_snippets.meta_stamp >>

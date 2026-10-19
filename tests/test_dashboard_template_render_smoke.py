@@ -1675,3 +1675,61 @@ def test_admin_quick_actions_economy_and_system_tabs() -> None:
     assert system[1]["cards"][0]["tap_action"]["service"] == (
         "choreops.reset_chores_to_pending_state"
     )
+
+
+def test_admin_reward_pools_card_lists_pools_and_refund_actions() -> None:
+    """Reward pools card shows progress, approve, refund and per-person refunds."""
+
+    template = _get_admin_filter_template(
+        "admin-shared-v1", "===== REWARD POOLS ====="
+    )
+    mock_states = _base_admin_system_administration_states()
+    mock_states["sensor.shared_admin_dashboard_helper"].attributes["ui_control"] = {
+        "admin-shared": {"reward-pools": {"header-collapse": False}}
+    }
+    mock_states["sensor.alice_dashboard_helper"].attributes["rewards"] = [
+        {"name": "Movie Night", "eid": "sensor.reward_movie", "cost": "60 Points"},
+        {"name": "Solo Treat", "eid": "sensor.reward_treat", "cost": "5 Points"},
+    ]
+    mock_states["sensor.reward_movie"] = _MockState(
+        entity_id="sensor.reward_movie",
+        state="available",
+        attributes={
+            "pooled": True,
+            "pool_total": 60,
+            "pool_remaining": 0,
+            "pool_full": True,
+            "pool_contributions": {"Lily": 25, "Olivia": 35},
+            "icon": "mdi:movie",
+        },
+        name="Movie Night",
+    )
+    mock_states["sensor.reward_treat"] = _MockState(
+        entity_id="sensor.reward_treat",
+        state="available",
+        attributes={"pooled": False},
+        name="Solo Treat",
+    )
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    output = env.from_string(template).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    parsed = yaml.safe_load(f"[{output}]")
+
+    assert len(parsed) == 2
+    assert "1 ready" in parsed[0]["label"] or parsed[0]["label"].startswith("Approve")
+    fields = parsed[1]["custom_fields"]
+    assert "READY" in fields["head"]
+    chips = fields["chips"]["card"]["cards"]
+    assert [c["tap_action"]["data"]["user_name"] for c in chips] == ["Lily", "Olivia"]
+    assert chips[0]["tap_action"]["service"] == "choreops.refund_reward_pool"
+    approve, refund = fields["acts"]["card"]["cards"]
+    assert approve["tap_action"]["service"] == "choreops.approve_reward_pool"
+    assert refund["tap_action"]["data"] == {
+        "config_entry_id": "entry-123",
+        "reward_name": "Movie Night",
+    }
