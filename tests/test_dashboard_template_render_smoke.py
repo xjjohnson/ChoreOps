@@ -259,6 +259,7 @@ def _base_admin_chore_management_states(
     shared_admin_ui_control: dict[str, object] | None = None,
     chore_sensor_state: str = "pending",
     chore_sensor_attributes: dict[str, object] | None = None,
+    chore_select_options: list[str] | None = None,
 ) -> dict[str, _MockState]:
     """Build minimal states for the admin chore-management filter tests."""
 
@@ -322,6 +323,11 @@ def _base_admin_chore_management_states(
             attributes={
                 "purpose": "purpose_select_user_chores",
                 "user_name": "Alice",
+                **(
+                    {"options": chore_select_options}
+                    if chore_select_options is not None
+                    else {}
+                ),
             },
             name="Alice Chores",
         ),
@@ -878,7 +884,7 @@ def test_admin_chore_management_hides_without_selected_user() -> None:
 
 
 def test_admin_chore_management_shows_selector_when_expanded() -> None:
-    """Expanded shared admin chore management shows the chore selector."""
+    """With nothing picked, chores appear as tappable chips instead of a dropdown."""
 
     chores_template = _get_admin_filter_template(
         "admin-shared-v1", "===== CHORE MANAGEMENT ====="
@@ -891,16 +897,26 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
             {
                 "name": "Wash Dishes",
                 "eid": "sensor.alice_chore_wash_dishes",
-                "state": "pending",
-            }
+                "state": "overdue",
+            },
+            {"name": "Feed Dog", "eid": "sensor.alice_chore_dog", "state": "pending"},
         ],
         selected_user_ui_control={
             "admin-shared": {"chore-management": {"header-collapse": False}}
         },
+        chore_select_options=[
+            "None",
+            "Feed Dog (Alice)",
+            "Wash Dishes (Alice)",
+            "──────────",
+            "⊘ Laundry",
+        ],
     )
     env, integration_entities, states, state_attr = _build_runtime_template_env(
         mock_states
     )
+    env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
+    env.globals["as_timestamp"] = lambda v: 0
 
     output = env.from_string(chores_template).render(
         integration_entities=integration_entities,
@@ -909,11 +925,55 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
     )
     parsed = yaml.safe_load(f"[{output}]")
 
-    assert isinstance(parsed, list)
     assert len(parsed) == 1
-    assert parsed[0]["type"] == "custom:button-card"
-    assert parsed[0]["name"] == "Select chore to manage"
-    assert parsed[0]["entity"] == "select.alice_chores"
+    assert parsed[0]["type"] == "vertical-stack"
+    grid = parsed[0]["cards"][1]
+    assert grid["type"] == "grid" and grid["columns"] == 2
+    names = [c["name"] for c in grid["cards"]]
+    assert names == ["Feed Dog", "Wash Dishes", "⊘ Laundry"]
+    tap = grid["cards"][1]["tap_action"]
+    assert tap["service"] == "select.select_option"
+    assert tap["data"] == {
+        "entity_id": "select.alice_chores",
+        "option": "Wash Dishes (Alice)",
+    }
+    assert "Overdue" in grid["cards"][1]["label"] or "overdue" in grid["cards"][1]["label"]
+    assert "err-" not in grid["cards"][2]["label"] or "Not assigned" in grid["cards"][2]["label"]
+
+
+def test_admin_chore_picker_caps_chips_and_offers_show_all() -> None:
+    """Long chore lists show eight chips plus a Show all chip."""
+
+    chores_template = _get_admin_filter_template(
+        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+    )
+    options = ["None"] + [f"Chore {i} (Alice)" for i in range(10)]
+    mock_states = _base_admin_chore_management_states(
+        selected_user_name="Alice",
+        selected_dashboard_helper="sensor.alice_dashboard_helper",
+        chore_selector_state="None",
+        chore_items=[],
+        selected_user_ui_control={
+            "admin-shared": {"chore-management": {"header-collapse": False}}
+        },
+        chore_select_options=options,
+    )
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
+    env.globals["as_timestamp"] = lambda v: 0
+    output = env.from_string(chores_template).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    cards = yaml.safe_load(f"[{output}]")[0]["cards"][1]["cards"]
+    assert len(cards) == 9
+    assert cards[-1]["name"] == "Show all 10"
+    assert cards[-1]["tap_action"]["data"]["key"] == (
+        "admin-shared/quick-actions/picker-all"
+    )
 
 
 def test_admin_all_chores_card_only_shows_when_tile_opens_it() -> None:
@@ -995,6 +1055,10 @@ def test_admin_chore_management_shows_detail_for_selected_chore() -> None:
     assert overview is not None
     assert overview.get("entity") == "sensor.alice_chore_wash_dishes"
     assert overview.get("name") == "Wash Dishes"
+    change = parsed[0]["custom_fields"]["entity_select"]["card"]
+    assert change["name"] == "Change chore"
+    assert change["tap_action"]["service"] == "select.select_option"
+    assert change["tap_action"]["data"]["option"] == "None"
 
 
 def test_admin_chore_management_resolves_selected_shard_backed_chore() -> None:
@@ -1480,31 +1544,91 @@ def test_admin_quick_actions_chores_tab_tiles_and_skip_list() -> None:
     assert "Feed Dog" in skip_names
 
 
-def test_admin_quick_actions_economy_uses_configured_point_buttons() -> None:
-    """Adjust points lists the amounts configured in the integration settings."""
+_ECON_BONUSES = [
+    {"eid": "button.alice_bonus_good", "name": "Good Attitude", "points": 5, "applied": 2},
+    {"eid": "button.alice_bonus_praise", "name": "Praised", "points": 100, "applied": 0},
+]
+_ECON_PENALTIES = [
+    {"eid": "button.alice_pen_argue", "name": "Argued", "points": -5, "applied": 1},
+]
+
+
+def test_admin_economy_tab_shows_balance_tabs_and_bonuses_by_default() -> None:
+    """Economy tab: balance header, three tabs, bonuses list, then the report tile."""
+
+    eco = _render_quick_actions(
+        "economy", None, {"bonuses": _ECON_BONUSES, "penalties": _ECON_PENALTIES}
+    )
+    assert "Available" in eco[0]["custom_fields"]["content"]
+    seg = eco[1]["cards"]
+    assert [c["name"] for c in seg] == ["Bonuses", "Penalties", "Points"]
+    assert seg[0]["styles"]["card"][-1]["background"] == "var(--primary-color)"
+    assert seg[1]["tap_action"]["data"] == {
+        "config_entry_id": "entry-123",
+        "ui_control_target": "shared_admin",
+        "ui_control_action": "update",
+        "key": "admin-shared/quick-actions/econ-tab",
+        "value": "penalties",
+    }
+    rows = eco[2]["cards"]
+    assert [r["name"] for r in rows] == ["Good Attitude", "Praised"]
+    assert rows[0]["label"] == "+5 · applied 2×"
+    assert rows[0]["tap_action"]["service"] == "button.press"
+    assert rows[0]["tap_action"]["target"] == {"entity_id": "button.alice_bonus_good"}
+    assert "Alice" in rows[0]["tap_action"]["confirmation"]["text"]
+    assert "REPORTS" in eco[3]["name"]
+    assert [t["name"] for t in eco[4]["cards"]] == ["Activity report"]
+    report = eco[4]["cards"][0]["tap_action"]
+    assert report["service"] == "choreops.generate_activity_report"
+    assert report["data"]["notify_service"] == "persistent_notification.create"
+    assert report["data"]["report_title"] == "Activity report: Alice"
+    assert report["data"]["user_name"] == "Alice"
+
+
+def test_admin_economy_tab_penalties_list() -> None:
+    """The Penalties tab lists penalties with a minus sign."""
+
+    eco = _render_quick_actions(
+        "economy",
+        {"econ-tab": "penalties"},
+        {"bonuses": _ECON_BONUSES, "penalties": _ECON_PENALTIES},
+    )
+    rows = eco[2]["cards"]
+    assert [r["name"] for r in rows] == ["Argued"]
+    assert rows[0]["label"].startswith("−5")
+    assert rows[0]["tap_action"]["target"] == {"entity_id": "button.alice_pen_argue"}
+    assert eco[1]["cards"][1]["styles"]["card"][-1]["background"] == (
+        "var(--primary-color)"
+    )
+
+
+def test_admin_economy_tab_points_uses_configured_point_buttons() -> None:
+    """The Points tab lists the amounts configured in the integration settings."""
 
     buttons = [
         {"eid": "button.alice_minus_200", "name": "Points -200"},
         {"eid": "button.alice_plus_50", "name": "Points +50"},
     ]
     eco = _render_quick_actions(
-        "economy",
-        {"adjust-open": True},
-        {"points_buttons": buttons},
+        "economy", {"econ-tab": "points"}, {"points_buttons": buttons}
     )
-    assert [t["name"] for t in eco[1]["cards"]] == ["Adjust points", "Activity report"]
-    report = eco[1]["cards"][1]["tap_action"]
-    assert report["service"] == "choreops.generate_activity_report"
-    assert report["data"]["notify_service"] == "persistent_notification.create"
-    assert report["data"]["report_title"] == "Activity report: Alice"
-    assert report["data"]["user_name"] == "Alice"
-    amounts = eco[3]["cards"]
+    amounts = eco[2]["cards"]
+    assert eco[2]["columns"] == 3
     assert [c["name"] for c in amounts] == ["-200", "+50"]
     assert amounts[0]["tap_action"] == {
         "action": "call-service",
         "service": "button.press",
         "data": {"entity_id": "button.alice_minus_200"},
     }
+
+
+def test_admin_economy_tab_empty_lists_show_a_hint() -> None:
+    """With nothing configured, each tab shows a short hint instead of a blank."""
+
+    eco = _render_quick_actions("economy", None, {})
+    assert eco[2]["cards"][0]["name"] == "No bonuses set up yet"
+    eco = _render_quick_actions("economy", {"econ-tab": "points"}, {"points_buttons": []})
+    assert eco[2]["cards"][0]["name"] == "No point amounts set up in settings"
 
 
 def test_admin_quick_actions_system_tab_tools_and_links() -> None:
