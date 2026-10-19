@@ -59,7 +59,11 @@
 			}
 		}},
 
+		{%- set any_ns = namespace(shown=false) -%}
 		{%- for chore_sensor_id in group.buttons -%}
+			{%- set row_undated = not (state_attr(chore_sensor_id, 'due_date') or state_attr(chore_sensor_id, 'due_window_start')) -%}
+			{%- set row_show_anytime = row_undated and not any_ns.shown -%}
+			{%- if row_show_anytime -%}{%- set any_ns.shown = true -%}{%- endif -%}
 			{%- set ns.group_cards = ns.group_cards + [
 				{
 					'type': 'custom:button-card',
@@ -78,6 +82,7 @@
 						'points_label': points_label,
 						'points_icon': points_icon,
 						'timeline_group_id': (group.id | default('', true) | string),
+						'timeline_show_anytime': row_show_anytime,
 						'timeline_first': false,
 						'timeline_last': (tl.idx == tl.total and loop.last)
 					}
