@@ -3009,7 +3009,15 @@ views:
                             {%- set ftype = (state_attr(fe, 'type') or '') | string | lower -%}
                             {#-- Day-streak goals count shared days, so they show a level track and no per-person rows --#}
                             {%- set fstreak = ftype in ['family_caught_up_days', 'family_active_days'] -%}
+                            {%- set fgrid = fstreak or ftype == 'family_everyone_contributes' -%}
                             {%- set funit = ' days' if fstreak else '' -%}
+                            {#-- Time left: only goals that run on the calendar day have a known end (midnight) --#}
+                            {%- set secs_left = 86400 - (now().hour * 3600 + now().minute * 60 + now().second) -%}
+                            {%- set hrs_left = (secs_left // 3600) | int -%}
+                            {%- set mins_left = ((secs_left % 3600) // 60) | int -%}
+                            {%- set time_txt = ((hrs_left ~ 'h ' ~ mins_left ~ 'm left') if hrs_left > 0 else (mins_left ~ 'm left')) if ftype in ['family_caught_up_days', 'family_active_days', 'family_chores_in_day'] else '' -%}
+                            {%- set time_col = 'var(--warning-color)' if hrs_left < 3 else 'var(--secondary-text-color)' -%}
+                            {%- set time_html = ("<div style='display:inline-flex;align-items:center;gap:3px;margin-top:4px;font-size:10px;font-weight:800;color:" ~ time_col ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ time_txt ~ "</div>") if time_txt else '' -%}
                             {%- set flevels = (state_attr(fe, 'family_levels') or []) | map('float', 0) | list -%}
                             {%- set frewards = (state_attr(fe, 'family_level_rewards') or []) | map('float', 0) | list -%}
                             {%- set flevel = state_attr(fe, 'family_level') | int(0) -%}
@@ -3044,7 +3052,24 @@ views:
                             {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
                             {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
 
-                            {%- if fstreak -%}
+                            {%- if fgrid -%}
+                              {#-- Who is in: a check for everyone who has done their part, the count for the rest --#}
+                              {%- set cchips = namespace(v='') -%}
+                              {%- if ftype == 'family_everyone_contributes' -%}
+                                {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
+                                  {%- set p = pts | float(0) | round(0) | int -%}
+                                  {%- set p_ok = p >= wtarget -%}
+                                  {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;'>" ~ ("<ha-icon icon='mdi:check-bold' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" if p_ok else p) ~ "</span>" ~ pname_safe ~ "<span style='opacity:0.6;font-weight:600;'>" ~ p ~ "/" ~ wtarget ~ "</span></div>" -%}
+                                {%- endfor -%}
+                              {%- elif ftype == 'family_caught_up_days' -%}
+                                {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
+                                {%- for pname, ptxt in cstat.items() -%}
+                                  {%- set p_ok = (ptxt | string).startswith('0 still') -%}
+                                  {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                                  {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
+                                {%- endfor -%}
+                              {%- endif -%}
                               {#-- Level track: one node per level, green line fills as levels are reached --#}
                               {%- set nodes = namespace(v='') -%}
                               {%- if fcount > 1 -%}
@@ -3061,10 +3086,12 @@ views:
                               {%- set fui_v = "<div style='text-align:left;padding:14px 10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                                 ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
                                 ~ "<div style='flex:1;min-width:0;'><div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
-                                ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div></div></div>"
+                                ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
                                 ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:#22c55e;'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
                                 ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
-                                ~ rec_html ~ "</div>" -%}
+                                ~ rec_html
+                                ~ ("<div style='display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:8px;'>" ~ cchips.v ~ "</div>" if cchips.v else '')
+                                ~ "</div>" -%}
                             {%- else -%}
                               {#-- Scoreboard: goal fill row on top, one fill row per contributor underneath --#}
                               {%- set rows = namespace(v='') -%}
@@ -3084,8 +3111,8 @@ views:
                                 ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
                                 ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
                                 ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div></div>"
-                                ~ "<div style='flex:0 0 auto;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div></div></div>"
-                                ~ rows.v ~ rec_html ~ "</div>" -%}
+                                ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
+                                ~ rec_html ~ rows.v ~ "</div>" -%}
                             {%- endif -%}
 
                             {{
