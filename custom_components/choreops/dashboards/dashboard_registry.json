@@ -312,6 +312,41 @@
       }
     },
     {
+      "template_id": "admin-family-home-v1",
+      "display_name": "Family Home",
+      "description": "Family home page: tappable person cards that open each Family Hub page, family goals tiles, and family achievements",
+      "audience": "approver",
+      "category": "admin",
+      "lifecycle_state": "active",
+      "min_integration_version": "1.5.0",
+      "maintainer": "xjjohnson",
+      "source": {
+        "type": "vendored",
+        "path": "templates/admin-family-home-v1.yaml"
+      },
+      "dependencies": {
+        "required": [
+          {
+            "id": "ha-card:auto-entities",
+            "name": "Auto-Entities",
+            "url": "https://github.com/thomasloven/lovelace-auto-entities"
+          },
+          {
+            "id": "ha-card:button-card",
+            "name": "Button Card",
+            "url": "https://github.com/custom-cards/button-card"
+          }
+        ],
+        "recommended": []
+      },
+      "preferences": {
+        "doc_asset_path": "preferences/admin-family-home-v1.md"
+      },
+      "shared_contract_version": 1,
+      "shared_fragments_required": [],
+      "shared_fragments_optional": []
+    },
+    {
       "template_id": "admin-shared-kidschores-classic-v1",
       "display_name": "Admin (Shared) KidsChores Classic",
       "description": "Classic admin dashboard with shared selector workflow",

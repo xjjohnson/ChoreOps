@@ -1557,3 +1557,36 @@ def test_user_family_hub_template_renders_without_parse_errors() -> None:
     assert rendered["views"][0]["path"] == "family-hub-zoe"
     assert isinstance(rendered["views"][0].get("sections"), list)
     assert "chore_row_timeline_v1" in rendered["button_card_templates"]
+
+
+def test_admin_family_home_template_renders_without_parse_errors() -> None:
+    """Family Home template renders to one view with person, goals and achievements cards."""
+    import jinja2
+
+    template_str = _read_template("admin-family-home-v1.yaml")
+    context = dh.build_admin_dashboard_context(
+        integration_entry_id="entry-123",
+        template_profile="admin-family-home-v1",
+        release_ref="0.0.1-beta.3",
+        generated_at="2026-10-19T00:00:00+00:00",
+    )
+
+    rendered = builder.render_dashboard_template(template_str, context)
+
+    assert len(rendered["views"]) == 1
+    view = rendered["views"][0]
+    assert view["path"] == "home"
+    cards = view["sections"][0]["cards"]
+    assert [c["type"] for c in cards] == [
+        "heading",
+        "custom:auto-entities",
+        "heading",
+        "custom:auto-entities",
+        "heading",
+        "custom:auto-entities",
+    ]
+    env = jinja2.Environment(extensions=["jinja2.ext.loopcontrols"])
+    for card in cards:
+        if card["type"] == "custom:auto-entities":
+            env.parse(card["filter"]["template"])
+    assert "family-hub-" in cards[1]["filter"]["template"]
