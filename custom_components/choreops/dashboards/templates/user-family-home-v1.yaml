@@ -9,12 +9,12 @@
 <#-- of that person (family-hub-<name>).         --#>
 <#-- OUTPUT: Full dashboard document with root keys --#>
 <#--                                             --#>
-<#-- Injection variables: << user.name >>, << user.slug >> --#>
+<#-- No injection needed (added automatically as the first tab with Family Hub) --#>
 <#-- ============================================= --#>
 
 views:
 - title: Home
-  path: home-<< user.slug >>
+  path: home
   sections:
     - type: grid
       cards:

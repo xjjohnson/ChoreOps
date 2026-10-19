@@ -757,6 +757,39 @@ def _merge_root_button_card_templates(
         merged_templates[template_name] = template_value
 
 
+FAMILY_HOME_TEMPLATE_ID = "user-family-home-v1"
+FAMILY_HOME_TRIGGER_TEMPLATE_ID = "user-family-hub-v1"
+FAMILY_HOME_VIEW_PATH = "home"
+
+
+def _render_family_home_view(
+    template_str: str,
+    *,
+    integration_entry_id: str,
+    release_ref: str | None,
+    release_version: str | None,
+    generated_at: str,
+    root_button_card_templates: dict[str, Any],
+) -> dict[str, Any]:
+    """Render the Family Home view (added first when Family Hub is used)."""
+    rendered = render_dashboard_template(
+        template_str,
+        build_admin_dashboard_context(
+            integration_entry_id=integration_entry_id,
+            template_profile=FAMILY_HOME_TEMPLATE_ID,
+            release_ref=release_ref,
+            release_version=release_version,
+            generated_at=generated_at,
+        ),
+    )
+    view, root_templates = _extract_rendered_template_view_and_root_templates(rendered)
+    _merge_root_button_card_templates(root_button_card_templates, root_templates)
+    view["path"] = FAMILY_HOME_VIEW_PATH
+    view.setdefault("title", "Home")
+    return view
+
+
+
 def build_multi_view_dashboard(
     views: list[dict[str, Any]],
     root_button_card_templates: dict[str, Any] | None = None,
@@ -1235,6 +1268,24 @@ async def create_choreops_dashboard(
             assignee_style,
         )
 
+    # Family Hub dashboards get one Home tab, placed first
+    if any(
+        resolve_assignee_template_profile(name, style, assignee_template_profiles)
+        == FAMILY_HOME_TRIGGER_TEMPLATE_ID
+        for name in assignee_names
+    ):
+        views.insert(
+            0,
+            _render_family_home_view(
+                await _get_template(FAMILY_HOME_TEMPLATE_ID),
+                integration_entry_id=integration_entry_id,
+                release_ref=pinned_release_tag,
+                release_version=local_release_version,
+                generated_at=generated_at,
+                root_button_card_templates=root_button_card_templates,
+            ),
+        )
+
     normalized_admin_mode = _normalize_admin_mode(admin_mode)
 
     # Add admin view if requested
@@ -1616,10 +1667,22 @@ async def update_choreops_dashboard_views(
     merged_views: list[dict[str, Any]] = []
     replaced_assignee_paths: set[str] = set()
     existing_admin_view: dict[str, Any] | None = None
+    family_home_view: dict[str, Any] | None = None
+    if template_profile == FAMILY_HOME_TRIGGER_TEMPLATE_ID:
+        family_home_view = _render_family_home_view(
+            await _get_template(FAMILY_HOME_TEMPLATE_ID),
+            integration_entry_id=integration_entry_id,
+            release_ref=pinned_release_tag,
+            release_version=local_release_version,
+            generated_at=generated_at,
+            root_button_card_templates=root_button_card_templates,
+        )
 
     for view in existing_views:
         if _is_admin_view(view):
             existing_admin_view = view
+            continue
+        if family_home_view is not None and view.get("path") == FAMILY_HOME_VIEW_PATH:
             continue
 
         path = view.get("path")
@@ -1633,6 +1696,9 @@ async def update_choreops_dashboard_views(
     for path, view in updated_assignee_views_by_path.items():
         if path not in replaced_assignee_paths:
             merged_views.append(view)
+
+    if family_home_view is not None:
+        merged_views.insert(0, family_home_view)
 
     if include_admin:
         include_global_admin = normalized_admin_mode in (

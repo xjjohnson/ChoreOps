@@ -1559,25 +1559,23 @@ def test_user_family_hub_template_renders_without_parse_errors() -> None:
     assert "chore_row_timeline_v1" in rendered["button_card_templates"]
 
 
-def test_user_family_home_template_renders_without_parse_errors() -> None:
-    """Family Home template renders to one view with person, goals and achievements cards."""
+def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
+    """Family Home renders to the 'home' view and is hidden from template pickers."""
     import jinja2
 
     template_str = _read_template("user-family-home-v1.yaml")
-    context = dh.build_dashboard_context(
-        "Zoe",
-        assignee_id="user-123",
+    root_templates: dict = {}
+    view = builder._render_family_home_view(
+        template_str,
         integration_entry_id="entry-123",
-        template_profile="user-family-home-v1",
         release_ref="0.0.1-beta.3",
+        release_version=None,
         generated_at="2026-10-19T00:00:00+00:00",
+        root_button_card_templates=root_templates,
     )
 
-    rendered = builder.render_dashboard_template(template_str, dict(context))
-
-    assert len(rendered["views"]) == 1
-    view = rendered["views"][0]
-    assert view["path"] == "home-zoe"
+    assert view["path"] == "home"
+    assert view["title"] == "Home"
     cards = view["sections"][0]["cards"]
     assert [c["type"] for c in cards] == [
         "heading",
@@ -1592,3 +1590,6 @@ def test_user_family_home_template_renders_without_parse_errors() -> None:
         if card["type"] == "custom:auto-entities":
             env.parse(card["filter"]["template"])
     assert "family-hub-" in cards[1]["filter"]["template"]
+    assert "user-family-home-v1" not in dh.get_assignee_template_ids()
+    assert "user-family-home-v1" not in dh.get_admin_template_ids()
+    assert dh.get_template_source_path("user-family-home-v1")
