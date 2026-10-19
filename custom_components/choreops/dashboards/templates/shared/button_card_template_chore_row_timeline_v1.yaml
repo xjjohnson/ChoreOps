@@ -1,0 +1,74 @@
+chore_row_timeline_v1:
+  template: chore_row_v1
+  show_icon: false
+  styles:
+    card:
+    - padding: 0px
+    - border-radius: 0px
+    - background: transparent
+    - box-shadow: none
+    - border: none
+    - overflow: visible
+    - opacity: '[[[ const canClaim = entity.attributes.can_claim === true; const rawState = entity.state; const normalizedState = (rawState === ''approved'' || rawState === ''already_approved'') ? ''completed'' : (rawState === ''approved_in_part'' ? ''completed_in_part'' : rawState); return (!canClaim && normalizedState !== ''claimed'') ? ''0.6'' : ''1.0''; ]]]'
+    grid:
+    - grid-template-areas: '". rail . . ." "time rail n btn_undo btn_action" ". rail due btn_undo btn_action" ". rail description btn_undo btn_action" ". rail history btn_undo btn_action" ". rail progress btn_undo btn_action" ". rail . . ."'
+    - grid-template-columns: 62px 22px minmax(0, 1fr) min-content min-content
+    - grid-template-rows: 10px min-content min-content min-content min-content min-content 10px
+    - row-gap: 0px
+    - column-gap: 0px
+    - align-items: center
+    name:
+    - margin-bottom: 0px
+    - padding-left: 14px
+    - box-sizing: border-box
+    - z-index: '1'
+    custom_fields:
+      due:
+      - padding-left: 14px
+      - box-sizing: border-box
+      - z-index: '1'
+      description:
+      - padding-left: 14px
+      - box-sizing: border-box
+      - z-index: '1'
+      history:
+      - padding-left: 14px
+      - box-sizing: border-box
+      - z-index: '1'
+      progress:
+      - padding-left: 14px
+      - box-sizing: border-box
+      - z-index: '1'
+      btn_undo:
+      - margin-right: 6px
+      - z-index: '1'
+      btn_action:
+      - margin-right: 10px
+      - z-index: '1'
+      time:
+      - justify-self: end
+      - align-self: center
+      - text-align: right
+      - padding-right: 6px
+      - font-size: 11px
+      - font-weight: '700'
+      - white-space: nowrap
+      - line-height: '1.2'
+      rail:
+      - overflow: visible
+      - align-self: stretch
+      - justify-self: stretch
+      - height: 100%
+      - width: 100%
+      bg:
+      - overflow: visible
+      - position: absolute
+      - left: 84px
+      - right: 0px
+      - top: 0px
+      - bottom: 0px
+      - z-index: '0'
+  custom_fields:
+    time: '[[[ const v = (typeof variables !== ''undefined'' && variables) ? variables : {}; const pick = (k, d) => (typeof v[k] === ''string'' && v[k].trim().length > 0) ? v[k].trim() : d; const claimAccent = pick(''pref_claim_accent'', ''#a957fa''); const dueAccent = pick(''pref_due_accent'', ''#ff9800''); const overdueAccent = pick(''pref_overdue_accent'', ''#ff4444''); const stealAccent = pick(''pref_steal_accent'', ''#F2C94C''); const standbyAccent = pick(''pref_standby_accent'', ''#5B8DEF''); const rawState = entity.state; const st = (rawState === ''approved'' || rawState === ''already_approved'') ? ''completed'' : (rawState === ''approved_in_part'' ? ''completed_in_part'' : rawState); const cm = entity.attributes.claim_mode || null; const canClaim = entity.attributes.can_claim === true; let accent = ''var(--secondary-text-color)''; if (cm === ''steal_available'') accent = stealAccent; else if (cm === ''standby_available'') accent = (entity.attributes.global_state === ''overdue'') ? overdueAccent : standbyAccent; else if ([''overdue'', ''missed''].includes(st)) accent = overdueAccent; else if (st === ''due'') accent = dueAccent; else if (st === ''claimed'') accent = claimAccent; else if ([''completed'', ''completed_in_part''].includes(st)) accent = ''var(--success-color)''; else if (canClaim) accent = ''var(--primary-color)''; const getLabels = () => { const directLabels = (typeof variables !== ''undefined'' && variables && typeof variables.ui_labels === ''object'') ? variables.ui_labels : null; if (directLabels) return directLabels; const sensorId = (typeof variables !== ''undefined'' && variables && typeof variables.translation_sensor_eid === ''string'') ? variables.translation_sensor_eid.trim() : ''''; const sensorState = sensorId && typeof hass !== ''undefined'' && hass && hass.states ? hass.states[sensorId] : null; const sensorLabels = sensorState && sensorState.attributes && typeof sensorState.attributes.ui_translations === ''object'' ? sensorState.attributes.ui_translations : null; return sensorLabels; }; const i18n = (key, fallback) => { const labels = getLabels(); const value = labels && typeof labels[key] === ''string'' ? labels[key].trim() : ''''; return value.length > 0 ? value : ((typeof fallback === ''string'' && fallback.startsWith(''err-'')) ? fallback : `err-${key}`); }; const raw = entity.attributes.due_date || entity.attributes.due_window_start; if (!raw) return i18n(''anytime'', ''err-anytime''); const dt = new Date(raw); if (Number.isNaN(dt.getTime())) return i18n(''anytime'', ''err-anytime''); const now = new Date(); const startOf = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()); const diff = Math.round((startOf(dt) - startOf(now)) / 86400000); const hasTime = dt.getHours() !== 0 || dt.getMinutes() !== 0; const timeText = dt.toLocaleTimeString([], dt.getMinutes() === 0 ? { hour: ''numeric'' } : { hour: ''numeric'', minute: ''2-digit'' }); const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1); let rtf = null; try { rtf = new Intl.RelativeTimeFormat(undefined, { numeric: ''auto'' }); } catch (e) { rtf = null; } const dayWord = (k) => rtf ? cap(rtf.format(k, ''day'')) : dt.toLocaleDateString([], { month: ''short'', day: ''numeric'' }); let text; if (diff === 0) text = hasTime ? timeText : dayWord(0); else if (diff === -1 || diff === 1) text = dayWord(diff); else if (diff > 1 && diff < 7) text = dt.toLocaleDateString([], { weekday: ''short'' }) + (hasTime ? '' '' + timeText : ''''); else text = dt.toLocaleDateString([], { month: ''short'', day: ''numeric'' }); return `<span style="color:${accent};">${text}</span>`; ]]]'
+    rail: '[[[ const v = (typeof variables !== ''undefined'' && variables) ? variables : {}; const pick = (k, d) => (typeof v[k] === ''string'' && v[k].trim().length > 0) ? v[k].trim() : d; const claimAccent = pick(''pref_claim_accent'', ''#a957fa''); const dueAccent = pick(''pref_due_accent'', ''#ff9800''); const overdueAccent = pick(''pref_overdue_accent'', ''#ff4444''); const stealAccent = pick(''pref_steal_accent'', ''#F2C94C''); const standbyAccent = pick(''pref_standby_accent'', ''#5B8DEF''); const rawState = entity.state; const st = (rawState === ''approved'' || rawState === ''already_approved'') ? ''completed'' : (rawState === ''approved_in_part'' ? ''completed_in_part'' : rawState); const cm = entity.attributes.claim_mode || null; const canClaim = entity.attributes.can_claim === true; let accent = ''var(--secondary-text-color)''; if (cm === ''steal_available'') accent = stealAccent; else if (cm === ''standby_available'') accent = (entity.attributes.global_state === ''overdue'') ? overdueAccent : standbyAccent; else if ([''overdue'', ''missed''].includes(st)) accent = overdueAccent; else if (st === ''due'') accent = dueAccent; else if (st === ''claimed'') accent = claimAccent; else if ([''completed'', ''completed_in_part''].includes(st)) accent = ''var(--success-color)''; else if (canClaim) accent = ''var(--primary-color)''; const first = v.timeline_first === true; const last = v.timeline_last === true; const hollow = cm === ''standby_available'' || (!canClaim && st !== ''completed'' && st !== ''completed_in_part'' && st !== ''claimed''); const top = first ? ''19px'' : ''0px''; const bottom = last ? ''calc(100% - 19px)'' : ''-8px''; return `<div style="position:relative;width:100%;height:100%;"><div style="position:absolute;left:calc(50% - 1px);width:2px;top:${top};bottom:${bottom};background:var(--divider-color);"></div><div style="position:absolute;left:calc(50% - 7px);top:12px;width:14px;height:14px;box-sizing:border-box;border-radius:50%;border:3px solid ${accent};background:${hollow ? ''var(--card-background-color)'' : accent};box-shadow:0 0 0 3px var(--card-background-color);"></div></div>`; ]]]'
+    bg: '[[[ const v = (typeof variables !== ''undefined'' && variables) ? variables : {}; const pick = (k, d) => (typeof v[k] === ''string'' && v[k].trim().length > 0) ? v[k].trim() : d; const claimAccent = pick(''pref_claim_accent'', ''#a957fa''); const dueAccent = pick(''pref_due_accent'', ''#ff9800''); const overdueAccent = pick(''pref_overdue_accent'', ''#ff4444''); const stealAccent = pick(''pref_steal_accent'', ''#F2C94C''); const standbyAccent = pick(''pref_standby_accent'', ''#5B8DEF''); const rawState = entity.state; const st = (rawState === ''approved'' || rawState === ''already_approved'') ? ''completed'' : (rawState === ''approved_in_part'' ? ''completed_in_part'' : rawState); const cm = entity.attributes.claim_mode || null; const canClaim = entity.attributes.can_claim === true; let accent = ''var(--secondary-text-color)''; if (cm === ''steal_available'') accent = stealAccent; else if (cm === ''standby_available'') accent = (entity.attributes.global_state === ''overdue'') ? overdueAccent : standbyAccent; else if ([''overdue'', ''missed''].includes(st)) accent = overdueAccent; else if (st === ''due'') accent = dueAccent; else if (st === ''claimed'') accent = claimAccent; else if ([''completed'', ''completed_in_part''].includes(st)) accent = ''var(--success-color)''; else if (canClaim) accent = ''var(--primary-color)''; return `<div style="width:100%;height:100%;box-sizing:border-box;border-radius:12px;background:color-mix(in srgb, ${accent} 7%, var(--card-background-color));border:1px solid color-mix(in srgb, ${accent} 22%, var(--divider-color));border-left:4px solid ${accent};"></div>`; ]]]'

@@ -1522,8 +1522,24 @@ def test_user_gamification_premier_template_contains_ui_control_contract() -> No
 
 
 def test_user_family_hub_template_renders_without_parse_errors() -> None:
-    """Family Hub template renders and parses into a dashboard dict."""
-    template_str = _read_template("user-family-hub-v1.yaml")
+    """Family Hub (redesigned Premier layout) renders and parses into a dashboard dict."""
+    names = [
+        "shared/chore_engine/context_v1.yaml",
+        "shared/chore_engine/prepare_groups_v1.yaml",
+        "shared/chore_engine/header_v1.yaml",
+        "shared/chore_engine/settings_panel_v1.yaml",
+        "shared/chore_engine/group_render_v1.yaml",
+        "shared/chore_engine/group_render_timeline_v1.yaml",
+        "shared/button_card_template_chore_row_v1.yaml",
+        "shared/button_card_template_chore_row_kids_v1.yaml",
+        "shared/button_card_template_chore_row_timeline_v1.yaml",
+    ]
+    assets = {"templates/user-family-hub-v1.yaml": _read_template("user-family-hub-v1.yaml")}
+    for name in names:
+        assets[f"templates/{name}"] = _read_template(name)
+    template_str = dh.compile_prepared_template_assets(assets)[
+        "templates/user-family-hub-v1.yaml"
+    ]
     context = dh.build_dashboard_context(
         "Zoe",
         assignee_id="user-123",
@@ -1540,3 +1556,4 @@ def test_user_family_hub_template_renders_without_parse_errors() -> None:
     assert rendered["views"][0]["title"] == "Family Hub"
     assert rendered["views"][0]["path"] == "family-hub-zoe"
     assert isinstance(rendered["views"][0].get("sections"), list)
+    assert "chore_row_timeline_v1" in rendered["button_card_templates"]

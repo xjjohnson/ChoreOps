@@ -153,7 +153,7 @@
     {
       "template_id": "user-family-hub-v1",
       "display_name": "Family Hub",
-      "description": "Shared family page: family goals, pool rewards, points leaderboard, and who still has chores today",
+      "description": "Family Hub: redesigned full user page with greeting hero, timeline chores, rewards, and progress-fill achievements with family goals",
       "audience": "user",
       "category": "full",
       "lifecycle_state": "active",
@@ -180,7 +180,19 @@
       },
       "preferences": {
         "doc_asset_path": "preferences/user-family-hub-v1.md"
-      }
+      },
+      "shared_contract_version": 1,
+      "shared_fragments_required": [
+        "chore_engine/context_v1",
+        "chore_engine/prepare_groups_v1",
+        "chore_engine/header_v1",
+        "chore_engine/settings_panel_v1",
+        "chore_engine/group_render_v1",
+        "button_card_template_chore_row_v1",
+        "button_card_template_chore_row_kids_v1",
+        "button_card_template_chore_row_timeline_v1",
+        "chore_engine/group_render_timeline_v1"
+      ]
     },
     {
       "template_id": "user-kidschores-classic-v1",
