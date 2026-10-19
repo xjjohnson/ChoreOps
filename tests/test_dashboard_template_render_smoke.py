@@ -1809,6 +1809,9 @@ def _render_home_card(marker: str, mock_states: dict[str, _MockState]):
     env.filters["slugify"] = lambda v: str(v).lower().replace(" ", "_")
     env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 19, 12, 0)
     env.filters["round"] = env.filters["round"]
+    env.globals["as_timestamp"] = lambda v: __import__("datetime").datetime.fromisoformat(
+        str(v)
+    ).timestamp()
     output = env.from_string(tpl).render(
         integration_entities=integration_entities,
         states=states,
@@ -1896,9 +1899,66 @@ def test_family_home_summary_leaderboard_and_streak_cards() -> None:
     people = _render_home_card("PERSON CARDS", states)
     lily = next(c for c in people if "Lily" in c["custom_fields"]["content"])
     dad = next(c for c in people if "Dad" in c["custom_fields"]["content"])
-    assert "12 days" in lily["custom_fields"]["content"]
-    assert "(at risk)" not in lily["custom_fields"]["content"]
-    assert "4 days (at risk)" in dad["custom_fields"]["content"]
+    lily_html = lily["custom_fields"]["content"]
+    dad_html = dad["custom_fields"]["content"]
+    assert lily_html.count("12 days") == 1
+    assert "⚠" not in lily_html
+    assert dad_html.count("4 days ⚠") == 1
+    # The streak sits beside the points (before the chip row), so the chips never wrap.
+    assert lily_html.index("12 days") < lily_html.index("flex-wrap:nowrap")
+    assert "flex-wrap:wrap" not in lily_html
+
+
+def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
+    """Family Goals: every person sits on a race track at their own progress."""
+
+    def badge_helper(name, progress, status):
+        slug = name.lower()
+        return {
+            f"sensor.{slug}_helper": _MockState(
+                entity_id=f"sensor.{slug}_helper",
+                state="ok",
+                attributes={
+                    "purpose": "purpose_dashboard_helper",
+                    "user_name": name,
+                    "badges": [
+                        {
+                            "eid": f"sensor.{slug}_badge",
+                            "name": "Brush Teeth",
+                            "badge_type": "periodic",
+                        }
+                    ],
+                },
+                name=name,
+            ),
+            f"sensor.{slug}_badge": _MockState(
+                entity_id=f"sensor.{slug}_badge",
+                state=str(progress),
+                attributes={
+                    "badge_name": "Brush Teeth",
+                    "status": status,
+                    "end_date": "2026-10-22T00:00:00",
+                    "icon": "mdi:tooth",
+                },
+                name="b",
+            ),
+        }
+
+    states = {}
+    states.update(badge_helper("Dad", 20, "in_progress"))
+    states.update(badge_helper("Lily", 20, "in_progress"))
+    cards = _render_home_card("pref_urgent_days", states)
+    assert len(cards) == 1
+    html = cards[0]["custom_fields"]["content"]
+    assert "Brush Teeth" in html
+    assert "0 of 2 done" in html
+    assert "3 days left" in html
+    # Milestone notches and the finish flag
+    assert ">25<" in html and ">50<" in html and ">75<" in html and "🏁" in html
+    # Both people sit at 20%; they are offset so neither avatar hides the other
+    assert html.count("calc(20% - 8px)") == 2
+    assert "margin-left:0px" in html and "margin-left:9px" in html
+    assert "width:20%" in html
 
 
 def test_family_hub_recent_activity_card_renders_rows() -> None:
