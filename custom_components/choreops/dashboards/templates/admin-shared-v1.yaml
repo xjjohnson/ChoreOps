@@ -639,6 +639,91 @@ views:
               << template_snippets.admin_setup_shared >>
 
               {%- set helpers = helper_sensor_entities -%}
+              {%- set pref_bp_ui_control_key_root = 'admin-shared/bonuses-penalties' -%}
+              {%- set pref_bp_default_collapsed = true -%}
+              {%- set bp_key = pref_bp_ui_control_key_root ~ '/header-collapse' -%}
+              {%- set bp_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set bp_ui = namespace(current=ui_root.shared_admin if ui_root.shared_admin is mapping else {}) -%}
+              {%- for segment in pref_bp_ui_control_key_root.split('/') -%}
+                {%- if bp_ui.current is mapping -%}
+                  {%- set bp_ui.current = bp_ui.current.get(segment, {}) -%}
+                {%- else -%}
+                  {%- set bp_ui.current = {} -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- set bp_has_override = bp_ui.current is mapping and 'header-collapse' in bp_ui.current -%}
+              {%- set bp_collapsed = bp_ui.current['header-collapse'] if bp_has_override else pref_bp_default_collapsed -%}
+              {%- set bp_collapsed = (bp_collapsed | string | lower) == 'true' -%}
+              {%- set bp_names = namespace(b=[], p=[]) -%}
+              {%- for h in helpers -%}
+                {%- for item in (h.attributes.get('bonuses') or []) -%}
+                  {%- if item is mapping and item.get('name') not in bp_names.b -%}{%- set bp_names.b = bp_names.b + [item.get('name')] -%}{%- endif -%}
+                {%- endfor -%}
+                {%- for item in (h.attributes.get('penalties') or []) -%}
+                  {%- if item is mapping and item.get('name') not in bp_names.p -%}{%- set bp_names.p = bp_names.p + [item.get('name')] -%}{%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {{
+                {
+                  'type': 'custom:button-card',
+                  'show_name': true,
+                  'show_label': true,
+                  'show_state': false,
+                  'show_icon': true,
+                  'icon': 'mdi:scale-balance',
+                  'name': 'Bonuses & Penalties',
+                  'label': (bp_names.b | length) ~ ' bonuses · ' ~ (bp_names.p | length) ~ ' penalties' if bp_collapsed else 'Tap a name to apply',
+                  'tap_action': ({
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': bp_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'update',
+                      'key': bp_key,
+                      'value': false
+                    }
+                  } if bp_collapsed and bp_entry_id not in ['', none] else {
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': bp_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'remove',
+                      'key': bp_key
+                    }
+                  } if bp_entry_id not in ['', none] else {
+                    'action': 'none'
+                  }),
+                  'hold_action': {'action': 'none'},
+                  'custom_fields': {
+                    'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if bp_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                  },
+                  'styles': {
+                    'card': [
+                      {'margin-top': '12px'},
+                      {'padding': '14px 16px'},
+                      {'border-radius': '16px'},
+                      {'box-shadow': 'none'},
+                      {'border': '1px solid color-mix(in srgb, var(--primary-color) 14%, var(--divider-color))'},
+                      {'background-color': 'color-mix(in srgb, var(--primary-color) 14%, var(--card-background-color))'}
+                    ],
+                    'grid': [
+                      {'grid-template-areas': '"i n toggle" "i l toggle"'},
+                      {'grid-template-columns': '32px minmax(0, 1fr) min-content'},
+                      {'grid-template-rows': 'min-content min-content'},
+                      {'column-gap': '14px'},
+                      {'row-gap': '2px'},
+                      {'align-items': 'center'}
+                    ],
+                    'icon': [{'width': '24px'}, {'height': '24px'}, {'align-self': 'center'}],
+                    'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '14px'}, {'font-weight': '700'}, {'line-height': '1.2'}, {'text-transform': 'uppercase'}],
+                    'label': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'opacity': '0.7'}],
+                    'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                  }
+                }
+              }},
+              {%- if not bp_collapsed -%}
               {%- for kind in ['bonuses', 'penalties'] -%}
                 {%- set good = kind == 'bonuses' -%}
                 {%- set col = '#22c55e' if good else '#ef4444' -%}
@@ -729,6 +814,7 @@ views:
                   {%- endfor -%}
                 {%- endif -%}
               {%- endfor -%}
+              {%- endif -%}
         - type: custom:auto-entities
           show_empty: false
           card:
