@@ -149,6 +149,15 @@ views:
                       {%- set status_text = ui.get('all_caught_up', 'All Caught Up!') -%}
                     {%- endif -%}
 
+                    {%- set cu = state_attr(dashboard_helper, 'caught_up_streak') or {} -%}
+                    {%- set cu_n = cu.get('count', 0) | int(0) -%}
+                    {%- set cu_best = cu.get('best', 0) | int(0) -%}
+                    {%- set cu_open = (overdue_now + due_today_open) > 0 -%}
+                    {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue_now > 0 -%}
+                    {%- set cu_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
+                    {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' (at risk)' if (cu_open and cu_n > 0) else '') -%}
+                    {%- set streak_chip = ("<span style='display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ cu_col ~ "; background: color-mix(in srgb, " ~ cu_col ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'><ha-icon icon='mdi:fire' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ cu_col ~ "; display: block;'></ha-icon><span>" ~ cu_txt ~ "</span></span>") if (cu_n > 0 or cu_broken) else '' -%}
+                    {%- set streak_note = ("<div style='font-size: 11px; opacity: 0.65; margin-top: 8px;'>" ~ (('Streak ended. ') if cu_broken else '') ~ 'Best: ' ~ (cu_best | string) ~ (' days' if cu_best != 1 else ' day') ~ "</div>") if cu_best > 0 else '' -%}
                     {%- set name_safe = name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                     {%- set hour_now = now().hour -%}
                     {%- if hour_now < 12 -%}
@@ -184,7 +193,8 @@ views:
                       ~ "</div>"
                       ~ right_col
                       ~ "</div>"
-                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ "</div>"
+                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ streak_chip ~ "</div>"
+                      ~ streak_note
                       ~ "</div>"
                     -%}
 

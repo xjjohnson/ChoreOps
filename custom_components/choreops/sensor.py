@@ -5120,6 +5120,18 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         return "available"
 
     @staticmethod
+    def _build_caught_up_streak(assignee_info: dict[str, Any]) -> dict[str, Any]:
+        """Return the person's "All Caught Up" day streak for dashboards."""
+        streak = assignee_info.get(const.DATA_USER_CAUGHT_UP_STREAK) or {}
+        count = int(streak.get("count", 0))
+        today_counted = str(streak.get("last_day", "")) == dt_today_local().isoformat()
+        return {
+            "count": count,
+            "best": int(streak.get("best", 0)),
+            "today_counted": today_counted,
+        }
+
+    @staticmethod
     def _build_recent_activity(
         assignee_info: dict[str, Any], limit: int = 5
     ) -> list[dict[str, Any]]:
@@ -5621,6 +5633,7 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             "points_buttons": points_buttons_attr,
             "pending_approvals": pending_approvals,
             "recent_activity": self._build_recent_activity(assignee_info),
+            "caught_up_streak": self._build_caught_up_streak(assignee_info),
             "core_sensors": core_sensors,
             const.ATTR_DASHBOARD_CONFIG: dashboard_config,
             "dashboard_helpers": dashboard_helpers,

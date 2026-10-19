@@ -189,28 +189,14 @@ views:
                 {%- set nm = uname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                 {%- set rank_html = ("<span style='font-size:10px;background:var(--secondary-background-color);padding:2px 8px;border-radius:999px;border:1px solid var(--divider-color);display:inline-flex;align-items:center;gap:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'><ha-icon icon='mdi:medal-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ rank ~ "</span>") if rank not in ['None', 'unknown', 'Unknown', 'unavailable'] else '' -%}
                 {%- set pts_html = ("<div style='display:inline-flex;align-items:center;gap:2px;color:var(--primary-color);font-size:15px;font-weight:800;white-space:nowrap;'><ha-icon icon='" ~ ((state_attr(points_sensor, 'icon') if points_sensor else none) or 'mdi:star-circle') ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;display:block;'></ha-icon>" ~ pts_txt ~ "</div>") if gam else '' -%}
-                {%- set fl = namespace(min=-1, daily=0) -%}
-                {%- set fl_items = namespace(l=(ha.get('chores') or [])) -%}
-                {%- set fl_shards = (ha.get('dashboard_helpers') or {}).get('chore_helper_eids', []) -%}
-                {%- if fl_shards is iterable and fl_shards is not string -%}
-                  {%- for fs in fl_shards | list -%}
-                    {%- if fs not in ['', none, 'None'] and states(fs) not in ['unknown', 'unavailable'] -%}
-                      {%- set fl_items.l = fl_items.l + (state_attr(fs, 'chores') | default([], true)) -%}
-                    {%- endif -%}
-                  {%- endfor -%}
-                {%- endif -%}
-                {%- for ci in fl_items.l -%}
-                  {%- set ce = ci.get('eid') if ci is mapping else none -%}
-                  {%- if ce and (state_attr(ce, 'recurring_frequency') | string | lower) == 'daily' -%}
-                    {%- set cs = state_attr(ce, 'chore_current_streak') | int(0) -%}
-                    {%- set fl.daily = fl.daily + 1 -%}
-                    {%- if fl.min < 0 or cs < fl.min -%}{%- set fl.min = cs -%}{%- endif -%}
-                  {%- endif -%}
-                {%- endfor -%}
-                {%- set fl_days = fl.min if (fl.daily > 0 and fl.min > 0) else 0 -%}
-                {%- set fl_open = (overdue + due) > 0 -%}
-                {%- set fl_col = 'var(--secondary-text-color)' if fl_open else 'var(--warning-color)' -%}
-                {%- set flame_html = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:" ~ fl_col ~ ";background:color-mix(in srgb," ~ fl_col ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='mdi:fire' style='width:12px;height:12px;--mdc-icon-size:12px;'></ha-icon>" ~ (fl_days | string) ~ (' days' if fl_days != 1 else ' day') ~ "</span>") if fl_days >= 2 else '' -%}
+                {%- set cu = ha.get('caught_up_streak') or {} -%}
+                {%- set cu_n = cu.get('count', 0) | int(0) -%}
+                {%- set cu_best = cu.get('best', 0) | int(0) -%}
+                {%- set cu_open = (overdue + due) > 0 -%}
+                {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue > 0 -%}
+                {%- set fl_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
+                {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' (at risk)' if (cu_open and cu_n > 0) else '') -%}
+                {%- set flame_html = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:" ~ fl_col ~ ";background:color-mix(in srgb," ~ fl_col ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='mdi:fire' style='width:12px;height:12px;--mdc-icon-size:12px;'></ha-icon>" ~ cu_txt ~ "</span>") if (cu_n > 0 or cu_broken) else '' -%}
                 {%- set html = "<div style='width:100%;text-align:left;position:relative;'>"
                   ~ "<div style='display:flex;align-items:center;gap:8px;'>"
                   ~ "<div style='width:36px;height:36px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex:0 0 auto;'>" ~ (nm[:1] | upper) ~ "</div>"
@@ -218,8 +204,7 @@ views:
                   ~ "<div style='font-size:16px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div></div>"
                   ~ pts_html ~ "</div>"
                   ~ "<div style='display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;margin-top:8px;'>" ~ rank_html
-                  ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:" ~ sc ~ ";background:color-mix(in srgb," ~ sc ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='" ~ si ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ st ~ "</span></div>"
-                  ~ flame_html
+                  ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:" ~ sc ~ ";background:color-mix(in srgb," ~ sc ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='" ~ si ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ st ~ "</span>" ~ flame_html ~ "</div>"
                   ~ "</div>" -%}
                 {{
                   {

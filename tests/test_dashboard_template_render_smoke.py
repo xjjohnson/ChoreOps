@@ -1794,6 +1794,11 @@ def _home_states() -> dict[str, _MockState]:
                         "rewards": [],
                     },
                     "gamification_enabled": True,
+                    "caught_up_streak": {
+                        "count": streak_daily,
+                        "best": max(streak_daily, 19 if name == "Lily" else 0),
+                        "today_counted": False,
+                    },
                 },
                 name=name,
             ),
@@ -1822,7 +1827,7 @@ def _home_states() -> dict[str, _MockState]:
         }
 
     states = {}
-    states.update(helper("Dad", 2, 1, 58, 0))
+    states.update(helper("Dad", 2, 1, 58, 4))
     states.update(helper("Lily", 0, 0, 145, 12))
     return states
 
@@ -1847,7 +1852,8 @@ def test_family_home_summary_leaderboard_and_streak_cards() -> None:
     lily = next(c for c in people if "Lily" in c["custom_fields"]["content"])
     dad = next(c for c in people if "Dad" in c["custom_fields"]["content"])
     assert "12 days" in lily["custom_fields"]["content"]
-    assert "mdi:fire" not in dad["custom_fields"]["content"]
+    assert "(at risk)" not in lily["custom_fields"]["content"]
+    assert "4 days (at risk)" in dad["custom_fields"]["content"]
 
 
 def test_family_hub_recent_activity_card_renders_rows() -> None:
