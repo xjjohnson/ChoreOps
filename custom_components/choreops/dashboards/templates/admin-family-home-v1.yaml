@@ -1,0 +1,421 @@
+<#-- ============================================= --#>
+<#-- ChoreOps Dashboard Template - ADMIN Style --#>
+<#-- Template Schema Version: 1                --#>
+<#-- ============================================= --#>
+<#--                                             --#>
+<#-- Family Home: tappable person cards, family  --#>
+<#-- goals tiles, and family achievements on one --#>
+<#-- page. Person cards open the Family Hub page --#>
+<#-- of that person (family-hub-<name>).         --#>
+<#-- OUTPUT: Full dashboard document with root keys --#>
+<#--                                             --#>
+<#-- No injection needed                         --#>
+<#-- ============================================= --#>
+
+views:
+- title: Home
+  path: home
+  sections:
+    - type: grid
+      cards:
+        - type: heading
+          heading: Family
+          heading_style: title
+          icon: mdi:account-group
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 2
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== PERSON CARDS ===== --#}
+              {#-- 1. User Configuration --#}
+              {%- set pref_dashboard_path = '' -%}  {#-- Optional: dashboard URL path (for example 'dashboard-choreops'). Leave empty to use paths relative to this dashboard. --#}
+              {%- set pref_points_precision = 'fixed_0' -%}  {#-- Allowed: fixed_0, fixed_1, fixed_2 --#}
+              {#-- 2. Dynamic Lookups & Validations --#}
+              {%- set helpers = integration_entities('choreops')
+                | select('search', '^sensor\\.')
+                | list
+                | expand
+                | selectattr('attributes.purpose', 'defined')
+                | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+                | list -%}
+              {%- set hour_now = now().hour -%}
+              {#-- 3. Render one tappable card per person --#}
+              {%- for h in helpers -%}
+                {%- set ha = h.attributes -%}
+                {%- set uname = (ha.get('user_name') or '') | string -%}
+                {%- if uname == '' -%}{%- continue -%}{%- endif -%}
+                {%- set core = ha.get('core_sensors') or {} -%}
+                {%- set points_sensor = core.get('points_eid') -%}
+                {%- set total_sensor = core.get('chores_eid') -%}
+                {%- set badge_sensor = core.get('badges_eid') -%}
+                {%- set tsensor = (ha.get('dashboard_helpers') or {}).get('translation_sensor_eid') -%}
+                {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
+                {%- set gam = ha.get('gamification_enabled') | default(false, true) -%}
+                {%- set pts = (states(points_sensor) | float(default=0)) if points_sensor else 0 -%}
+                {%- set pts_txt = ('%.2f' | format(pts)) if pref_points_precision == 'fixed_2' else (('%.1f' | format(pts)) if pref_points_precision == 'fixed_1' else ((pts | round(0) | int) | string)) -%}
+                {%- set overdue = (state_attr(total_sensor, 'chore_stat_current_overdue') | int(default=0)) if total_sensor else 0 -%}
+                {%- set due = (state_attr(total_sensor, 'chore_stat_current_due_today') | int(default=0)) if total_sensor else 0 -%}
+                {%- set rank = ((states(badge_sensor) if badge_sensor else 'None') or 'None') -%}
+                {%- if ha.get('chores_paused') | bool(false) -%}
+                  {%- set sc = 'var(--warning-color)' -%}{%- set si = 'mdi:pause-circle-outline' -%}{%- set st = ui.get('chores_are_paused', 'Paused') -%}
+                {%- elif overdue > 0 -%}
+                  {%- set sc = 'var(--error-color)' -%}{%- set si = 'mdi:alert-octagon' -%}{%- set st = ui.get('overdue', 'Overdue') ~ ': ' ~ overdue -%}
+                {%- elif due > 0 -%}
+                  {%- set sc = 'var(--warning-color)' -%}{%- set si = 'mdi:calendar-clock' -%}{%- set st = ui.get('due_today', 'Due Today') ~ ': ' ~ due -%}
+                {%- else -%}
+                  {%- set sc = 'var(--success-color)' -%}{%- set si = 'mdi:check-circle' -%}{%- set st = ui.get('all_caught_up', 'All Caught Up!') -%}
+                {%- endif -%}
+                {%- set greet = ui.get('good_morning', 'Good morning') if hour_now < 12 else (ui.get('good_afternoon', 'Good afternoon') if hour_now < 18 else ui.get('good_evening', 'Good evening')) -%}
+                {%- set nm = uname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {%- set rank_html = ("<span style='font-size:10px;background:var(--secondary-background-color);padding:2px 8px;border-radius:999px;border:1px solid var(--divider-color);display:inline-flex;align-items:center;gap:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'><ha-icon icon='mdi:medal-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ rank ~ "</span>") if rank not in ['None', 'unknown', 'Unknown', 'unavailable'] else '' -%}
+                {%- set pts_html = ("<div style='display:inline-flex;align-items:center;gap:2px;color:var(--primary-color);font-size:15px;font-weight:800;white-space:nowrap;'><ha-icon icon='" ~ ((state_attr(points_sensor, 'icon') if points_sensor else none) or 'mdi:star-circle') ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;display:block;'></ha-icon>" ~ pts_txt ~ "</div>") if gam else '' -%}
+                {%- set html = "<div style='width:100%;text-align:left;position:relative;'>"
+                  ~ "<div style='display:flex;align-items:center;gap:8px;'>"
+                  ~ "<div style='width:36px;height:36px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex:0 0 auto;'>" ~ (nm[:1] | upper) ~ "</div>"
+                  ~ "<div style='flex:1;min-width:0;'><div style='font-size:9px;font-weight:700;opacity:.65;text-transform:uppercase;letter-spacing:.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ greet ~ "</div>"
+                  ~ "<div style='font-size:16px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div></div>"
+                  ~ pts_html ~ "</div>"
+                  ~ "<div style='display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin-top:8px;'>" ~ rank_html
+                  ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:" ~ sc ~ ";background:color-mix(in srgb," ~ sc ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='" ~ si ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ st ~ "</span></div>"
+                  ~ "<ha-icon icon='mdi:chevron-right' style='position:absolute;right:0;bottom:0;width:18px;height:18px;--mdc-icon-size:18px;opacity:.5;'></ha-icon>"
+                  ~ "</div>" -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'navigate', 'navigation_path': ((('/' ~ pref_dashboard_path ~ '/') if pref_dashboard_path else '') ~ 'family-hub-' ~ (uname | slugify))},
+                    'hold_action': {'action': 'none'},
+                    'custom_fields': {'content': html},
+                    'styles': {
+                      'card': [
+                        {'padding': '10px'},
+                        {'border-radius': '16px'},
+                        {'border': '1px solid color-mix(in srgb, var(--primary-color) 25%, var(--divider-color))'},
+                        {'background': 'linear-gradient(135deg, color-mix(in srgb, var(--primary-color) 21%, var(--card-background-color)), color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color)))'},
+                        {'box-shadow': 'none'}
+                      ],
+                      'grid': [
+                        {'grid-template-areas': '"content"'},
+                        {'grid-template-columns': '1fr'}
+                      ],
+                      'custom_fields': {'content': [{'width': '100%'}]}
+                    }
+                  }
+                }},
+              {%- endfor -%}
+        - type: heading
+          heading: Family Goals
+          heading_style: title
+          icon: mdi:flag-checkered
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 2
+          card_param: cards
+          filter:
+            template: |-
+              {%- set pref_urgent_days = 3 -%}
+              {%- set pref_dashboard_path = '' -%}  {#-- Optional: your dashboard URL path (for example 'dashboard-choreops'). Leave empty to use paths relative to this dashboard. --#}
+              {%- set helpers = integration_entities('choreops')
+                | select('search', '^sensor\\.')
+                | list
+                | expand
+                | selectattr('attributes.purpose', 'defined')
+                | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+                | list -%}
+              {%- set today = now().strftime('%Y-%m-%d') -%}
+              {%- set ns = namespace(q={}) -%}
+              {%- for h in helpers -%}
+                {%- set uname = (h.attributes.get('user_name') or '') | string -%}
+                {%- for badge in (h.attributes.get('badges') or []) -%}
+                  {%- if badge is mapping and badge.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] and (badge.get('badge_type') | string | lower) in ['periodic', 'daily', 'special_occasion'] -%}
+                    {%- set be = badge.get('eid') -%}
+                    {%- set ba = states[be].attributes | default({}, true) -%}
+                    {%- set rs = ba.get('reset_schedule') if ba.get('reset_schedule') is mapping else {} -%}
+                    {%- set bname = (ba.get('badge_name') or badge.get('name') or state_attr(be, 'friendly_name') or '') | string -%}
+                    {%- set status = (ba.get('status') or badge.get('status') or 'in_progress') | string | lower -%}
+                    {%- set prog = states(be) | float(default=0) -%}
+                    {%- set prog = 0 if prog < 0 else (100 if prog > 100 else prog) -%}
+                    {%- set earned = status in ['earned', 'completed'] -%}
+                    {%- set b_end = ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', '') -%}
+                    {%- set b_start = ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', '') -%}
+                    {%- set dl = (((as_timestamp(b_end ~ 'T12:00:00') - as_timestamp(today ~ 'T12:00:00')) / 86400) | round(0) | int) if b_end | length > 0 else 999 -%}
+                    {%- set cur = ns.q.get(bname, {'name': bname, 'icon': (ba.get('icon') or 'mdi:medal-outline') | string, 'left': dl, 'future': (b_start | length > 0 and b_start > today), 'people': []}) -%}
+                    {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'p': prog, 'e': earned}]}) -%}
+                    {%- set ns.q = ns.q | combine({bname: cur}) -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {%- set items = namespace(l=[]) -%}
+              {%- for qn, q in ns.q.items() -%}
+                {%- set top = (q.people | map(attribute='p') | list | max) if q.people else 0 -%}
+                {%- set alldone = q.people | length > 0 and (q.people | selectattr('e') | list | length) == (q.people | length) -%}
+                {%- set items.l = items.l + [q | combine({'top': top, 'alldone': alldone, 'key': [(1 if alldone else 0), (1 if q.left >= 999 else 0), (q.left if q.left < 999 else 0), (100 - top), qn | lower]})] -%}
+              {%- endfor -%}
+              {%- for q in items.l | sort(attribute='key') -%}
+                {%- set acc = '#22c55e' if q.alldone else '#8b5cf6' -%}
+                {%- set acc2 = '#86efac' if q.alldone else '#ec4899' -%}
+                {%- set urgent = (not q.alldone) and q.left >= 0 and q.left <= pref_urgent_days -%}
+                {%- set tcol = 'var(--warning-color)' if urgent else 'var(--secondary-text-color)' -%}
+                {%- set ttxt = ('Ends today' if q.left == 0 else ('1 day left' if q.left == 1 else (q.left ~ ' days left'))) if (q.left < 999 and q.left >= 0) else 'no end' -%}
+                {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>no end</span>") -%}
+                {%- set av = namespace(v='') -%}
+                {%- for pp in q.people -%}
+                  {%- set lead = pp.p > 0 and pp.p == q.top -%}
+                  {%- set pc = '#22c55e' if pp.e else ('var(--warning-color)' if lead else 'var(--primary-color)') -%}
+                  {%- set nm = pp.u | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                  {%- set av.v = av.v ~ "<div style='margin-left:-4px;border:2px solid var(--card-background-color);border-radius:50%;'><div style='width:18px;height:18px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
+                {%- endfor -%}
+                {%- set lead_user = (q.people | sort(attribute='p', reverse=true) | map(attribute='u') | first) | default('', true) -%}
+                {%- set nav_path = ((('/' ~ pref_dashboard_path ~ '/') if pref_dashboard_path else '') ~ 'family-hub-' ~ (lead_user | slugify)) -%}
+                {%- set qname = q.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {%- set html = "<div style='position:relative;overflow:hidden;border-radius:16px;text-align:left;border:1px solid " ~ (('var(--warning-color)') if urgent else (acc ~ '55')) ~ ";'>"
+                  ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ (100 if q.alldone else (q.top | round(0) | int)) ~ "%;background:linear-gradient(90deg,color-mix(in srgb," ~ acc ~ " 34%,transparent),color-mix(in srgb," ~ acc ~ " 10%,transparent));'></div>"
+                  ~ "<div style='position:relative;display:flex;flex-direction:column;gap:6px;padding:9px 10px;'>"
+                  ~ "<div style='display:flex;align-items:center;gap:8px;'><div style='width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg," ~ acc ~ "," ~ acc2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#fff;display:block;'></ha-icon></div>"
+                  ~ "<div style='flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.15;color:var(--primary-text-color);'>" ~ qname ~ "</div></div>"
+                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;'><div style='display:flex;padding-left:4px;'>" ~ av.v ~ "</div>"
+                  ~ "<div style='text-align:right;'><b style='font-size:13px;color:var(--primary-text-color);'>" ~ ('✓' if q.alldone else ((q.top | round(0) | int) ~ '%')) ~ "</b><div>" ~ clock ~ "</div></div></div>"
+                  ~ "</div></div>" -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'navigate', 'navigation_path': nav_path} if lead_user else {'action': 'none'},
+                    'hold_action': {'action': 'none'},
+                    'custom_fields': {'content': html},
+                    'styles': {
+                      'card': [
+                        {'background': 'transparent'},
+                        {'box-shadow': 'none'},
+                        {'border': 'none'},
+                        {'padding': '0px'},
+                        {'min-height': 'unset'}
+                      ],
+                      'grid': [
+                        {'grid-template-areas': '"content"'},
+                        {'grid-template-columns': '1fr'}
+                      ],
+                      'custom_fields': {
+                        'content': [{'width': '100%'}]
+                      }
+                    }
+                  }
+                }},
+              {%- endfor -%}
+        - type: heading
+          heading: Family Achievements
+          heading_style: title
+          icon: mdi:trophy
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== FAMILY ACHIEVEMENTS ===== --#}
+              {#-- 1. User Configuration --#}
+              {#-- 2. Dynamic Lookups & Validations --#}
+              {%- set helpers = integration_entities('choreops')
+                | select('search', '^sensor\\.')
+                | list
+                | expand
+                | selectattr('attributes.purpose', 'defined')
+                | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+                | list -%}
+              {%- set tsensor = ((helpers | first).attributes.get('dashboard_helpers') or {}).get('translation_sensor_eid') if helpers else none -%}
+              {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
+              {#-- 3. Render --#}
+              {%- set family_sensors = integration_entities('choreops')
+                  | select('search', '^sensor\\.')
+                  | list
+                  | expand
+                  | selectattr('attributes.family_contributions', 'defined')
+                  | map(attribute='entity_id')
+                  | list -%}
+              {#-- Goals that track people (day streaks, everyone-contributes) go first, then the scoreboards --#}
+              {%- set fsort = namespace(top=[], rest=[]) -%}
+              {%- for fe0 in family_sensors -%}
+                {%- if (state_attr(fe0, 'type') or '') | string | lower in ['family_caught_up_days', 'family_active_days', 'family_everyone_contributes'] -%}
+                  {%- set fsort.top = fsort.top + [fe0] -%}
+                {%- else -%}
+                  {%- set fsort.rest = fsort.rest + [fe0] -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- for fe in fsort.top + fsort.rest -%}
+                {%- if states(fe) not in ['unknown', 'unavailable'] -%}
+                  {%- set fname = state_attr(fe, 'achievement_name') | default('Family Goal', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                  {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                  {%- set ficon = state_attr(fe, 'icon') or 'mdi:trophy' -%}
+                  {%- set ftype = (state_attr(fe, 'type') or '') | string | lower -%}
+                  {#-- Day-streak goals count shared days, so they show a level track and no per-person rows --#}
+                  {%- set fstreak = ftype in ['family_caught_up_days', 'family_active_days'] -%}
+                  {%- set fgrid = fstreak or ftype == 'family_everyone_contributes' -%}
+                  {%- set funit = ' days' if fstreak else '' -%}
+                  {#-- Time left: only goals that run on the calendar day have a known end (midnight) --#}
+                  {%- set secs_left = 86400 - (now().hour * 3600 + now().minute * 60 + now().second) -%}
+                  {%- set hrs_left = (secs_left // 3600) | int -%}
+                  {%- set mins_left = ((secs_left % 3600) // 60) | int -%}
+                  {%- set time_txt = ((hrs_left ~ 'h ' ~ mins_left ~ 'm left') if hrs_left > 0 else (mins_left ~ 'm left')) if ftype in ['family_caught_up_days', 'family_active_days', 'family_chores_in_day'] else '' -%}
+                  {%- set time_col = 'var(--warning-color)' if hrs_left < 3 else 'var(--secondary-text-color)' -%}
+                  {%- set time_html = ("<div style='display:inline-flex;align-items:center;gap:3px;margin-top:4px;font-size:10px;font-weight:800;color:" ~ time_col ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ time_txt ~ "</div>") if time_txt else '' -%}
+                  {%- set flevels = (state_attr(fe, 'family_levels') or []) | map('float', 0) | list -%}
+                  {%- set frewards = (state_attr(fe, 'family_level_rewards') or []) | map('float', 0) | list -%}
+                  {%- set flevel = state_attr(fe, 'family_level') | int(0) -%}
+                  {%- set fcount = flevels | length -%}
+                  {%- set fnext = state_attr(fe, 'family_next_target') | float(0) -%}
+                  {%- set ftarget = (fnext if fnext > 0 else (state_attr(fe, 'target_value') | float(0))) | round(0) | int -%}
+                  {%- set freward = state_attr(fe, 'family_next_reward') | float(0) | round(0) | int -%}
+                  {%- set fmult = state_attr(fe, 'family_top_multiplier') | float(1) -%}
+                  {%- set ftotal = state_attr(fe, 'family_total') | float(0) | round(0) | int -%}
+                  {#-- A goal that reset for a new period keeps its reached levels but starts a new total, so only call it done while the total is still at the last level --#}
+                  {%- set fraw_done = fcount > 0 and flevel >= fcount -%}
+                  {%- set fdone = fraw_done and ftotal >= ((flevels | last) | float(0)) -%}
+                  {%- set elevel = (fcount - 1) if (fraw_done and not fdone) else flevel -%}
+                  {#-- Day-streak goals follow the CURRENT streak: when it breaks, the levels shown start over --#}
+                  {%- set scnt = namespace(v=0) -%}
+                  {%- if fstreak -%}
+                    {%- for lv0 in flevels -%}
+                      {%- if lv0 <= ftotal -%}
+                        {%- set scnt.v = scnt.v + 1 -%}
+                      {%- endif -%}
+                    {%- endfor -%}
+                  {%- endif -%}
+                  {%- set streak_reset = fstreak and flevel > scnt.v -%}
+                  {%- set fdone = ((scnt.v >= fcount and fcount > 0) if fstreak else fdone) -%}
+                  {%- set elevel = (scnt.v if fstreak else elevel) -%}
+                  {%- set ftarget = (((flevels[elevel] if elevel < fcount else (flevels | last)) | round(0) | int) if (fstreak and fcount > 0) else ftarget) -%}
+                  {%- set freward = (((frewards[elevel] | round(0) | int) if elevel < (frewards | length) else 0) if (fstreak and fcount > 0) else freward) -%}
+                  {%- set fshares = state_attr(fe, 'family_level_contributions') or state_attr(fe, 'family_contributions') or {} -%}
+                  {%- set wtarget = ((flevels | last) if (fdone and fcount > 0) else ftarget) | float(1) | round(0) | int -%}
+                  {%- set pidx = (elevel - 1) if not fdone else (fcount - 2) -%}
+                  {%- set fprev = ((flevels[pidx] | round(0) | int) if (fcount > 1 and pidx >= 0) else 0) -%}
+                  {%- set wspan = [wtarget - fprev, 1] | max -%}
+                  {%- set winto = [[ftotal - fprev, 0] | max, wspan] | min -%}
+                  {%- set bpct = 100 if fdone else (((winto / wspan) * 100) | round(1)) -%}
+                  {%- set togo = [ftarget - ftotal, 0] | max -%}
+                  {%- set ftop = (fshares.values() | map('float', 0) | list | max) if fshares else 0 -%}
+                  {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
+                  {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
+                  {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
+                  {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ('STREAK RESET · LEVELS RESET' if streak_reset else 'NEW PERIOD · LEVELS RESET') ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
+                  {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
+                  {%- set sub = '🎉 All levels complete' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ (' day' if (funit and togo == 1) else funit) ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '')) -%}
+                  {%- set mult_html = ("<div style='font-size:11px;font-weight:700;color:var(--warning-color);line-height:1.35;'>🏆 Top contributor ×" ~ ('%g' | format(fmult)) ~ "</div>") if (fmult > 1 and not fdone) else '' -%}
+                  {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
+
+                  {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
+                  {%- set frecord_day = state_attr(fe, 'family_record_day') or '' -%}
+                  {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
+                  {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
+
+                  {%- if fgrid -%}
+                    {#-- Who is in: a check for everyone who has done their part, the count for the rest --#}
+                    {%- set cchips = namespace(v='') -%}
+                    {%- if ftype == 'family_everyone_contributes' -%}
+                      {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
+                        {%- set p = pts | float(0) | round(0) | int -%}
+                        {%- set p_ok = p >= wtarget -%}
+                        {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;'>" ~ ("<ha-icon icon='mdi:check-bold' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" if p_ok else p) ~ "</span>" ~ pname_safe ~ "<span style='opacity:0.6;font-weight:600;'>" ~ p ~ "/" ~ wtarget ~ "</span></div>" -%}
+                      {%- endfor -%}
+                    {%- elif ftype == 'family_caught_up_days' -%}
+                      {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
+                      {%- for pname, ptxt in cstat.items() -%}
+                        {%- set p_ok = (ptxt | string).startswith('0 still') -%}
+                        {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('#22c55e' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
+                      {%- endfor -%}
+                    {%- endif -%}
+                    {#-- Level track: one node per level, green line fills as levels are reached --#}
+                    {%- set nodes = namespace(v='') -%}
+                    {#-- Show at most 5 levels; the window slides so the current level sits in the middle with 2 before and 2 after --#}
+                    {%- set wcnt = [fcount, 5] | min -%}
+                    {%- set cidx = (fcount - 1) if fdone else elevel -%}
+                    {%- set wstart = [[cidx - 2, 0] | max, fcount - wcnt] | min -%}
+                    {%- if fcount > 1 -%}
+                      {%- for lv in flevels -%}
+                        {%- if loop.index0 >= wstart and loop.index0 < wstart + wcnt -%}
+                        {%- set n_reached = fdone or loop.index <= elevel -%}
+                        {%- set n_cur = (not fdone) and loop.index == elevel + 1 -%}
+                        {%- set n_col = '#22c55e' if n_reached else ('#8b5cf6' if n_cur else 'var(--divider-color)') -%}
+                        {%- set n_rw = (frewards[loop.index0] | round(0) | int) if loop.index0 < (frewards | length) else 0 -%}
+                        {%- set nodes.v = nodes.v ~ "<div style='position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;'><div style='width:34px;height:34px;border-radius:50%;border:3px solid " ~ n_col ~ ";background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ ('mdi:check' if n_reached else 'mdi:star') ~ "' style='width:17px;height:17px;--mdc-icon-size:17px;color:" ~ n_col ~ ";display:block;'></ha-icon></div><div style='font-size:11px;font-weight:800;margin-top:4px;color:" ~ ('var(--primary-text-color)' if n_cur else 'var(--secondary-text-color)') ~ ";'>" ~ (lv | round(0) | int) ~ funit ~ "</div>" ~ ("<div style='font-size:10px;color:var(--secondary-text-color);'>+" ~ n_rw ~ " ⭐</div>" if n_rw > 0 else '') ~ "</div>" -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                    {%- endif -%}
+                    {%- set tfrac = 1 if fdone else (0 if elevel == 0 else ([([elevel - wstart - 1 + bpct / 100, 0] | max) / ([wcnt - 1, 1] | max), 1] | min)) -%}
+                    {%- set tinset = 'calc(100% / ' ~ (wcnt * 2) ~ ')' -%}
+                    {%- set fui_v = "<div style='text-align:left;padding:14px 10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
+                      ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
+                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
+                      ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
+                      ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:#22c55e;'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
+                      ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
+                      ~ (("<div style='text-align:center;'>" ~ mult_html ~ "</div>") if mult_html else '')
+                      ~ rec_html
+                      ~ ("<div style='display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:8px;'>" ~ cchips.v ~ "</div>" if cchips.v else '')
+                      ~ "</div>" -%}
+                  {%- else -%}
+                    {#-- Scoreboard: goal fill row on top, one fill row per contributor underneath --#}
+                    {%- set rows = namespace(v='') -%}
+                    {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
+                      {%- set p = pts | float(0) | round(0) | int -%}
+                      {%- set ppct = ([((p / ftop) * 100) | round(0) | int, 100] | min) if ftop > 0 else 0 -%}
+                      {%- set lead = (p > 0 and (pts | float(0)) == ftop and ntop == 1) -%}
+                      {%- set pcol = 'var(--warning-color)' if lead else 'var(--primary-color)' -%}
+                      {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                      {%- set rows.v = rows.v ~ "<div style='position:relative;overflow:hidden;border-radius:12px;border:1px solid var(--divider-color);'>"
+                        ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ ppct ~ "%;background:linear-gradient(90deg,color-mix(in srgb," ~ pcol ~ " 34%,transparent),color-mix(in srgb," ~ pcol ~ " 10%,transparent));'></div>"
+                        ~ "<div style='position:relative;display:flex;align-items:center;gap:6px;padding:6px 8px;'><div style='width:20px;height:20px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
+                        ~ "<span style='flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary-text-color);'>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><b style='font-size:12px;color:var(--primary-text-color);'>" ~ p ~ "</b></div></div>" -%}
+                    {%- endfor -%}
+                    {%- set fui_v = "<div style='text-align:left;padding:10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
+                      ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
+                      ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
+                      ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
+                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div>" ~ mult_html ~ "</div>"
+                      ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
+                      ~ rec_html ~ "<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div></div>" -%}
+                  {%- endif -%}
+
+                  {{
+                    {
+                      'type': 'custom:button-card',
+                      'show_name': false,
+                      'show_icon': false,
+                      'tap_action': {'action': 'none'},
+                      'hold_action': {'action': 'none'},
+                      'custom_fields': {'content': fui_v},
+                      'styles': {
+                        'card': [
+                          {'background': 'transparent'},
+                          {'box-shadow': 'none'},
+                          {'border': 'none'},
+                          {'padding': '0px'},
+                          {'min-height': 'unset'}
+                        ],
+                        'grid': [
+                          {'grid-template-areas': '"content"'},
+                          {'grid-template-columns': '1fr'}
+                        ],
+                        'custom_fields': {
+                          'content': [{'width': '100%'}]
+                        }
+                      }
+                    }
+                  }},
+                {%- endif -%}
+              {%- endfor -%}
