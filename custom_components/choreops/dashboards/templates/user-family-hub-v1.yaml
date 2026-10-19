@@ -602,6 +602,40 @@ views:
                         {%- set achievement_eid = achievement.get('eid') -%}
                         {%- if achievement_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(achievement_eid) not in ['unknown', 'unavailable'] -%}
                           {%- set achievement_attrs = states[achievement_eid].attributes | default({}, true) -%}
+                          {#-- FAMILY GOAL ROW: level chip, level pips and a bar that fills only the current level window --#}
+                          {%- if 'family_total' in achievement_attrs -%}
+                            {%- set fl = (achievement_attrs.get('family_levels') or []) | map('float', 0) | list -%}
+                            {%- set fcnt = fl | length -%}
+                            {%- set flv = achievement_attrs.get('family_level', 0) | int(0) -%}
+                            {%- set ftot = achievement_attrs.get('family_total', 0) | float(0) | round(0) | int -%}
+                            {%- set fnx = achievement_attrs.get('family_next_target', 0) | float(0) -%}
+                            {%- set ftg = (fnx if fnx > 0 else (achievement_attrs.get('target_value', 0) | float(0))) | round(0) | int -%}
+                            {%- set frw = achievement_attrs.get('family_next_reward', 0) | float(0) | round(0) | int -%}
+                            {%- set fraw = fcnt > 0 and flv >= fcnt -%}
+                            {%- set fdn = fraw and ftot >= ((fl | last) | float(0)) -%}
+                            {%- set felv = (fcnt - 1) if (fraw and not fdn) else flv -%}
+                            {%- set fwt = ((fl | last) if (fdn and fcnt > 0) else ftg) | float(1) | round(0) | int -%}
+                            {%- set fpi = (felv - 1) if not fdn else (fcnt - 2) -%}
+                            {%- set fpv = ((fl[fpi] | round(0) | int) if (fcnt > 1 and fpi >= 0) else 0) -%}
+                            {%- set fsp = [fwt - fpv, 1] | max -%}
+                            {%- set fpc = (([[ftot - fpv, 0] | max, fsp] | min / fsp) * 100) | round(1) -%}
+                            {%- set fac = '#22c55e' if fdn else '#8b5cf6' -%}
+                            {%- set fac2 = '#86efac' if fdn else '#ec4899' -%}
+                            {%- set fnm = (achievement_attrs.get('achievement_name') or achievement.get('name') or ui.get('achievements', 'err-achievements')) | string | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set fpp = namespace(v='') -%}
+                            {%- if fcnt > 1 -%}
+                              {%- for lv in fl -%}
+                                {%- set fpp.v = fpp.v ~ "<div style='flex:1;height:4px;border-radius:999px;background:" ~ ('#22c55e' if loop.index <= felv else ('#8b5cf6' if loop.index == felv + 1 else 'var(--divider-color)')) ~ ";'></div>" -%}
+                              {%- endfor -%}
+                            {%- endif -%}
+                            {%- set fchip = ('✓ ALL ' ~ fcnt if fdn else 'LV ' ~ (felv + 1) ~ '/' ~ fcnt) if fcnt > 1 else '' -%}
+                            {%- set fsub = ('🎉 All levels complete' if fdn else '') ~ ('' if fdn else '<b style="color:' ~ fac ~ ';">' ~ ([ftg - ftot, 0] | max) ~ ' to go</b>' ~ (' · +' ~ frw ~ ' ⭐' if frw > 0 else '')) -%}
+                            {%- set achievement_ns.count = achievement_ns.count + 1 -%}
+                            {%- set achievement_ns.rows_html = achievement_ns.rows_html ~ "<div style='margin-top:10px;'><div style='display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:700;'><span style='display:flex;align-items:center;gap:6px;min-width:0;'><span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--primary-text-color);'>" ~ fnm ~ "</span>" ~ ("<span style='font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 6px;border-radius:999px;background:" ~ fac ~ "26;color:" ~ fac ~ ";white-space:nowrap;'>" ~ fchip ~ "</span>" if fchip else '') ~ "</span><span style='font-size:12px;white-space:nowrap;color:" ~ fac ~ ";'>" ~ ftot ~ ' / ' ~ fwt ~ "</span></div>"
+                              ~ ("<div style='display:flex;gap:3px;margin-top:5px;'>" ~ fpp.v ~ "</div>" if fcnt > 1 else '')
+                              ~ "<div style='margin-top:4px;height:8px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='width:" ~ fpc ~ "%;min-width:" ~ ('8px' if fpc > 0 else '0') ~ ";height:100%;background:linear-gradient(90deg," ~ fac ~ "," ~ fac2 ~ ");border-radius:999px;'></div></div>"
+                              ~ "<div style='display:flex;justify-content:space-between;margin-top:3px;font-size:10px;font-weight:700;color:var(--secondary-text-color);'><span>" ~ fpv ~ "</span><span>" ~ fsub ~ "</span><span>" ~ fwt ~ "</span></div></div>" -%}
+                          {%- endif -%}
                           {%- set achievement_awarded_raw = achievement_attrs.get('awarded', false) -%}
                           {%- set achievement_awarded = achievement_awarded_raw if achievement_awarded_raw is boolean else (achievement_awarded_raw | string | lower) == 'true' -%}
                           {%- set achievement_target = achievement_attrs.get('target_value', 0) | int(default=0) -%}
@@ -611,7 +645,7 @@ views:
                             {%- set achievement_progress_clamped = achievement_target -%}
                           {%- endif -%}
                           {%- set achievement_pct = ((achievement_progress_clamped / achievement_target) * 100) | round(0) | int if achievement_target > 0 else 0 -%}
-                          {%- if not achievement_awarded and achievement_target > 0 -%}
+                          {%- if 'family_total' not in achievement_attrs and not achievement_awarded and achievement_target > 0 -%}
                             {%- set achievement_name = ((achievement_attrs.get('achievement_name') or achievement.get('name') or state_attr(achievement_eid, 'friendly_name') or ui.get('achievements', 'err-achievements')) | string | trim) -%}
                             {%- set achievement_name_safe = achievement_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set achievement_icon = (achievement_attrs.get('icon') or 'mdi:trophy') | string -%}
