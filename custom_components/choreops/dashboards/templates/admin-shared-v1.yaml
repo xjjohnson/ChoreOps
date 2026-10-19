@@ -2221,13 +2221,23 @@ views:
                 {%- set has_chore_selector = chore_select_entity not in ['', None, 'None'] -%}
                 {%- set has_selected_chore = has_selected_dashboard_helper and has_chore_selector and selected_chore_name not in ['None', 'none', '', 'unknown', 'unavailable'] -%}
                 {%- set selected_chore_is_unassigned = has_selected_chore and selected_chore_name is string and selected_chore_name.startswith('⊘ ') -%}
-                {%- set selected_chore_core_name = (
-                  selected_chore_name.removeprefix('⊘ ').split(' (')[0]
-                  if selected_chore_is_unassigned
-                  else selected_chore_name.split(' (')[0]
-                  if has_selected_chore
-                  else ''
-                ) -%}
+                {#-- Chore names can contain parentheses themselves, e.g. "Evening tidy-up (10 min)".
+                     Only a trailing "(Name, Name)" group made of real user names is the assignee suffix. --#}
+                {%- set known_users = namespace(n=[]) -%}
+                {%- for kh in helper_sensor_entities -%}
+                  {%- set known_users.n = known_users.n + [(kh.attributes.get('user_name') or kh.name) | string] -%}
+                {%- endfor -%}
+                {%- macro chore_core(option, users) -%}
+                  {%- set cb = option | string -%}
+                  {%- if cb.startswith('⊘ ') -%}{%- set cb = cb[2:] -%}{%- endif -%}
+                  {%- set ci = cb.rfind(' (') -%}
+                  {%- if ci > 0 and cb.endswith(')') and (cb[ci + 2:-1].split(', ') | reject('in', users) | list | length) == 0 -%}
+                    {{- cb[:ci] -}}
+                  {%- else -%}
+                    {{- cb -}}
+                  {%- endif -%}
+                {%- endmacro -%}
+                {%- set selected_chore_core_name = (chore_core(selected_chore_name, known_users.n) | string | trim) if has_selected_chore else '' -%}
                 {%- set selected_chore_display = selected_chore_core_name if has_selected_chore else '' -%}
                 {%- set helper_chore_items_ns = namespace(items=state_attr(selected_dashboard_helper, 'chores') | default([], true) if has_selected_dashboard_helper else []) -%}
                 {%- set selected_chore_helper_eids = selected_dashboard_helpers.get('chore_helper_eids', []) if has_selected_dashboard_helper and selected_dashboard_helpers is mapping else [] -%}
@@ -3958,7 +3968,7 @@ views:
                         'show_label': False,
                         'show_state': False,
                         'icon': 'mdi:clipboard-search-outline',
-                        'name': ui.get('select_chore_to_manage', 'err-select_chore_to_manage'),
+                        'name': ui.get('viewing_selected_chore', 'Viewing selected chore'),
                         'tap_action': {'action': 'more-info'},
                         'custom_fields': {
                           'action': {
@@ -4071,10 +4081,11 @@ views:
                         'entity': chore_select_entity,
                         'show_name': True,
                         'show_icon': True,
-                        'show_label': False,
+                        'show_label': True,
                         'show_state': False,
                         'icon': 'mdi:clipboard-search-outline',
-                        'name': ui.get('select_chore_to_manage', 'err-select_chore_to_manage'),
+                        'name': selected_chore_display,
+                        'label': (('Not assigned to ' ~ (selected_user_name | e) ~ '. Tap Assign to add it.') if selected_chore_is_unassigned else ('Could not load details for this chore.')),
                         'tap_action': {'action': 'more-info'},
                         'custom_fields': {
                           'action': {
@@ -4139,9 +4150,9 @@ views:
                             {'background-color': 'var(--card-background-color)'}
                           ],
                           'grid': [
-                            {'grid-template-areas': '"i n action" "entity_select entity_select entity_select"'},
+                            {'grid-template-areas': '"i n action" "i l action" "entity_select entity_select entity_select"'},
                             {'grid-template-columns': '26px minmax(0, 1fr) min-content'},
-                            {'grid-template-rows': 'min-content min-content'},
+                            {'grid-template-rows': 'min-content min-content min-content'},
                             {'column-gap': '10px'},
                             {'row-gap': '3px'},
                             {'align-items': 'center'}
@@ -4158,6 +4169,7 @@ views:
                             {'font-weight': '700'},
                             {'line-height': '1.2'}
                           ],
+                          'label': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'color': 'var(--secondary-text-color)'}, {'white-space': 'normal'}],
                           'custom_fields': {
                             'action': [
                               {'justify-self': 'end'},
@@ -4181,7 +4193,7 @@ views:
                     {%- set cp_cards = namespace(items=[]) -%}
                     {%- for cp_opt in cp_show -%}
                       {%- set cp_off = cp_opt.startswith('⊘ ') -%}
-                      {%- set cp_core = cp_opt.removeprefix('⊘ ').split(' (')[0] | trim -%}
+                      {%- set cp_core = chore_core(cp_opt, known_users.n) | string | trim -%}
                       {%- set cp_row = namespace(state='', eid='') -%}
                       {%- for cp_item in helper_chore_items -%}
                         {%- if cp_row.eid == '' and (cp_item.name | default('', true) | string | trim) == cp_core -%}

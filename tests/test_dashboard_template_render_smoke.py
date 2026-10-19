@@ -941,6 +941,73 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
     assert "err-" not in grid["cards"][2]["label"] or "Not assigned" in grid["cards"][2]["label"]
 
 
+def _render_chore_management(selected: str, options: list[str], items, state="pending"):
+    template = _get_admin_filter_template(
+        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
+    )
+    mock_states = _base_admin_chore_management_states(
+        selected_user_name="Alice",
+        selected_dashboard_helper="sensor.alice_dashboard_helper",
+        chore_selector_state=selected,
+        chore_items=items,
+        chore_sensor_state=state,
+        selected_user_ui_control={
+            "admin-shared": {"chore-management": {"header-collapse": False}}
+        },
+        chore_select_options=options,
+    )
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
+    env.globals["as_timestamp"] = lambda v: 0
+    output = env.from_string(template).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    return yaml.safe_load(f"[{output}]")
+
+
+def test_admin_chore_names_with_parentheses_still_resolve() -> None:
+    """A chore called "Evening tidy-up (10 min)" keeps its own parentheses and
+    only the trailing list of user names is treated as the assignee suffix."""
+
+    items = [
+        {"name": "Evening tidy-up (10 min)", "eid": "sensor.alice_chore_eve", "state": "pending"},
+        {"name": "Plain (10 min)", "eid": "sensor.alice_chore_plain", "state": "overdue"},
+    ]
+    options = [
+        "None",
+        "Evening tidy-up (10 min) (Alice)",
+        "Plain (10 min)",
+    ]
+    picker = _render_chore_management("None", options, items)
+    chips = picker[0]["cards"][1]["cards"]
+    assert [c["name"] for c in chips] == ["Evening tidy-up (10 min)", "Plain (10 min)"]
+    assert all(c["label"].strip() for c in chips)
+    assert chips[0]["tap_action"]["data"]["option"] == "Evening tidy-up (10 min) (Alice)"
+
+    detail = _render_chore_management(
+        "Evening tidy-up (10 min) (Alice)", options, items
+    )
+    overview = detail[0]["custom_fields"]["overview"]["card"]
+    assert overview["entity"] == "sensor.alice_chore_eve"
+    assert overview["name"] == "Evening tidy-up (10 min)"
+    assert detail[0]["name"] == "Viewing selected chore"
+
+
+def test_admin_unassigned_chore_explains_why_there_are_no_details() -> None:
+    """Picking a chore that is not assigned to the person says so."""
+
+    items = [{"name": "Feed Dog", "eid": "sensor.alice_chore_dog", "state": "pending"}]
+    unassigned = _render_chore_management(
+        "⊘ Mow lawn", ["None", "Feed Dog (Alice)", "⊘ Mow lawn"], items
+    )
+    assert unassigned[0]["name"] == "Mow lawn"
+    assert "Not assigned to Alice" in unassigned[0]["label"]
+
+
 def test_admin_chore_picker_caps_chips_and_offers_show_all() -> None:
     """Long chore lists show eight chips plus a Show all chip."""
 
