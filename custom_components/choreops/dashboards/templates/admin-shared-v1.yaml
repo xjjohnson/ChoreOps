@@ -1693,7 +1693,6 @@ views:
                 {%- set qa_paused_until = state_attr(selected_dashboard_helper, 'chores_paused_until') -%}
                 {%- set qa_gam = state_attr(selected_dashboard_helper, 'gamification_enabled') | default(false, true) -%}
                 {%- set qa_pbuttons = (state_attr(selected_dashboard_helper, 'points_buttons') | default([], true)) if qa_user_ok else [] -%}
-                {%- set qa_notify = ((state_attr(selected_dashboard_helper, 'notify_service') or '') | string | trim) if qa_user_ok else '' -%}
                 {%- set qa_badges = (state_attr(selected_dashboard_helper, 'badges') | default([], true)) if qa_user_ok else [] -%}
                 {%- set qa_specs = namespace(items=[]) -%}
 
@@ -1757,9 +1756,9 @@ views:
                     ,{
                       'icon': 'mdi:chart-box-outline',
                       'name': 'Activity report',
-                      'label': ('Send to ' ~ qa_notify) if qa_notify else 'Set a notify service in settings',
+                      'label': 'Posts to the bell' if qa_user_ok else 'Pick a person first',
                       'color': 'var(--primary-color)',
-                      'tap': ({'action': 'call-service', 'service': 'choreops.generate_activity_report', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'notify_service': qa_notify}, 'confirmation': {'text': 'Send the last 7 days of activity for ' ~ selected_user_name ~ ' to ' ~ qa_notify ~ '?'}} if qa_notify else {'action': 'url', 'url_path': '/config/integrations/integration/choreops'})
+                      'tap': {'action': 'call-service', 'service': 'choreops.generate_activity_report', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'report_title': 'Activity report: ' ~ selected_user_name, 'notify_service': 'persistent_notification.create'}, 'confirmation': {'text': 'Post the last 7 days of activity for ' ~ selected_user_name ~ ' to the Home Assistant notifications bell?'}} if qa_user_ok else {'action': 'none'}
                     }
                   ] -%}
                 {%- elif qa_tab == 'system' -%}

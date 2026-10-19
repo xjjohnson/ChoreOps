@@ -5662,9 +5662,6 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             "pending_approvals": pending_approvals,
             "recent_activity": self._build_recent_activity(assignee_info),
             "caught_up_streak": self._build_caught_up_streak(assignee_info),
-            "notify_service": str(
-                assignee_info.get(const.DATA_USER_MOBILE_NOTIFY_SERVICE) or ""
-            ).strip(),
             "core_sensors": core_sensors,
             const.ATTR_DASHBOARD_CONFIG: dashboard_config,
             "dashboard_helpers": dashboard_helpers,
