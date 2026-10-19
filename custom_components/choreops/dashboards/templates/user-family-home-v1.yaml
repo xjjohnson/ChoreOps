@@ -15,6 +15,7 @@
 views:
 - title: Home
   path: home
+  max_columns: 3
   sections:
     - type: grid
       cards:
@@ -27,7 +28,117 @@ views:
           card:
             type: grid
             square: false
-            columns: 2
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== SUMMARY + OPSCENTER ===== --#}
+              {%- set pref_dashboard_path = '' -%}  {#-- Optional: dashboard URL path (for example 'dashboard-choreops'). Leave empty to use paths relative to this dashboard. --#}
+              {%- set helpers = integration_entities('choreops')
+                | select('search', '^sensor\\.')
+                | list
+                | expand
+                | selectattr('attributes.purpose', 'defined')
+                | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+                | list -%}
+              {%- set pref_users = << home.user_names >> -%}
+              {%- if pref_users | length > 0 -%}
+                {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
+              {%- endif -%}
+              {%- set t = namespace(over=0, due=0, worst='', worst_n=0, pending_c=0, pending_r=0, people=0) -%}
+              {%- for h in helpers -%}
+                {%- set ha = h.attributes -%}
+                {%- set uname = (ha.get('user_name') or '') | string -%}
+                {%- if uname == '' -%}{%- continue -%}{%- endif -%}
+                {%- set total_sensor = (ha.get('core_sensors') or {}).get('chores_eid') -%}
+                {%- set o = (state_attr(total_sensor, 'chore_stat_current_overdue') | int(default=0)) if total_sensor else 0 -%}
+                {%- set d = (state_attr(total_sensor, 'chore_stat_current_due_today') | int(default=0)) if total_sensor else 0 -%}
+                {%- set t.over = t.over + o -%}
+                {%- set t.due = t.due + d -%}
+                {%- set t.people = t.people + 1 -%}
+                {%- if o > t.worst_n -%}
+                  {%- set t.worst = uname -%}{%- set t.worst_n = o -%}
+                {%- endif -%}
+                {%- set pa = ha.get('pending_approvals') or {} -%}
+                {%- set t.pending_c = t.pending_c + ((pa.get('chores') or []) | length if pa is mapping else 0) -%}
+                {%- set t.pending_r = t.pending_r + ((pa.get('rewards') or []) | length if pa is mapping else 0) -%}
+              {%- endfor -%}
+              {%- if t.people > 0 -%}
+                {%- if t.over > 0 -%}
+                  {%- set col = 'var(--error-color)' -%}{%- set ic = 'mdi:alert-octagon' -%}
+                  {%- set head = (t.due | string) ~ ' due today · ' ~ (t.over | string) ~ ' overdue' -%}
+                  {%- set sub = 'Most overdue: ' ~ (t.worst | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ ' (' ~ (t.worst_n | string) ~ ')' -%}
+                {%- elif t.due > 0 -%}
+                  {%- set col = 'var(--warning-color)' -%}{%- set ic = 'mdi:calendar-clock' -%}
+                  {%- set head = (t.due | string) ~ ' due today' -%}
+                  {%- set sub = 'Nothing overdue' -%}
+                {%- else -%}
+                  {%- set col = 'var(--success-color)' -%}{%- set ic = 'mdi:check-circle' -%}
+                  {%- set head = 'All caught up' -%}
+                  {%- set sub = 'Nothing due or overdue right now' -%}
+                {%- endif -%}
+                {%- set html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><ha-icon icon='" ~ ic ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ col ~ ";flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;'>" ~ head ~ "</div><div style='font-size:11px;opacity:.7;'>" ~ sub ~ "</div></div></div>" -%}
+                {%- set bcol = 'color-mix(in srgb,' ~ col ~ ' 45%, var(--divider-color))' -%}
+                {%- set bg = 'color-mix(in srgb,' ~ col ~ ' 10%, var(--card-background-color))' -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': ({'action': 'navigate', 'navigation_path': ((('/' ~ pref_dashboard_path ~ '/') if pref_dashboard_path else '') ~ 'family-hub-' ~ (t.worst | slugify))} if t.worst != '' else {'action': 'none'}),
+                    'hold_action': {'action': 'none'},
+                    'custom_fields': {'content': html},
+                    'styles': {
+                      'card': [
+                        {'padding': '12px'},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'border': '1px solid ' ~ bcol},
+                        {'background': bg}
+                      ],
+                      'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                      'custom_fields': {'content': [{'width': '100%'}]}
+                    }
+                  }
+                }},
+                {%- set pend = t.pending_c + t.pending_r -%}
+                {%- if pend > 0 -%}
+                  {%- set col = 'var(--primary-color)' -%}
+                  {%- set parts = [] -%}
+                  {%- set head = 'OpsCenter' -%}
+                  {%- set sub = ((t.pending_c | string) ~ (' chore' if t.pending_c == 1 else ' chores')) ~ ((' · ' ~ (t.pending_r | string) ~ (' reward' if t.pending_r == 1 else ' rewards')) if t.pending_r > 0 else '') ~ ' waiting for approval' -%}
+                  {%- set html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><ha-icon icon='mdi:shield-check-outline' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ col ~ ";flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;'>" ~ head ~ "</div><div style='font-size:11px;opacity:.7;'>" ~ sub ~ "</div></div><span style='font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--error-color);color:#fff;'>" ~ (pend | string) ~ "</span></div>" -%}
+                  {%- set bcol = col -%}
+                  {%- set bg = 'color-mix(in srgb,' ~ col ~ ' 8%, var(--card-background-color))' -%}
+                  {{
+                    {
+                      'type': 'custom:button-card',
+                      'show_name': false,
+                      'show_icon': false,
+                      'tap_action': {'action': 'navigate', 'navigation_path': ((('/' ~ pref_dashboard_path ~ '/') if pref_dashboard_path else '') ~ 'admin')},
+                      'hold_action': {'action': 'none'},
+                      'custom_fields': {'content': html},
+                      'styles': {
+                      'card': [
+                        {'padding': '12px'},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'border': '1px solid ' ~ bcol},
+                        {'background': bg}
+                      ],
+                      'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                      'custom_fields': {'content': [{'width': '100%'}]}
+                    }
+                    }
+                  }},
+                {%- endif -%}
+              {%- endif -%}
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
           card_param: cards
           filter:
             template: |-
@@ -78,6 +189,28 @@ views:
                 {%- set nm = uname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                 {%- set rank_html = ("<span style='font-size:10px;background:var(--secondary-background-color);padding:2px 8px;border-radius:999px;border:1px solid var(--divider-color);display:inline-flex;align-items:center;gap:4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'><ha-icon icon='mdi:medal-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ rank ~ "</span>") if rank not in ['None', 'unknown', 'Unknown', 'unavailable'] else '' -%}
                 {%- set pts_html = ("<div style='display:inline-flex;align-items:center;gap:2px;color:var(--primary-color);font-size:15px;font-weight:800;white-space:nowrap;'><ha-icon icon='" ~ ((state_attr(points_sensor, 'icon') if points_sensor else none) or 'mdi:star-circle') ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;display:block;'></ha-icon>" ~ pts_txt ~ "</div>") if gam else '' -%}
+                {%- set fl = namespace(min=-1, daily=0) -%}
+                {%- set fl_items = namespace(l=(ha.get('chores') or [])) -%}
+                {%- set fl_shards = (ha.get('dashboard_helpers') or {}).get('chore_helper_eids', []) -%}
+                {%- if fl_shards is iterable and fl_shards is not string -%}
+                  {%- for fs in fl_shards | list -%}
+                    {%- if fs not in ['', none, 'None'] and states(fs) not in ['unknown', 'unavailable'] -%}
+                      {%- set fl_items.l = fl_items.l + (state_attr(fs, 'chores') | default([], true)) -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                {%- endif -%}
+                {%- for ci in fl_items.l -%}
+                  {%- set ce = ci.get('eid') if ci is mapping else none -%}
+                  {%- if ce and (state_attr(ce, 'recurring_frequency') | string | lower) == 'daily' -%}
+                    {%- set cs = state_attr(ce, 'chore_current_streak') | int(0) -%}
+                    {%- set fl.daily = fl.daily + 1 -%}
+                    {%- if fl.min < 0 or cs < fl.min -%}{%- set fl.min = cs -%}{%- endif -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {%- set fl_days = fl.min if (fl.daily > 0 and fl.min > 0) else 0 -%}
+                {%- set fl_open = (overdue + due) > 0 -%}
+                {%- set fl_col = 'var(--secondary-text-color)' if fl_open else 'var(--warning-color)' -%}
+                {%- set flame_html = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:" ~ fl_col ~ ";background:color-mix(in srgb," ~ fl_col ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='mdi:fire' style='width:12px;height:12px;--mdc-icon-size:12px;'></ha-icon>" ~ (fl_days | string) ~ (' days' if fl_days != 1 else ' day') ~ "</span>") if fl_days >= 2 else '' -%}
                 {%- set html = "<div style='width:100%;text-align:left;position:relative;'>"
                   ~ "<div style='display:flex;align-items:center;gap:8px;'>"
                   ~ "<div style='width:36px;height:36px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex:0 0 auto;'>" ~ (nm[:1] | upper) ~ "</div>"
@@ -86,6 +219,7 @@ views:
                   ~ pts_html ~ "</div>"
                   ~ "<div style='display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px;margin-top:8px;'>" ~ rank_html
                   ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:" ~ sc ~ ";background:color-mix(in srgb," ~ sc ~ " 14%,transparent);padding:2px 8px;border-radius:999px;'><ha-icon icon='" ~ si ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ st ~ "</span></div>"
+                  ~ flame_html
                   ~ "</div>" -%}
                 {{
                   {
@@ -112,6 +246,77 @@ views:
                   }
                 }},
               {%- endfor -%}
+    - type: grid
+      cards:
+        - type: heading
+          heading: This week
+          heading_style: title
+          icon: mdi:podium
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== WEEKLY LEADERBOARD ===== --#}
+              {%- set pref_dashboard_path = '' -%}  {#-- Optional: dashboard URL path (for example 'dashboard-choreops'). Leave empty to use paths relative to this dashboard. --#}
+              {%- set helpers = integration_entities('choreops')
+                | select('search', '^sensor\\.')
+                | list
+                | expand
+                | selectattr('attributes.purpose', 'defined')
+                | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+                | list -%}
+              {%- set pref_users = << home.user_names >> -%}
+              {%- if pref_users | length > 0 -%}
+                {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
+              {%- endif -%}
+              {%- set lb = namespace(rows=[], top=0) -%}
+              {%- for h in helpers -%}
+                {%- set ha = h.attributes -%}
+                {%- set uname = (ha.get('user_name') or '') | string -%}
+                {%- if uname == '' -%}{%- continue -%}{%- endif -%}
+                {%- set total_sensor = (ha.get('core_sensors') or {}).get('chores_eid') -%}
+                {%- set wk = (state_attr(total_sensor, 'chore_stat_points_week') | float(default=0)) if total_sensor else 0 -%}
+                {%- set lb.rows = lb.rows + [{'name': uname, 'pts': wk}] -%}
+                {%- if wk > lb.top -%}{%- set lb.top = wk -%}{%- endif -%}
+              {%- endfor -%}
+              {%- if lb.rows | length > 0 -%}
+                {%- set rows_html = namespace(v='') -%}
+                {%- for r in lb.rows | sort(attribute='pts', reverse=true) -%}
+                  {%- set nm = r.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                  {%- set pct = ((r.pts / lb.top * 100) | round(0) | int) if lb.top > 0 else 0 -%}
+                  {%- set crown = '&#128081;' if (loop.first and r.pts > 0) else '' -%}
+                  {%- set rows_html.v = rows_html.v ~ "<div style='display:flex;align-items:center;gap:8px;margin-top:8px;'><span style='width:18px;font-size:14px;text-align:center;'>" ~ crown ~ "</span><span style='width:28px;height:28px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;'>" ~ (r.name[:1] | upper) ~ "</span><span style='width:64px;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</span><div style='flex:1;height:9px;border-radius:99px;background:var(--divider-color);overflow:hidden;'><div style='height:100%;width:" ~ (pct | string) ~ "%;border-radius:99px;background:" ~ ('var(--warning-color)' if (loop.first and r.pts > 0) else 'var(--primary-color)') ~ ";'></div></div><span style='width:40px;text-align:right;font-size:12px;font-weight:800;'>" ~ ('%g' | format(r.pts | round(1))) ~ "</span></div>" -%}
+                {%- endfor -%}
+                {%- set html = "<div style='width:100%;text-align:left;'><div style='display:flex;align-items:center;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'>Points earned</div></div>" ~ rows_html.v ~ "</div>" -%}
+                {%- set bcol = 'var(--divider-color)' -%}
+                {%- set bg = 'var(--card-background-color)' -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'none'},
+                    'hold_action': {'action': 'none'},
+                    'custom_fields': {'content': html},
+                    'styles': {
+                      'card': [
+                        {'padding': '12px'},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'border': '1px solid ' ~ bcol},
+                        {'background': bg}
+                      ],
+                      'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                      'custom_fields': {'content': [{'width': '100%'}]}
+                    }
+                  }
+                }},
+              {%- endif -%}
         - type: heading
           heading: Family Goals
           heading_style: title
@@ -219,6 +424,8 @@ views:
                   }
                 }},
               {%- endfor -%}
+    - type: grid
+      cards:
         - type: heading
           heading: Family Achievements
           heading_style: title

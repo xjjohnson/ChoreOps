@@ -1542,22 +1542,27 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
 
     assert view["path"] == "home"
     assert view["title"] == "Home"
-    cards = view["sections"][0]["cards"]
-    assert [c["type"] for c in cards] == [
-        "heading",
-        "custom:auto-entities",
-        "heading",
-        "custom:auto-entities",
-        "heading",
-        "custom:auto-entities",
+    assert view["max_columns"] == 3
+    types = [[c["type"] for c in sec["cards"]] for sec in view["sections"]]
+    assert types == [
+        ["heading", "custom:auto-entities", "custom:auto-entities"],
+        ["heading", "custom:auto-entities", "heading", "custom:auto-entities"],
+        ["heading", "custom:auto-entities"],
     ]
     env = jinja2.Environment(extensions=["jinja2.ext.loopcontrols"])
-    for card in cards:
-        if card["type"] == "custom:auto-entities":
-            env.parse(card["filter"]["template"])
-    assert "family-hub-" in cards[1]["filter"]["template"]
-    assert '["Dad", "Lily"]' in cards[1]["filter"]["template"]
-    assert '["Dad", "Lily"]' in cards[3]["filter"]["template"]
+    autos = [
+        c
+        for sec in view["sections"]
+        for c in sec["cards"]
+        if c["type"] == "custom:auto-entities"
+    ]
+    assert len(autos) == 5
+    for card in autos:
+        env.parse(card["filter"]["template"])
+        assert '["Dad", "Lily"]' in card["filter"]["template"] or "Achievements" in str(
+            card["filter"]["template"]
+        ) or "family_total" in card["filter"]["template"]
+    assert "family-hub-" in autos[1]["filter"]["template"]
     assert "user-family-home-v1" not in dh.get_assignee_template_ids()
     assert "user-family-home-v1" not in dh.get_admin_template_ids()
     assert dh.get_template_source_path("user-family-home-v1")
@@ -1733,3 +1738,113 @@ def test_admin_reward_pools_card_lists_pools_and_refund_actions() -> None:
         "config_entry_id": "entry-123",
         "reward_name": "Movie Night",
     }
+
+
+def _render_home_card(marker: str, mock_states: dict[str, _MockState]):
+    template_str = _read_template("user-family-home-v1.yaml")
+    view = builder._render_family_home_view(
+        template_str,
+        integration_entry_id="entry-123",
+        release_ref="0.0.1-beta.3",
+        release_version=None,
+        generated_at="2026-10-19T00:00:00+00:00",
+        root_button_card_templates={},
+        user_names=["Dad", "Lily"],
+    )
+    tpl = next(
+        c["filter"]["template"]
+        for sec in view["sections"]
+        for c in sec["cards"]
+        if c["type"] == "custom:auto-entities" and marker in c["filter"]["template"]
+    )
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    env.add_extension("jinja2.ext.loopcontrols")
+    env.filters["slugify"] = lambda v: str(v).lower().replace(" ", "_")
+    env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 19, 12, 0)
+    env.filters["round"] = env.filters["round"]
+    output = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    return yaml.safe_load(f"[{output}]")
+
+
+def _home_states() -> dict[str, _MockState]:
+    def helper(name, over, due, week, streak_daily):
+        slug = name.lower()
+        return {
+            f"sensor.{slug}_helper": _MockState(
+                entity_id=f"sensor.{slug}_helper",
+                state="ok",
+                attributes={
+                    "purpose": "purpose_dashboard_helper",
+                    "user_name": name,
+                    "core_sensors": {
+                        "points_eid": f"sensor.{slug}_points",
+                        "chores_eid": f"sensor.{slug}_chores",
+                        "badges_eid": None,
+                    },
+                    "dashboard_helpers": {},
+                    "chores": [{"eid": f"sensor.{slug}_chore_daily"}],
+                    "pending_approvals": {
+                        "chores": [{"chore_name": "Dishes"}] if name == "Dad" else [],
+                        "rewards": [],
+                    },
+                    "gamification_enabled": True,
+                },
+                name=name,
+            ),
+            f"sensor.{slug}_points": _MockState(
+                entity_id=f"sensor.{slug}_points", state="100", attributes={}, name="p"
+            ),
+            f"sensor.{slug}_chores": _MockState(
+                entity_id=f"sensor.{slug}_chores",
+                state="1",
+                attributes={
+                    "chore_stat_current_overdue": over,
+                    "chore_stat_current_due_today": due,
+                    "chore_stat_points_week": week,
+                },
+                name="c",
+            ),
+            f"sensor.{slug}_chore_daily": _MockState(
+                entity_id=f"sensor.{slug}_chore_daily",
+                state="pending",
+                attributes={
+                    "recurring_frequency": "daily",
+                    "chore_current_streak": streak_daily,
+                },
+                name="d",
+            ),
+        }
+
+    states = {}
+    states.update(helper("Dad", 2, 1, 58, 0))
+    states.update(helper("Lily", 0, 0, 145, 12))
+    return states
+
+
+def test_family_home_summary_leaderboard_and_streak_cards() -> None:
+    """Home shows the due-soon line, OpsCenter card, leaderboard and streak chip."""
+
+    states = _home_states()
+    summary = _render_home_card("SUMMARY + OPSCENTER", states)
+    assert len(summary) == 2
+    assert "2 overdue" in summary[0]["custom_fields"]["content"]
+    assert summary[0]["tap_action"]["navigation_path"].endswith("family-hub-dad")
+    assert "OpsCenter" in summary[1]["custom_fields"]["content"]
+    assert summary[1]["tap_action"]["navigation_path"].endswith("admin")
+
+    board = _render_home_card("WEEKLY LEADERBOARD", states)
+    html = board[0]["custom_fields"]["content"]
+    assert html.index("Lily") < html.index("Dad")
+    assert "145" in html and "58" in html
+
+    people = _render_home_card("PERSON CARDS", states)
+    lily = next(c for c in people if "Lily" in c["custom_fields"]["content"])
+    dad = next(c for c in people if "Dad" in c["custom_fields"]["content"])
+    assert "12 days" in lily["custom_fields"]["content"]
+    assert "mdi:fire" not in dad["custom_fields"]["content"]
