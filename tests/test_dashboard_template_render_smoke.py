@@ -1559,23 +1559,25 @@ def test_user_family_hub_template_renders_without_parse_errors() -> None:
     assert "chore_row_timeline_v1" in rendered["button_card_templates"]
 
 
-def test_admin_family_home_template_renders_without_parse_errors() -> None:
+def test_user_family_home_template_renders_without_parse_errors() -> None:
     """Family Home template renders to one view with person, goals and achievements cards."""
     import jinja2
 
-    template_str = _read_template("admin-family-home-v1.yaml")
-    context = dh.build_admin_dashboard_context(
+    template_str = _read_template("user-family-home-v1.yaml")
+    context = dh.build_dashboard_context(
+        "Zoe",
+        assignee_id="user-123",
         integration_entry_id="entry-123",
-        template_profile="admin-family-home-v1",
+        template_profile="user-family-home-v1",
         release_ref="0.0.1-beta.3",
         generated_at="2026-10-19T00:00:00+00:00",
     )
 
-    rendered = builder.render_dashboard_template(template_str, context)
+    rendered = builder.render_dashboard_template(template_str, dict(context))
 
     assert len(rendered["views"]) == 1
     view = rendered["views"][0]
-    assert view["path"] == "home"
+    assert view["path"] == "home-zoe"
     cards = view["sections"][0]["cards"]
     assert [c["type"] for c in cards] == [
         "heading",
