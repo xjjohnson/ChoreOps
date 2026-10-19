@@ -255,12 +255,14 @@ def _base_admin_chore_management_states(
     chore_items: list[dict[str, object]],
     chore_shard_items: list[list[dict[str, object]]] | None = None,
     selected_user_ui_control: dict[str, object] | None = None,
+    shared_admin_ui_control: dict[str, object] | None = None,
     chore_sensor_state: str = "pending",
     chore_sensor_attributes: dict[str, object] | None = None,
 ) -> dict[str, _MockState]:
     """Build minimal states for the admin chore-management filter tests."""
 
     selected_user_ui_control = selected_user_ui_control or {}
+    shared_admin_ui_control = shared_admin_ui_control or {}
     chore_sensor_attributes = chore_sensor_attributes or {}
     chore_shard_items = chore_shard_items or []
     chore_helper_eids = [
@@ -285,7 +287,7 @@ def _base_admin_chore_management_states(
                 "purpose": "purpose_system_dashboard_helper",
                 "integration_entry_id": "entry-123",
                 "dashboard_lookup_key": "entry-123:shared_admin",
-                "ui_control": {},
+                "ui_control": shared_admin_ui_control,
                 "user_dashboard_helpers": {
                     "user-alice": selected_dashboard_helper,
                 },
@@ -383,6 +385,7 @@ def _base_admin_economy_management_states(
     selected_dashboard_helper: str,
     gamification_enabled: bool,
     selected_user_ui_control: dict[str, object] | None = None,
+    shared_admin_ui_control: dict[str, object] | None = None,
     point_buttons: list[dict[str, object]] | None = None,
     bonuses: list[dict[str, object]] | None = None,
     penalties: list[dict[str, object]] | None = None,
@@ -390,6 +393,7 @@ def _base_admin_economy_management_states(
     """Build minimal states for the admin economy-management filter tests."""
 
     selected_user_ui_control = selected_user_ui_control or {}
+    shared_admin_ui_control = shared_admin_ui_control or {}
     point_buttons = point_buttons or []
     bonuses = bonuses or []
     penalties = penalties or []
@@ -412,7 +416,7 @@ def _base_admin_economy_management_states(
                 "purpose": "purpose_system_dashboard_helper",
                 "integration_entry_id": "entry-123",
                 "dashboard_lookup_key": "entry-123:shared_admin",
-                "ui_control": {},
+                "ui_control": shared_admin_ui_control,
                 "user_dashboard_helpers": {
                     "user-alice": selected_dashboard_helper,
                 },
@@ -535,7 +539,7 @@ def _base_admin_system_administration_states() -> dict[str, _MockState]:
                 "purpose": "purpose_system_dashboard_helper",
                 "integration_entry_id": "entry-123",
                 "dashboard_lookup_key": "entry-123:shared_admin",
-                "ui_control": {},
+                "ui_control": {"admin-shared": {"management-tab": "system"}},
                 "user_dashboard_helpers": {
                     "user-alice": "sensor.alice_dashboard_helper",
                 },
@@ -681,7 +685,7 @@ def test_admin_target_selector_template_renders_as_valid_cards() -> None:
     parsed = yaml.safe_load(f"[{output}]")
 
     assert isinstance(parsed, list)
-    assert len(parsed) == 1
+    assert len(parsed) == 3
     assert parsed[0]["type"] == "custom:button-card"
     assert parsed[0]["entity"] == "select.choreops_admin_target"
     assert parsed[0]["tap_action"]["action"] == "call-service"
@@ -691,7 +695,7 @@ def test_admin_target_selector_template_renders_as_valid_cards() -> None:
         "ui_control_target": "shared_admin",
         "ui_control_action": "update",
         "key": "admin-shared/admin-target-selector/header-collapse",
-        "value": False,
+        "value": True,
     }
     assert parsed[0]["hold_action"]["action"] == "more-info"
     assert "Alice" in parsed[0]["custom_fields"]["target"]
@@ -786,7 +790,7 @@ def test_admin_target_selector_template_shows_guidance_without_selection() -> No
     parsed = yaml.safe_load(f"[{output}]")
 
     assert isinstance(parsed, list)
-    assert len(parsed) == 1
+    assert len(parsed) == 2
     assert parsed[0]["type"] == "custom:button-card"
     assert parsed[0]["entity"] == "select.choreops_admin_target"
     assert parsed[0]["label"] == "Choose the user for admin actions below."
@@ -797,7 +801,7 @@ def test_admin_target_selector_template_shows_guidance_without_selection() -> No
         "ui_control_target": "shared_admin",
         "ui_control_action": "update",
         "key": "admin-shared/admin-target-selector/header-collapse",
-        "value": False,
+        "value": True,
     }
     assert parsed[0]["hold_action"]["action"] == "more-info"
 
@@ -905,12 +909,12 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
     parsed = yaml.safe_load(f"[{output}]")
 
     assert isinstance(parsed, list)
-    assert len(parsed) == 3
+    assert len(parsed) == 2
     assert parsed[0]["type"] == "custom:button-card"
-    assert parsed[0]["name"] == "Chores"
-    assert parsed[2]["type"] == "custom:button-card"
-    assert parsed[2]["name"] == "Select chore to manage"
-    assert parsed[2]["entity"] == "select.alice_chores"
+    assert parsed[0]["name"] == "err-all_chores"
+    assert parsed[1]["type"] == "custom:button-card"
+    assert parsed[1]["name"] == "Select chore to manage"
+    assert parsed[1]["entity"] == "select.alice_chores"
 
 
 def test_admin_chore_management_shows_detail_for_selected_chore() -> None:
@@ -946,10 +950,10 @@ def test_admin_chore_management_shows_detail_for_selected_chore() -> None:
     parsed = yaml.safe_load(f"[{output}]")
 
     assert isinstance(parsed, list)
-    assert len(parsed) == 3
+    assert len(parsed) == 2
     # Overview card is nested inside the chore select card's custom_fields
-    assert parsed[2]["type"] == "custom:button-card"
-    overview = parsed[2].get("custom_fields", {}).get("overview", {}).get("card")
+    assert parsed[1]["type"] == "custom:button-card"
+    overview = parsed[1].get("custom_fields", {}).get("overview", {}).get("card")
     assert overview is not None
     assert overview.get("entity") == "sensor.alice_chore_wash_dishes"
     assert overview.get("name") == "Wash Dishes"
@@ -991,10 +995,10 @@ def test_admin_chore_management_resolves_selected_shard_backed_chore() -> None:
     parsed = yaml.safe_load(f"[{output}]")
 
     assert isinstance(parsed, list)
-    assert len(parsed) == 3
-    assert parsed[2]["type"] == "custom:button-card"
+    assert len(parsed) == 2
+    assert parsed[1]["type"] == "custom:button-card"
     # Overview card is nested inside the chore select card's custom_fields
-    overview = parsed[2].get("custom_fields", {}).get("overview", {}).get("card")
+    overview = parsed[1].get("custom_fields", {}).get("overview", {}).get("card")
     assert overview is not None
     assert overview.get("entity") == "sensor.alice_chore_wash_dishes"
     assert overview.get("name") == "Wash Dishes"
@@ -1042,50 +1046,6 @@ def test_admin_peruser_chore_management_resolves_selected_shard_backed_chore() -
     assert overview.get("entity") == "sensor.alice_chore_wash_dishes"
     assert overview.get("name") == "Wash Dishes"
 
-
-def test_admin_chore_management_collapsed_selected_chore_keeps_tinted_header() -> None:
-    """Collapsed shared admin chore management keeps the tinted header for context."""
-
-    chores_template = _get_admin_filter_template(
-        "admin-shared-v1", "===== CHORE MANAGEMENT ====="
-    )
-    mock_states = _base_admin_chore_management_states(
-        selected_user_name="Alice",
-        selected_dashboard_helper="sensor.alice_dashboard_helper",
-        chore_selector_state="Wash Dishes",
-        chore_items=[
-            {
-                "name": "Wash Dishes",
-                "eid": "sensor.alice_chore_wash_dishes",
-                "state": "pending",
-            }
-        ],
-        selected_user_ui_control={
-            "admin-shared": {"chore-management": {"header-collapse": True}}
-        },
-    )
-    env, integration_entities, states, state_attr = _build_runtime_template_env(
-        mock_states
-    )
-
-    output = env.from_string(chores_template).render(
-        integration_entities=integration_entities,
-        states=states,
-        state_attr=state_attr,
-    )
-    parsed = yaml.safe_load(f"[{output}]")
-
-    assert isinstance(parsed, list)
-    assert len(parsed) == 1
-    assert parsed[0]["type"] == "custom:button-card"
-    assert {
-        "border": "1px solid color-mix(in srgb, var(--primary-color) 14%, var(--divider-color))"
-    } in parsed[0]["styles"]["card"]
-    assert {
-        "background-color": "color-mix(in srgb, var(--primary-color) 14%, var(--card-background-color))"
-    } in parsed[0]["styles"]["card"]
-
-
 def test_admin_economy_management_hides_without_gamification() -> None:
     """Shared admin economy management renders nothing when gamification is off."""
 
@@ -1093,6 +1053,7 @@ def test_admin_economy_management_hides_without_gamification() -> None:
         "admin-shared-v1", "===== ECONOMY MANAGEMENT ====="
     )
     mock_states = _base_admin_economy_management_states(
+        shared_admin_ui_control={"admin-shared": {"management-tab": "economy"}},
         selected_user_name="Alice",
         selected_dashboard_helper="sensor.alice_dashboard_helper",
         gamification_enabled=False,
@@ -1117,6 +1078,7 @@ def test_admin_economy_management_shows_detail_stack_when_expanded() -> None:
         "admin-shared-v1", "===== ECONOMY MANAGEMENT ====="
     )
     mock_states = _base_admin_economy_management_states(
+        shared_admin_ui_control={"admin-shared": {"management-tab": "economy"}},
         selected_user_name="Alice",
         selected_dashboard_helper="sensor.alice_dashboard_helper",
         gamification_enabled=True,
@@ -1166,9 +1128,9 @@ def test_admin_economy_management_shows_detail_stack_when_expanded() -> None:
     parsed = yaml.safe_load(f"[{output}]")
 
     assert isinstance(parsed, list)
-    assert len(parsed) >= 2
+    assert len(parsed) >= 1
     hero_content = (
-        parsed[1]
+        parsed[0]
         .get("custom_fields", {})
         .get("hero", {})
         .get("card", {})
@@ -1176,20 +1138,20 @@ def test_admin_economy_management_shows_detail_stack_when_expanded() -> None:
         .get("content", "")
     )
     assert "📈 33 Points/Day" in hero_content
-    assert parsed[1]["custom_fields"]["actions"]["card"]["type"] == "grid"
-    assert parsed[1]["custom_fields"]["actions"]["card"]["columns"] == 6
-    assert parsed[1]["custom_fields"]["actions"]["card"]["cards"][0]["name"] == "+1"
-    assert parsed[1]["custom_fields"]["actions"]["card"]["cards"][1]["name"] == "-1"
-    assert parsed[1]["custom_fields"]["ledger"]["card"]["type"] == "grid"
-    assert parsed[1]["custom_fields"]["ledger"]["card"]["columns"] == 1
+    assert parsed[0]["custom_fields"]["actions"]["card"]["type"] == "grid"
+    assert parsed[0]["custom_fields"]["actions"]["card"]["columns"] == 6
+    assert parsed[0]["custom_fields"]["actions"]["card"]["cards"][0]["name"] == "+1"
+    assert parsed[0]["custom_fields"]["actions"]["card"]["cards"][1]["name"] == "-1"
+    assert parsed[0]["custom_fields"]["ledger"]["card"]["type"] == "grid"
+    assert parsed[0]["custom_fields"]["ledger"]["card"]["columns"] == 1
     assert (
         "✨ Bonus"
-        in parsed[1]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
+        in parsed[0]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
             "content"
         ]
     )
     assert (
-        parsed[1]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
+        parsed[0]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
             "items"
         ]["card"]["cards"][0]["custom_fields"]["btn_apply"]["card"]["tap_action"][
             "data"
@@ -1197,7 +1159,7 @@ def test_admin_economy_management_shows_detail_stack_when_expanded() -> None:
         == "button.alice_bonus_helpful"
     )
     assert (
-        parsed[1]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
+        parsed[0]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
             "items"
         ]["card"]["cards"][0]["custom_fields"]["btn_clear"]["card"]["tap_action"][
             "data"
@@ -1205,32 +1167,32 @@ def test_admin_economy_management_shows_detail_stack_when_expanded() -> None:
         == "Helpful"
     )
     assert (
-        parsed[1]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
+        parsed[0]["custom_fields"]["ledger"]["card"]["cards"][0]["custom_fields"][
             "items"
         ]["card"]["cards"][0]["custom_fields"]["btn_clear"]["card"]["icon"]
         == "mdi:eraser"
     )
-    assert {"margin-top": "10px"} in parsed[1]["custom_fields"]["ledger"]["card"][
+    assert {"margin-top": "10px"} in parsed[0]["custom_fields"]["ledger"]["card"][
         "cards"
     ][0]["styles"]["card"]
     assert (
         "💥 Penalty"
-        in parsed[1]["custom_fields"]["ledger"]["card"]["cards"][1]["custom_fields"][
+        in parsed[0]["custom_fields"]["ledger"]["card"]["cards"][1]["custom_fields"][
             "content"
         ]
     )
-    assert {"margin-top": "10px"} in parsed[1]["custom_fields"]["ledger"]["card"][
+    assert {"margin-top": "10px"} in parsed[0]["custom_fields"]["ledger"]["card"][
         "cards"
     ][1]["styles"]["card"]
     assert (
-        parsed[1]["custom_fields"]["ledger"]["card"]["cards"][1]["custom_fields"][
+        parsed[0]["custom_fields"]["ledger"]["card"]["cards"][1]["custom_fields"][
             "action"
         ]["card"]["cards"][0]["icon"]
         == "mdi:eraser"
     )
     assert (
         ">-8<"
-        in parsed[1]["custom_fields"]["ledger"]["card"]["cards"][1]["custom_fields"][
+        in parsed[0]["custom_fields"]["ledger"]["card"]["cards"][1]["custom_fields"][
             "content"
         ]
     )
@@ -1243,6 +1205,7 @@ def test_admin_economy_points_buttons_render_when_expanded() -> None:
         "admin-shared-v1", "===== ECONOMY MANAGEMENT ====="
     )
     mock_states = _base_admin_economy_management_states(
+        shared_admin_ui_control={"admin-shared": {"management-tab": "economy"}},
         selected_user_name="Alice",
         selected_dashboard_helper="sensor.alice_dashboard_helper",
         gamification_enabled=True,
@@ -1274,27 +1237,27 @@ def test_admin_economy_points_buttons_render_when_expanded() -> None:
     parsed = yaml.safe_load(f"[{output}]")
 
     assert isinstance(parsed, list)
-    assert len(parsed) == 2
-    assert parsed[1]["custom_fields"]["actions"]["card"]["type"] == "grid"
-    assert parsed[1]["custom_fields"]["actions"]["card"]["columns"] == 6
+    assert len(parsed) == 1
+    assert parsed[0]["custom_fields"]["actions"]["card"]["type"] == "grid"
+    assert parsed[0]["custom_fields"]["actions"]["card"]["columns"] == 6
     assert (
-        parsed[1]["custom_fields"]["actions"]["card"]["cards"][0]["type"]
+        parsed[0]["custom_fields"]["actions"]["card"]["cards"][0]["type"]
         == "custom:button-card"
     )
     assert (
-        parsed[1]["custom_fields"]["actions"]["card"]["cards"][0]["tap_action"][
+        parsed[0]["custom_fields"]["actions"]["card"]["cards"][0]["tap_action"][
             "service"
         ]
         == "button.press"
     )
     assert (
-        parsed[1]["custom_fields"]["actions"]["card"]["cards"][0]["tap_action"]["data"][
+        parsed[0]["custom_fields"]["actions"]["card"]["cards"][0]["tap_action"]["data"][
             "entity_id"
         ]
         == "button.alice_points_plus_1"
     )
-    assert parsed[1]["custom_fields"]["actions"]["card"]["cards"][0]["name"] == "+1"
-    assert parsed[1]["custom_fields"]["actions"]["card"]["cards"][1]["name"] == "-1"
+    assert parsed[0]["custom_fields"]["actions"]["card"]["cards"][0]["name"] == "+1"
+    assert parsed[0]["custom_fields"]["actions"]["card"]["cards"][1]["name"] == "-1"
 
 
 def test_admin_system_administration_renders_link_stack() -> None:

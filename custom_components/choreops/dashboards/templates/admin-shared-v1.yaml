@@ -891,7 +891,7 @@ views:
 
               {%- set pref_selector_ui_control_key_root = 'admin-shared/admin-target-selector' -%}
 
-              {%- set pref_selector_default_header_collapsed = true -%}
+              {%- set pref_selector_default_header_collapsed = false -%}
 
               {%- set pref_selector_primary_tint_mix_pct = 14 -%}
 
@@ -914,7 +914,7 @@ views:
                 {%- set pref_selector_ui_control_key_root_segments = ['admin-shared', 'admin-target-selector'] -%}
               {%- endif -%}
               {%- set pref_selector_ui_control_key_root = pref_selector_ui_control_key_root_segments | join('/') -%}
-              {%- set pref_selector_default_header_collapsed = (pref_selector_default_header_collapsed | default('true') | string | lower) == 'true' -%}
+              {%- set pref_selector_default_header_collapsed = (pref_selector_default_header_collapsed | default('false') | string | lower) == 'true' -%}
               {%- set pref_selector_primary_tint_mix_pct = pref_selector_primary_tint_mix_pct | int(default=14) -%}
               {%- set pref_selector_show_header_background = (pref_selector_show_header_background | default('true') | string | lower) == 'true' -%}
               {%- set pref_selector_show_header_thin_border = (pref_selector_show_header_thin_border | default('true') | string | lower) == 'true' -%}
@@ -999,16 +999,7 @@ views:
                       'ui_control_target': 'shared_admin',
                       'ui_control_action': 'update',
                       'key': ui_control_key_header_collapsed,
-                      'value': false
-                    }
-                  } if header_collapsed and integration_entry_id not in ['', none] else {
-                    'action': 'call-service',
-                    'service': 'choreops.manage_ui_control',
-                    'data': {
-                      'config_entry_id': integration_entry_id,
-                      'ui_control_target': 'shared_admin',
-                      'ui_control_action': 'remove',
-                      'key': ui_control_key_header_collapsed
+                      'value': not header_collapsed
                     }
                   } if integration_entry_id not in ['', none] else {
                     'action': 'none'
@@ -1121,45 +1112,38 @@ views:
                 {%- for helper_state in helper_sensor_entities -%}
                   {%- set helper_name = helper_state.attributes.user_name | default(helper_state.name, true) -%}
                   {%- set chip_is_selected = helper_name == selected_user_name -%}
+                  {%- set chip_pts_eid = (helper_state.attributes.get('core_sensors') or {}).get('points_eid') -%}
+                  {%- set chip_pts = (states(chip_pts_eid) | float(default=0) | round(0) | int) if chip_pts_eid else none -%}
                   {%- set chip_card = {
                     'type': 'custom:button-card',
                     'entity': admin_selector_eid,
                     'show_name': True,
-                    'show_label': False,
+                    'show_label': chip_pts is not none,
                     'show_state': False,
-                    'show_icon': False,
+                    'show_icon': True,
+                    'icon': 'mdi:account-circle',
                     'name': helper_name,
-                    'tap_action': {'action': 'none'} if chip_is_selected else {
-                      'action': 'multi-actions',
-                      'actions': [
-                        {
-                          'action': 'call-service',
-                          'service': 'select.select_option',
-                          'data': {
-                            'entity_id': admin_selector_eid,
-                            'option': helper_name
-                          }
-                        },
-                        {
-                          'action': 'call-service',
-                          'service': 'choreops.manage_ui_control',
-                          'data': {
-                            'config_entry_id': integration_entry_id,
-                            'ui_control_target': 'shared_admin',
-                            'ui_control_action': 'remove',
-                            'key': ui_control_key_header_collapsed
-                          }
-                        }
-                      ]
+                    'label': (chip_pts | string ~ ' pts') if chip_pts is not none else '',
+                    'tap_action': {
+                      'action': 'call-service',
+                      'service': 'select.select_option',
+                      'data': {
+                        'entity_id': admin_selector_eid,
+                        'option': 'None' if chip_is_selected else helper_name
+                      }
                     },
                     'hold_action': {'action': 'more-info'},
                     'styles': {
                       'card': [
-                        {'padding': '10px'},
-                        {'border-radius': '12px'},
+                        {'padding': '10px 4px'},
+                        {'border-radius': '14px'},
                         {'box-shadow': 'none'},
                         {'border': '2px solid var(--primary-color)' if chip_is_selected else '1px solid var(--divider-color)'},
                         {'background-color': 'rgba(var(--rgb-primary-color), 0.1)' if chip_is_selected else 'var(--card-background-color)'}
+                      ],
+                      'icon': [
+                        {'width': '34px'},
+                        {'color': 'var(--primary-color)' if chip_is_selected else 'var(--secondary-text-color)'}
                       ],
                       'name': [
                         {'font-size': '13px'},
@@ -1167,6 +1151,10 @@ views:
                         {'overflow': 'hidden'},
                         {'text-overflow': 'ellipsis'},
                         {'white-space': 'nowrap'}
+                      ],
+                      'label': [
+                        {'font-size': '11px'},
+                        {'color': 'var(--secondary-text-color)'}
                       ]
                     }
                   } -%}
@@ -1175,15 +1163,71 @@ views:
 
                 {#-- 6. Render --#}
 
+                {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+                {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+                {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
+                {%- set tab_ns = namespace(cards=[]) -%}
+                {%- for tab_key, tab_icon, tab_label in [('chores', 'mdi:broom', ui.get('chores', 'Chores')), ('economy', 'mdi:star-circle-outline', ui.get('economy', 'Economy')), ('system', 'mdi:cog-outline', ui.get('system', 'System'))] -%}
+                  {%- set tab_active = mgmt_tab == tab_key -%}
+                  {%- set tab_ns.cards = tab_ns.cards + [{
+                    'type': 'custom:button-card',
+                    'entity': admin_selector_eid,
+                    'show_name': True,
+                    'show_label': False,
+                    'show_state': False,
+                    'show_icon': True,
+                    'icon': tab_icon,
+                    'name': tab_label,
+                    'tap_action': {
+                      'action': 'call-service',
+                      'service': 'choreops.manage_ui_control',
+                      'data': {
+                        'config_entry_id': integration_entry_id,
+                        'ui_control_target': 'shared_admin',
+                        'ui_control_action': 'update',
+                        'key': 'admin-shared/management-tab',
+                        'value': tab_key
+                      }
+                    },
+                    'hold_action': {'action': 'none'},
+                    'styles': {
+                      'card': [
+                        {'padding': '8px 4px'},
+                        {'border-radius': '12px'},
+                        {'box-shadow': 'none'},
+                        {'border': '2px solid var(--primary-color)' if tab_active else '1px solid var(--divider-color)'},
+                        {'background-color': 'var(--primary-color)' if tab_active else 'var(--card-background-color)'}
+                      ],
+                      'icon': [
+                        {'width': '20px'},
+                        {'color': 'var(--text-primary-color)' if tab_active else 'var(--secondary-text-color)'}
+                      ],
+                      'name': [
+                        {'font-size': '13px'},
+                        {'font-weight': '700'},
+                        {'color': 'var(--text-primary-color)' if tab_active else 'var(--primary-text-color)'}
+                      ]
+                    }
+                  }] -%}
+                {%- endfor -%}
+
                 {{ selector_summary_card }},
                 {%- if header_collapsed -%}
                 {%- else -%}
                 {{ {
                   'type': 'grid',
-                  'columns': pref_selector_column_count,
+                  'columns': (ns.chips | length) if (ns.chips | length) in [2, 3, 4] else pref_selector_column_count,
                   'square': False,
-                  'cards': [none_chip] + ns.chips
+                  'cards': ns.chips
                 } }},
+                {%- if has_selected_user -%}
+                {{ {
+                  'type': 'grid',
+                  'columns': 3,
+                  'square': False,
+                  'cards': tab_ns.cards
+                } }},
+                {%- endif -%}
                 {%- endif -%}
               {%- endif -%}
 
@@ -1334,7 +1378,10 @@ views:
                 {%- set has_selected_chore_sensor = selected_chore_sensor not in ['', None, 'None'] and states(selected_chore_sensor) not in ['unknown', 'unavailable'] -%}
                 {%- set has_resolved_selected_chore = has_selected_chore and has_selected_chore_sensor -%}
                 {%- set header_collapsed = selected_user_ui_root.current['header-collapse'] if has_header_collapsed_override else pref_chore_management_default_header_collapsed -%}
-                {%- set header_collapsed = (header_collapsed | string | lower) == 'true' -%}
+                {%- set header_collapsed = false -%}
+                {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+                {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+                {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
                 {%- set management_label_html = (
                   "<span style='color:var(--secondary-text-color);'>" ~ ui.get('manage_for', 'Manage for') ~ ":</span> <span style='font-weight:700;color:var(--primary-text-color);'>" ~ (selected_user_name | e) ~ "</span>"
                 ) if has_selected_user else '' -%}
@@ -2755,8 +2802,7 @@ views:
 
               {#-- 6. Render Logic --#}
 
-              {%- if has_selected_dashboard_helper -%}
-                {{ management_summary_card }},
+              {%- if has_selected_dashboard_helper and has_selected_user and mgmt_tab == 'chores' -%}
                 {#-- ===== ALL CHORES ACTIONS ===== --#}
                 {%- if not header_collapsed and has_selected_user -%}
                   {#-- All Chores card (unified pause + reschedule) --#}
@@ -3429,6 +3475,10 @@ views:
                 {%- set points_total_display = states(points_sensor) if has_points_sensor and states(points_sensor) not in ['unknown', 'unavailable', 'None', ''] else '0' -%}
                 {%- set header_collapsed = selected_user_ui_root.current['header-collapse'] if has_header_collapsed_override else pref_economy_management_default_header_collapsed -%}
                 {%- set header_collapsed = (header_collapsed | string | lower) == 'true' -%}
+                {%- set header_collapsed = false -%}
+                {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+                {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+                {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
                 {%- set economy_label = ui.get('manage_for', 'Manage for') if has_selected_user else ui.get('select_user_first', 'err-select_user_first') -%}
                 {%- set economy_label_html = (
                   "<span style='color:var(--secondary-text-color);'>" ~ ui.get('manage_for', 'Manage for') ~ ":</span> <span style='font-weight:700;color:var(--primary-text-color);'>" ~ (selected_user_name | e) ~ "</span>"
@@ -4361,8 +4411,7 @@ views:
 
               {#-- 6. Render Logic --#}
 
-              {%- if has_selected_dashboard_helper and selected_gamification_enabled -%}
-                {{ economy_summary_card }},
+              {%- if has_selected_dashboard_helper and selected_gamification_enabled and has_selected_user and mgmt_tab == 'economy' -%}
                 {%- if not header_collapsed and has_points_sensor -%}
                   {{ economy_detail_card }},
                 {%- endif -%}
@@ -4393,4 +4442,9 @@ views:
 
               << template_snippets.admin_validation_missing_selector >>
 
-              << template_shared.admin_system_administration_links_v1 >>
+              {%- set mgmt_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
+              {%- set mgmt_sa_admin = mgmt_sa.get('admin-shared', {}) -%}
+              {%- set mgmt_tab = (mgmt_sa_admin.get('management-tab', 'chores') if mgmt_sa_admin is mapping else 'chores') | string -%}
+              {%- if (not has_selected_user) or mgmt_tab == 'system' -%}
+                            << template_shared.admin_system_administration_links_v1 >>
+              {%- endif -%}
