@@ -2251,22 +2251,22 @@ views:
                             {%- endif -%}
                             {%- set nrole = badge.role -%}
                             {%- set ncol = cur_accent if nrole == 'current' else ('var(--primary-color)' if nrole == 'next_higher' else ('var(--success-color)' if nrole == 'earned' else 'var(--secondary-text-color)')) -%}
-                            {%- set nsz = 46 if nrole == 'current' else 34 -%}
+                            {%- set nsz = 34 if nrole == 'current' else 26 -%}
                             {%- set nname = badge.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
                             {%- set tr.nodes = tr.nodes
                                 ~ "<div style='position:relative;z-index:1;flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;'>"
-                                ~ "<div style='height:46px;display:flex;align-items:center;justify-content:center;'>"
+                                ~ "<div style='height:34px;display:flex;align-items:center;justify-content:center;'>"
                                 ~ "<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid " ~ ncol ~ ";background:" ~ ("color-mix(in srgb, " ~ ncol ~ " 20%, var(--card-background-color))" if nrole == 'current' else "var(--card-background-color)") ~ ";display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.6' if nrole == 'future' else '1') ~ ";'>"
-                                ~ "<ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('24' if nrole == 'current' else '18') ~ "px;height:" ~ ('24' if nrole == 'current' else '18') ~ "px;--mdc-icon-size:" ~ ('24' if nrole == 'current' else '18') ~ "px;color:" ~ ncol ~ ";display:block;'></ha-icon></div></div>"
+                                ~ "<ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('18' if nrole == 'current' else '14') ~ "px;height:" ~ ('18' if nrole == 'current' else '14') ~ "px;--mdc-icon-size:" ~ ('18' if nrole == 'current' else '14') ~ "px;color:" ~ ncol ~ ";display:block;'></ha-icon></div></div>"
                                 ~ "<div style='max-width:100%;margin-top:4px;font-size:11px;font-weight:800;color:" ~ ('var(--primary-text-color)' if nrole == 'current' else 'var(--secondary-text-color)') ~ ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ nname ~ "</div>"
                                 ~ "<div style='font-size:10px;color:var(--secondary-text-color);opacity:0.8;'>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div></div>" -%}
                           {%- endfor -%}
                           {%- set trk_frac = 0 if tr.ci < 0 else ([((tr.ci + ((tr.nxt_pct / 100) if tr.has_next else 0)) / ([n_b - 1, 1] | max)), 1] | min) -%}
-                          {%- set trk_caption = ("<div style='text-align:center;margin-top:8px;font-size:12px;color:var(--secondary-text-color);'><b style='color:var(--primary-color);'>" ~ (format_points(tr.nxt_to_go, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ ' ' ~ ui.get('to_go', 'to go') ~ "</b> &rarr; <b style='color:var(--primary-text-color);'>" ~ tr.nxt_name ~ "</b></div>") if tr.has_next and tr.nxt_to_go > 0 else '' -%}
-                          {%- set trk_html = "<div style='box-sizing:border-box;width:100%;border-radius:16px;border:1px solid var(--divider-color);background:var(--card-background-color);padding:14px 8px 12px;'>"
+                          {%- set trk_caption = ("<div style='text-align:center;margin-top:2px;font-size:11px;color:var(--secondary-text-color);'><b style='color:var(--primary-color);'>" ~ (format_points(tr.nxt_to_go, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ ' ' ~ ui.get('to_go', 'to go') ~ "</b> &rarr; <b style='color:var(--primary-text-color);'>" ~ tr.nxt_name ~ "</b></div>") if tr.has_next and tr.nxt_to_go > 0 else '' -%}
+                          {%- set trk_html = "<div style='box-sizing:border-box;width:100%;border-radius:16px;border:1px solid var(--divider-color);background:var(--card-background-color);padding:8px 8px 8px;'>"
                               ~ "<div style='position:relative;display:flex;'>"
-                              ~ "<div style='position:absolute;left:calc(50% / " ~ n_b ~ ");right:calc(50% / " ~ n_b ~ ");top:21px;height:4px;border-radius:4px;background:var(--divider-color);'></div>"
-                              ~ "<div style='position:absolute;left:calc(50% / " ~ n_b ~ ");width:calc((100% - 100% / " ~ n_b ~ ") * " ~ ('%.3f' | format(trk_frac)) ~ ");top:21px;height:4px;border-radius:4px;background:var(--success-color);'></div>"
+                              ~ "<div style='position:absolute;left:calc(50% / " ~ n_b ~ ");right:calc(50% / " ~ n_b ~ ");top:15px;height:3px;border-radius:4px;background:var(--divider-color);'></div>"
+                              ~ "<div style='position:absolute;left:calc(50% / " ~ n_b ~ ");width:calc((100% - 100% / " ~ n_b ~ ") * " ~ ('%.3f' | format(trk_frac)) ~ ");top:15px;height:3px;border-radius:4px;background:var(--success-color);'></div>"
                               ~ tr.nodes ~ "</div>" ~ trk_caption ~ "</div>" -%}
                           {%- set row_styles = {
                             'card': [
@@ -2358,9 +2358,7 @@ views:
                             {#-- award pills --#}
                             {%- set pill_style = "display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:999px;background:color-mix(in srgb, var(--primary-color) 12%, transparent);font-size:11px;font-weight:700;color:var(--primary-text-color);margin:0 6px 4px 0;" -%}
                             {%- set pills = namespace(v='') -%}
-                            {%- if badge.points_multiplier | float(default=0) > 0 -%}
-                              {%- set pills.v = pills.v ~ "<span style='" ~ pill_style ~ "'>⚡ ×" ~ ('%g' | format(badge.points_multiplier | float(default=0) | round(2))) ~ "</span>" -%}
-                            {%- endif -%}
+                            {%- set mult_pill = ("<span style='" ~ pill_style ~ "margin:0 0 0 6px;'>⚡ ×" ~ ('%g' | format(badge.points_multiplier | float(default=0) | round(2))) ~ "</span>") if badge.points_multiplier | float(default=0) > 0 else '' -%}
                             {%- if badge.award_points | float(default=0) > 0 -%}
                               {%- set pills.v = pills.v ~ "<span style='" ~ pill_style ~ "'>+" ~ ('%g' | format(badge.award_points | float(default=0) | round(2))) ~ " <ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;color:var(--primary-color);'></ha-icon></span>" -%}
                             {%- endif -%}
@@ -2391,13 +2389,13 @@ views:
                               {%- if show_bar -%}
                                 {%- set sub_html = (("<span>" ~ prog_label ~ " <b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b></span> &nbsp;&bull;&nbsp; ") if is_current else ("<b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b> &nbsp;&bull;&nbsp; ")) ~ prog_note -%}
                               {%- endif -%}
-                              {%- set tile = "<div style='flex:0 0 auto;width:" ~ ('48px' if is_current else '40px') ~ ";height:" ~ ('48px' if is_current else '40px') ~ ";border-radius:12px;background:color-mix(in srgb, " ~ accent ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('28' if is_current else '22') ~ "px;height:" ~ ('28' if is_current else '22') ~ "px;--mdc-icon-size:" ~ ('28' if is_current else '22') ~ "px;color:" ~ accent ~ ";display:block;'></ha-icon></div>" -%}
+                              {%- set tile = "<div style='flex:0 0 auto;width:" ~ ('36px' if is_current else '30px') ~ ";height:" ~ ('36px' if is_current else '30px') ~ ";border-radius:12px;background:color-mix(in srgb, " ~ accent ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('22' if is_current else '18') ~ "px;height:" ~ ('22' if is_current else '18') ~ "px;--mdc-icon-size:" ~ ('22' if is_current else '18') ~ "px;color:" ~ accent ~ ";display:block;'></ha-icon></div>" -%}
                               {%- set chip = "<span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:" ~ accent ~ ";color:#fff;'>" ~ chip_label ~ "</span>" -%}
                               {%- set cost_pill = "<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div>" -%}
-                              {%- set pill_row = ("<div style='margin-top:6px;text-align:left;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
+                              {%- set pill_row = ("<div style='margin-top:3px;text-align:left;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
                               {%- set foot_row = ("<div style='margin-top:2px;font-size:10px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>" ~ (foot | join(' &nbsp;•&nbsp; ')) ~ "</div>") if foot | length > 0 else '' -%}
-                              {%- set desc_row = ("<div style='margin-top:2px;font-size:11px;line-height:1.3;color:var(--secondary-text-color);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ bdesc ~ "</div>") if bdesc | length > 0 else '' -%}
-                              {%- set row_html = "<div style='position:relative;overflow:hidden;box-sizing:border-box;width:100%;border-radius:16px;border:" ~ (('1px solid ' ~ accent) if is_current else '1px solid var(--divider-color)') ~ ";background:linear-gradient(90deg, color-mix(in srgb, " ~ fill_col ~ " 34%, var(--card-background-color)) 0%, color-mix(in srgb, " ~ fill_col ~ " 13%, var(--card-background-color)) " ~ fill_pct ~ "%, var(--card-background-color) " ~ fill_pct ~ "%);padding:" ~ ('14px' if is_current else '10px 12px') ~ ";text-align:left;'>"
+                              {%- set desc_row = ("<div style='margin-top:2px;display:flex;align-items:center;font-size:11px;line-height:1.3;color:var(--secondary-text-color);'><span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ bdesc ~ "</span>" ~ mult_pill ~ "</div>") if (bdesc | length > 0 or mult_pill | length > 0) else '' -%}
+                              {%- set row_html = "<div style='position:relative;overflow:hidden;box-sizing:border-box;width:100%;border-radius:16px;border:" ~ (('1px solid ' ~ accent) if is_current else '1px solid var(--divider-color)') ~ ";background:linear-gradient(90deg, color-mix(in srgb, " ~ fill_col ~ " 34%, var(--card-background-color)) 0%, color-mix(in srgb, " ~ fill_col ~ " 13%, var(--card-background-color)) " ~ fill_pct ~ "%, var(--card-background-color) " ~ fill_pct ~ "%);padding:" ~ ('9px 12px' if is_current else '6px 10px') ~ ";text-align:left;'>"
                                   ~ "<div style='display:flex;align-items:center;gap:10px;'>" ~ tile
                                   ~ "<div style='flex:1;min-width:0;'><div style='display:flex;align-items:center;gap:6px;'><span style='font-size:" ~ ('18px' if is_current else '15px') ~ ";line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>" ~ chip ~ "</div>"
                                   ~ (("<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);'>" ~ sub_html ~ "</div>") if sub_html | length > 0 else '')
@@ -2406,7 +2404,7 @@ views:
                             {%- else -%}
                               {%- set slim_col = 'var(--success-color)' if badge.role == 'earned' else 'var(--secondary-text-color)' -%}
                               {%- set slim_right = ('✓ ' ~ ui.get('earned', 'Earned') ~ ((' ' ~ last_earned) if last_earned | length > 0 else '')) if badge.role == 'earned' else ('🔒 ' ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ ' ' ~ ns.points_label) -%}
-                              {%- set row_html = "<div style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:8px 12px;border-radius:14px;background:var(--card-background-color);border:1px solid var(--divider-color);opacity:" ~ ('1' if badge.role == 'earned' else '0.8') ~ ";text-align:left;'>"
+                              {%- set row_html = "<div style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:5px 10px;border-radius:12px;background:var(--card-background-color);border:1px solid var(--divider-color);opacity:" ~ ('1' if badge.role == 'earned' else '0.8') ~ ";text-align:left;'>"
                                   ~ "<ha-icon icon='" ~ badge.icon ~ "' style='flex:0 0 auto;width:20px;height:20px;--mdc-icon-size:20px;color:" ~ slim_col ~ ";display:block;'></ha-icon>"
                                   ~ "<span style='min-width:0;font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>"
                                   ~ "<span style='margin-left:auto;flex:0 0 auto;font-size:12px;color:var(--secondary-text-color);'>" ~ slim_right ~ "</span></div>" -%}
@@ -2423,7 +2421,7 @@ views:
                             {%- endif -%}
                           {%- endfor -%}
 
-                          {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);margin:6px 0 6px 2px;text-align:left;" -%}
+                          {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);margin:2px 0 4px 2px;text-align:left;" -%}
                           {%- set emit = namespace(items=[]) -%}
                           {%- for it in rows.cur -%}
                             {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html, 'head': ''}] -%}
