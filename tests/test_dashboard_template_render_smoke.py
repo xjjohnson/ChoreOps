@@ -1544,31 +1544,91 @@ def test_admin_quick_actions_chores_tab_tiles_and_skip_list() -> None:
     assert "Feed Dog" in skip_names
 
 
-def test_admin_quick_actions_economy_uses_configured_point_buttons() -> None:
-    """Adjust points lists the amounts configured in the integration settings."""
+_ECON_BONUSES = [
+    {"eid": "button.alice_bonus_good", "name": "Good Attitude", "points": 5, "applied": 2},
+    {"eid": "button.alice_bonus_praise", "name": "Praised", "points": 100, "applied": 0},
+]
+_ECON_PENALTIES = [
+    {"eid": "button.alice_pen_argue", "name": "Argued", "points": -5, "applied": 1},
+]
+
+
+def test_admin_economy_tab_shows_balance_tabs_and_bonuses_by_default() -> None:
+    """Economy tab: balance header, three tabs, bonuses list, then the report tile."""
+
+    eco = _render_quick_actions(
+        "economy", None, {"bonuses": _ECON_BONUSES, "penalties": _ECON_PENALTIES}
+    )
+    assert "Available" in eco[0]["custom_fields"]["content"]
+    seg = eco[1]["cards"]
+    assert [c["name"] for c in seg] == ["Bonuses", "Penalties", "Points"]
+    assert seg[0]["styles"]["card"][-1]["background"] == "var(--primary-color)"
+    assert seg[1]["tap_action"]["data"] == {
+        "config_entry_id": "entry-123",
+        "ui_control_target": "shared_admin",
+        "ui_control_action": "update",
+        "key": "admin-shared/quick-actions/econ-tab",
+        "value": "penalties",
+    }
+    rows = eco[2]["cards"]
+    assert [r["name"] for r in rows] == ["Good Attitude", "Praised"]
+    assert rows[0]["label"] == "+5 · applied 2×"
+    assert rows[0]["tap_action"]["service"] == "button.press"
+    assert rows[0]["tap_action"]["target"] == {"entity_id": "button.alice_bonus_good"}
+    assert "Alice" in rows[0]["tap_action"]["confirmation"]["text"]
+    assert "REPORTS" in eco[3]["name"]
+    assert [t["name"] for t in eco[4]["cards"]] == ["Activity report"]
+    report = eco[4]["cards"][0]["tap_action"]
+    assert report["service"] == "choreops.generate_activity_report"
+    assert report["data"]["notify_service"] == "persistent_notification.create"
+    assert report["data"]["report_title"] == "Activity report: Alice"
+    assert report["data"]["user_name"] == "Alice"
+
+
+def test_admin_economy_tab_penalties_list() -> None:
+    """The Penalties tab lists penalties with a minus sign."""
+
+    eco = _render_quick_actions(
+        "economy",
+        {"econ-tab": "penalties"},
+        {"bonuses": _ECON_BONUSES, "penalties": _ECON_PENALTIES},
+    )
+    rows = eco[2]["cards"]
+    assert [r["name"] for r in rows] == ["Argued"]
+    assert rows[0]["label"].startswith("−5")
+    assert rows[0]["tap_action"]["target"] == {"entity_id": "button.alice_pen_argue"}
+    assert eco[1]["cards"][1]["styles"]["card"][-1]["background"] == (
+        "var(--primary-color)"
+    )
+
+
+def test_admin_economy_tab_points_uses_configured_point_buttons() -> None:
+    """The Points tab lists the amounts configured in the integration settings."""
 
     buttons = [
         {"eid": "button.alice_minus_200", "name": "Points -200"},
         {"eid": "button.alice_plus_50", "name": "Points +50"},
     ]
     eco = _render_quick_actions(
-        "economy",
-        {"adjust-open": True},
-        {"points_buttons": buttons},
+        "economy", {"econ-tab": "points"}, {"points_buttons": buttons}
     )
-    assert [t["name"] for t in eco[1]["cards"]] == ["Adjust points", "Activity report"]
-    report = eco[1]["cards"][1]["tap_action"]
-    assert report["service"] == "choreops.generate_activity_report"
-    assert report["data"]["notify_service"] == "persistent_notification.create"
-    assert report["data"]["report_title"] == "Activity report: Alice"
-    assert report["data"]["user_name"] == "Alice"
-    amounts = eco[3]["cards"]
+    amounts = eco[2]["cards"]
+    assert eco[2]["columns"] == 3
     assert [c["name"] for c in amounts] == ["-200", "+50"]
     assert amounts[0]["tap_action"] == {
         "action": "call-service",
         "service": "button.press",
         "data": {"entity_id": "button.alice_minus_200"},
     }
+
+
+def test_admin_economy_tab_empty_lists_show_a_hint() -> None:
+    """With nothing configured, each tab shows a short hint instead of a blank."""
+
+    eco = _render_quick_actions("economy", None, {})
+    assert eco[2]["cards"][0]["name"] == "No bonuses set up yet"
+    eco = _render_quick_actions("economy", {"econ-tab": "points"}, {"points_buttons": []})
+    assert eco[2]["cards"][0]["name"] == "No point amounts set up in settings"
 
 
 def test_admin_quick_actions_system_tab_tools_and_links() -> None:

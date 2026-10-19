@@ -1693,6 +1693,8 @@ views:
                 {%- set qa_paused_until = state_attr(selected_dashboard_helper, 'chores_paused_until') -%}
                 {%- set qa_gam = state_attr(selected_dashboard_helper, 'gamification_enabled') | default(false, true) -%}
                 {%- set qa_pbuttons = (state_attr(selected_dashboard_helper, 'points_buttons') | default([], true)) if qa_user_ok else [] -%}
+                {%- set qa_bonuses = (state_attr(selected_dashboard_helper, 'bonuses') | default([], true)) if qa_user_ok else [] -%}
+                {%- set qa_penalties = (state_attr(selected_dashboard_helper, 'penalties') | default([], true)) if qa_user_ok else [] -%}
                 {%- set qa_badges = (state_attr(selected_dashboard_helper, 'badges') | default([], true)) if qa_user_ok else [] -%}
                 {%- set qa_specs = namespace(items=[]) -%}
 
@@ -1746,14 +1748,6 @@ views:
                                 {%- elif qa_tab == 'economy' and qa_gam -%}
                   {%- set qa_specs.items = [
                     {
-                      'icon': 'mdi:plus-minus-variant',
-                      'name': 'Adjust points',
-                      'label': 'Hide amounts' if qa_open.get('adjust-open', false) else 'Pick an amount',
-                      'color': 'var(--primary-color)',
-                      'tint': qa_open.get('adjust-open', false),
-                      'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/adjust-open', 'value': not (qa_open.get('adjust-open', false) | bool(false))}}
-                    }
-                    ,{
                       'icon': 'mdi:chart-box-outline',
                       'name': 'Activity report',
                       'label': 'Posts to the bell' if qa_user_ok else 'Pick a person first',
@@ -1780,9 +1774,210 @@ views:
                   ] -%}
                 {%- endif -%}
 
+                {#-- Economy panel: balance, Bonuses / Penalties / Points tabs --#}
+                {%- if qa_tab == 'economy' and qa_gam and qa_user_ok -%}
+                  {%- set ep_tab = (qa_open.get('econ-tab', 'bonuses')) | string -%}
+                  {%- if ep_tab not in ['bonuses', 'penalties', 'points'] -%}
+                    {%- set ep_tab = 'bonuses' -%}
+                  {%- endif -%}
+                  {%- set ep_core = state_attr(selected_dashboard_helper, 'core_sensors') or {} -%}
+                  {%- set ep_eid = ep_core.get('points_eid') if ep_core is mapping else none -%}
+                  {%- set ep_raw = states(ep_eid) | float(default=0) if ep_eid else 0 -%}
+                  {%- set ep_bal = (ep_raw | round(0) | int) | string if ep_raw == (ep_raw | round(0)) else (ep_raw | round(1)) | string -%}
+                  {%- set ep_unit = ((state_attr(ep_eid, 'unit_of_measurement') if ep_eid else none) or 'Points') | string | replace('&', '&amp;') | replace('<', '&lt;') -%}
+                  {%- set ep_mult = (state_attr(ep_eid, 'points_multiplier') | float(default=1)) if ep_eid else 1 -%}
+                  {%- set ep_mult_txt = ('%.2f' | format(ep_mult)) | regex_replace('\.?0+$', '') -%}
+                  {%- set ep_week = state_attr(ep_eid, 'point_stat_points_net_week') if ep_eid else none -%}
+                  {%- set ep_day = state_attr(ep_eid, 'point_stat_avg_per_day_week') if ep_eid else none -%}
+                  {%- set ep_chip_style = 'border-radius:14px;padding:4px 10px;font-size:11px;font-weight:600;white-space:nowrap;' -%}
+                  {%- set ep_chips = "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--primary-color) 14%, transparent);'>x" ~ ep_mult_txt ~ (' Active' if ep_mult > 1 else '') ~ "</span>" -%}
+                  {%- if ep_week not in [none, '', 'None', 'unknown', 'unavailable'] -%}
+                    {%- set ep_week_n = ep_week | float(default=0) -%}
+                    {%- set ep_chips = ep_chips ~ "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--success-color) 12%, transparent);'>" ~ ('+' if ep_week_n >= 0 else '') ~ ('%g' | format(ep_week_n | round(1))) ~ " This Week</span>" -%}
+                  {%- endif -%}
+                  {%- if ep_day not in [none, '', 'None', 'unknown', 'unavailable'] -%}
+                    {%- set ep_chips = ep_chips ~ "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--warning-color) 12%, transparent);'>" ~ ('%g' | format((ep_day | float(default=0)) | round(1))) ~ " Points/Day</span>" -%}
+                  {%- endif -%}
+                  {{-
+                    {
+                      'type': 'custom:button-card',
+                      'show_name': false,
+                      'show_icon': false,
+                      'show_label': false,
+                      'show_state': false,
+                      'tap_action': {'action': 'none'},
+                      'hold_action': {'action': 'none'},
+                      'custom_fields': {
+                        'content': "<div style='display:flex;align-items:flex-end;justify-content:space-between;gap:10px;text-align:left;'><div><div style='font-size:10.5px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;opacity:0.6;'>Available · " ~ (selected_user_name | e) ~ "</div><div style='font-size:34px;font-weight:800;line-height:1.1;'>" ~ ep_bal ~ "</div><div style='font-size:12px;opacity:0.65;'>" ~ ep_unit ~ "</div></div><div style='display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:55%;'>" ~ ep_chips ~ "</div></div>"
+                      },
+                      'styles': {
+                        'card': [
+                          {'padding': '12px 14px'},
+                          {'border-radius': '16px'},
+                          {'box-shadow': 'none'},
+                          {'border': '1px solid var(--divider-color)'},
+                          {'background-color': 'var(--card-background-color)'}
+                        ],
+                        'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                        'custom_fields': {'content': [{'width': '100%'}]}
+                      }
+                    }
+                  }},
+                  {%- set ep_seg = namespace(c=[]) -%}
+                  {%- for ek, el, ei in [('bonuses', 'Bonuses', 'mdi:gift-outline'), ('penalties', 'Penalties', 'mdi:alert-octagon-outline'), ('points', 'Points', 'mdi:plus-minus-variant')] -%}
+                    {%- set ep_on = ek == ep_tab -%}
+                    {%- set ep_seg.c = ep_seg.c + [{
+                      'type': 'custom:button-card',
+                      'entity': admin_selector_eid,
+                      'icon': ei,
+                      'name': el,
+                      'show_name': true,
+                      'show_icon': true,
+                      'show_label': false,
+                      'show_state': false,
+                      'tap_action': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/econ-tab', 'value': ek}},
+                      'hold_action': {'action': 'none'},
+                      'styles': {
+                        'card': [
+                          {'padding': '8px 4px'},
+                          {'border-radius': '999px'},
+                          {'box-shadow': 'none'},
+                          {'border': '1px solid var(--primary-color)' if ep_on else '1px solid transparent'},
+                          {'background': 'var(--primary-color)' if ep_on else 'transparent'}
+                        ],
+                        'grid': [
+                          {'grid-template-areas': '"i n"'},
+                          {'grid-template-columns': 'min-content min-content'},
+                          {'column-gap': '6px'},
+                          {'align-items': 'center'},
+                          {'justify-content': 'center'}
+                        ],
+                        'icon': [{'width': '16px'}, {'color': 'var(--text-primary-color)' if ep_on else 'var(--primary-color)'}],
+                        'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'white-space': 'nowrap'}, {'color': 'var(--text-primary-color)' if ep_on else 'var(--primary-text-color)'}]
+                      }
+                    }] -%}
+                  {%- endfor -%}
+                  {{-
+                    {'type': 'grid', 'columns': 3, 'square': false, 'cards': ep_seg.c}
+                  }},
+                  {%- set ep_rows = namespace(c=[]) -%}
+                  {%- if ep_tab in ['bonuses', 'penalties'] -%}
+                    {%- set ep_good = ep_tab == 'bonuses' -%}
+                    {%- set ep_col = 'var(--success-color)' if ep_good else 'var(--error-color)' -%}
+                    {%- for it in (qa_bonuses if ep_good else qa_penalties) if it is mapping and it.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] -%}
+                      {%- set ep_pts = (it.get('points', 0) | float(default=0)) | abs -%}
+                      {%- set ep_n = it.get('applied', 0) | float(default=0) -%}
+                      {%- set ep_rows.c = ep_rows.c + [{
+                        'type': 'custom:button-card',
+                        'entity': it.get('eid'),
+                        'icon': (state_attr(it.get('eid'), 'icon') or ('mdi:gift-outline' if ep_good else 'mdi:alert-octagon-outline')) | string,
+                        'name': (it.get('name') or '') | string,
+                        'label': ('+' if ep_good else '−') ~ ('%g' | format(ep_pts)) ~ ' · applied ' ~ ('%g' | format(ep_n)) ~ '×',
+                        'show_name': true,
+                        'show_icon': true,
+                        'show_label': true,
+                        'show_state': false,
+                        'custom_fields': {'act': "<div style='width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:" ~ ep_col ~ ";border:1.5px solid " ~ ep_col ~ ";background:color-mix(in srgb, " ~ ep_col ~ " 15%, transparent);'>" ~ ('+' if ep_good else '−') ~ "</div>"},
+                        'tap_action': {'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': it.get('eid')}, 'confirmation': {'text': ('Give ' if ep_good else 'Apply ') ~ (it.get('name') or '') ~ (' to ' if ep_good else ' to ') ~ selected_user_name ~ '?'}},
+                        'hold_action': {'action': 'none'},
+                        'styles': {
+                          'card': [
+                            {'padding': '8px 12px'},
+                            {'border-radius': '14px'},
+                            {'box-shadow': 'none'},
+                            {'border': '1px solid color-mix(in srgb, ' ~ ep_col ~ ' 35%, var(--divider-color))'},
+                            {'background': 'color-mix(in srgb, ' ~ ep_col ~ ' 8%, var(--card-background-color))'}
+                          ],
+                          'grid': [
+                            {'grid-template-areas': '"i n act" "i l act"'},
+                            {'grid-template-columns': '34px minmax(0, 1fr) min-content'},
+                            {'column-gap': '10px'},
+                            {'row-gap': '1px'},
+                            {'align-items': 'center'}
+                          ],
+                          'icon': [{'width': '22px'}, {'color': ep_col}],
+                          'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}, {'text-align': 'left'}],
+                          'label': [{'justify-self': 'start'}, {'font-size': '11px'}, {'opacity': '0.7'}],
+                          'custom_fields': {'act': [{'justify-self': 'end'}]}
+                        }
+                      }] -%}
+                    {%- endfor -%}
+                    {%- if ep_rows.c | length == 0 -%}
+                      {%- set ep_rows.c = [{
+                        'type': 'custom:button-card',
+                        'show_name': true,
+                        'show_icon': false,
+                        'show_label': false,
+                        'show_state': false,
+                        'name': 'No ' ~ ep_tab ~ ' set up yet',
+                        'tap_action': {'action': 'none'},
+                        'styles': {
+                          'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': '1px dashed var(--divider-color)'}, {'background': 'transparent'}],
+                          'name': [{'font-size': '12px'}, {'opacity': '0.65'}]
+                        }
+                      }] -%}
+                    {%- endif -%}
+                    {{-
+                      {'type': 'grid', 'columns': 1, 'square': false, 'cards': ep_rows.c}
+                    }},
+                  {%- else -%}
+                    {%- for pb in qa_pbuttons -%}
+                      {%- set pb_eid = pb.get('eid') if pb is mapping else pb -%}
+                      {%- set pb_raw = (pb.get('name') if pb is mapping else '') | string -%}
+                      {%- set pb_short = pb_raw[7:] if pb_raw[:7] == 'Points ' else pb_raw -%}
+                      {%- set pb_val = pb_short | float(0) -%}
+                      {%- set pb_abs = ((pb_val | abs | round(2)) | string | regex_replace('\.?0+$', '')) -%}
+                      {%- if pb_eid not in ['', none] -%}
+                        {%- set pb_col = 'var(--success-color)' if pb_val > 0 else 'var(--error-color)' -%}
+                        {%- set ep_rows.c = ep_rows.c + [{
+                          'type': 'custom:button-card',
+                          'entity': pb_eid,
+                          'icon': 'mdi:plus-circle-outline' if pb_val > 0 else 'mdi:minus-circle-outline',
+                          'name': ('+' ~ pb_abs) if pb_val > 0 else ('-' ~ pb_abs if pb_val < 0 else pb_short),
+                          'show_name': true,
+                          'show_icon': true,
+                          'show_label': false,
+                          'show_state': false,
+                          'tap_action': {'action': 'call-service', 'service': 'button.press', 'data': {'entity_id': pb_eid}},
+                          'hold_action': {'action': 'none'},
+                          'styles': {
+                            'card': [
+                              {'padding': '10px 4px'},
+                              {'border-radius': '14px'},
+                              {'box-shadow': 'none'},
+                              {'border': '1px solid color-mix(in srgb, ' ~ pb_col ~ ' 40%, var(--divider-color))'},
+                              {'background': 'color-mix(in srgb, ' ~ pb_col ~ ' 10%, var(--card-background-color))'}
+                            ],
+                            'icon': [{'width': '20px'}, {'color': pb_col}],
+                            'name': [{'font-size': '13px'}, {'font-weight': '700'}]
+                          }
+                        }] -%}
+                      {%- endif -%}
+                    {%- endfor -%}
+                    {%- if ep_rows.c | length == 0 -%}
+                      {%- set ep_rows.c = [{
+                        'type': 'custom:button-card',
+                        'show_name': true,
+                        'show_icon': false,
+                        'show_label': false,
+                        'show_state': false,
+                        'name': 'No point amounts set up in settings',
+                        'tap_action': {'action': 'none'},
+                        'styles': {
+                          'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': '1px dashed var(--divider-color)'}, {'background': 'transparent'}],
+                          'name': [{'font-size': '12px'}, {'opacity': '0.65'}]
+                        }
+                      }] -%}
+                    {%- endif -%}
+                    {{-
+                      {'type': 'grid', 'columns': 3 if ep_rows.c | length > 1 else 1, 'square': false, 'cards': ep_rows.c}
+                    }},
+                  {%- endif -%}
+                {%- endif -%}
+
                 {%- if qa_specs.items | length > 0 -%}
                   {%- set qa_group_defs = [
-                    ('main', ('QUICK ACTIONS' if qa_tab == 'chores' else 'POINTS') ~ ' · ' ~ (selected_user_name | upper)),
+                    ('main', ('QUICK ACTIONS' if qa_tab == 'chores' else 'REPORTS') ~ ' · ' ~ (selected_user_name | upper)),
                     ('fix', 'FIX-IT TOOLS · ' ~ (selected_user_name | upper)),
                     ('family', 'FAMILY-WIDE · AFFECTS EVERYONE')
                   ] -%}
@@ -1860,18 +2055,6 @@ views:
                   {%- for ch in qa_chores.items -%}
                     {%- set qa_pick.c = qa_pick.c + [{'name': ch.name, 'sub': '', 'color': 'var(--divider-color)', 'tap': {'action': 'call-service', 'service': 'choreops.skip_chore_due_date', 'data': {'config_entry_id': qa_entry_id, 'chore_name': ch.name, 'user_name': selected_user_name}, 'confirmation': {'text': 'Skip the next due date for ' ~ ch.name ~ '?'}}}] -%}
                   {%- endfor -%}
-                {%- elif qa_tab == 'economy' and qa_gam and (qa_open.get('adjust-open', false) | bool(false)) -%}
-                  {%- set qa_pick.title = 'ADJUST POINTS · ' ~ (selected_user_name | upper) -%}
-                  {%- for pb in qa_pbuttons -%}
-                    {%- set pb_eid = pb.get('eid') if pb is mapping else pb -%}
-                    {%- set pb_raw = (pb.get('name') if pb is mapping else '') | string -%}
-                    {%- set pb_short = pb_raw[7:] if pb_raw[:7] == 'Points ' else pb_raw -%}
-                    {%- set pb_val = pb_short | float(0) -%}
-                    {%- set pb_abs = ((pb_val | abs | round(2)) | string | regex_replace('\.?0+$', '')) -%}
-                    {%- if pb_eid not in ['', none] -%}
-                      {%- set qa_pick.c = qa_pick.c + [{'name': ('+' ~ pb_abs) if pb_val > 0 else ('-' ~ pb_abs if pb_val < 0 else pb_short), 'sub': '', 'color': 'var(--success-color)' if pb_val > 0 else 'var(--error-color)', 'tap': {'action': 'call-service', 'service': 'button.press', 'data': {'entity_id': pb_eid}}}] -%}
-                    {%- endif -%}
-                  {%- endfor -%}
                 {%- elif qa_tab == 'system' and qa_user_ok and (qa_open.get('badge-open', false) | bool(false)) -%}
                   {%- set qa_pick.title = 'REMOVE A BADGE · ' ~ (selected_user_name | upper) -%}
                   {%- for bd in qa_badges if bd is mapping and bd.get('earned', false) -%}
@@ -1919,7 +2102,7 @@ views:
                     }
                   }},
                   {{-
-                    {'type': 'grid', 'columns': 3 if qa_tab == 'economy' else 2, 'square': false, 'cards': qa_pick_cards.c}
+                    {'type': 'grid', 'columns': 2, 'square': false, 'cards': qa_pick_cards.c}
                   }},
                 {%- endif -%}
               {%- endif -%}
