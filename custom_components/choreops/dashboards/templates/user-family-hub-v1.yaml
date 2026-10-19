@@ -3001,7 +3001,16 @@ views:
                             | selectattr('attributes.family_contributions', 'defined')
                             | map(attribute='entity_id')
                             | list -%}
-                        {%- for fe in family_sensors -%}
+                        {#-- Goals that track people (day streaks, everyone-contributes) go first, then the scoreboards --#}
+                        {%- set fsort = namespace(top=[], rest=[]) -%}
+                        {%- for fe0 in family_sensors -%}
+                          {%- if (state_attr(fe0, 'type') or '') | string | lower in ['family_caught_up_days', 'family_active_days', 'family_everyone_contributes'] -%}
+                            {%- set fsort.top = fsort.top + [fe0] -%}
+                          {%- else -%}
+                            {%- set fsort.rest = fsort.rest + [fe0] -%}
+                          {%- endif -%}
+                        {%- endfor -%}
+                        {%- for fe in fsort.top + fsort.rest -%}
                           {%- if states(fe) not in ['unknown', 'unavailable'] -%}
                             {%- set fname = state_attr(fe, 'achievement_name') | default('Family Goal', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
@@ -3043,6 +3052,7 @@ views:
                             {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
                             {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
                             {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
+                            {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>NEW PERIOD · LEVELS RESET</div>" if (fraw_done and not fdone) else '' -%}
                             {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
                             {%- set sub = '🎉 All levels complete' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ funit ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '') ~ (' · 🏆 top contributor ×' ~ ('%g' | format(fmult)) if fmult > 1 else '')) -%}
                             {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
@@ -3085,7 +3095,7 @@ views:
                               {%- set tinset = 'calc(100% / ' ~ (fcount * 2) ~ ')' -%}
                               {%- set fui_v = "<div style='text-align:left;padding:14px 10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                                 ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
-                                ~ "<div style='flex:1;min-width:0;'><div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
+                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
                                 ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
                                 ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:#22c55e;'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
                                 ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
@@ -3101,18 +3111,18 @@ views:
                                 {%- set lead = (p > 0 and (pts | float(0)) == ftop and ntop == 1) -%}
                                 {%- set pcol = 'var(--warning-color)' if lead else 'var(--primary-color)' -%}
                                 {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                                {%- set rows.v = rows.v ~ "<div style='position:relative;overflow:hidden;border-radius:12px;margin-bottom:4px;border:1px solid var(--divider-color);'>"
+                                {%- set rows.v = rows.v ~ "<div style='position:relative;overflow:hidden;border-radius:12px;border:1px solid var(--divider-color);'>"
                                   ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ ppct ~ "%;background:linear-gradient(90deg,color-mix(in srgb," ~ pcol ~ " 34%,transparent),color-mix(in srgb," ~ pcol ~ " 10%,transparent));'></div>"
-                                  ~ "<div style='position:relative;display:flex;align-items:center;gap:8px;padding:6px 10px;'><div style='width:22px;height:22px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
-                                  ~ "<span style='flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--primary-text-color);'>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><b style='font-size:13px;color:var(--primary-text-color);'>" ~ p ~ "</b></div></div>" -%}
+                                  ~ "<div style='position:relative;display:flex;align-items:center;gap:6px;padding:6px 8px;'><div style='width:20px;height:20px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
+                                  ~ "<span style='flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary-text-color);'>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><b style='font-size:12px;color:var(--primary-text-color);'>" ~ p ~ "</b></div></div>" -%}
                               {%- endfor -%}
-                              {%- set fui_v = "<div style='text-align:left;margin:2px 0 4px 0;'>"
+                              {%- set fui_v = "<div style='text-align:left;padding:10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                                 ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
                                 ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
                                 ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
-                                ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div></div>"
+                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div></div>"
                                 ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
-                                ~ rec_html ~ rows.v ~ "</div>" -%}
+                                ~ rec_html ~ "<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div></div>" -%}
                             {%- endif -%}
 
                             {{
