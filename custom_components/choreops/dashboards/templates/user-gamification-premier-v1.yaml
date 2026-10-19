@@ -923,7 +923,7 @@ views:
 
                   << template_snippets.user_override_helper >>
 
-                  {%- set pref_column_count = 1 -%}
+                  {%- set pref_column_count = 2 -%}
 
                   {%- set pref_use_label_grouping = false -%}
 
@@ -1465,8 +1465,8 @@ views:
                               {%- set ring = "<div style='flex:0 0 auto;width:" ~ ring_size ~ ";height:" ~ ring_size ~ ";border-radius:50%;background:conic-gradient(" ~ bar_color ~ " " ~ pct ~ "%, var(--divider-color) 0);display:flex;align-items:center;justify-content:center;'>" ~ ring_inner ~ "</div>" -%}
                               {%- set top = "<div style='display:flex;align-items:center;gap:12px;'>" ~ ring
                                   ~ "<div style='flex:1;min-width:0;text-align:left;'>"
-                                  ~ "<div style='display:flex;justify-content:space-between;align-items:center;gap:8px;'><span style='font-size:15px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ rname ~ "</span><span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 8px;border-radius:999px;color:" ~ accent ~ ";border:1px solid " ~ accent ~ ";'>" ~ (reward_state_display | string | upper) ~ "</span></div>"
-                                  ~ "<div style='margin-top:2px;font-size:11px;color:var(--secondary-text-color);'>" ~ ui.get('cost', 'Cost') ~ ": <b style='color:var(--primary-text-color);'>" ~ ('%g' | format(reward_cost | round(2))) ~ "</b> <ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;color:var(--primary-color);vertical-align:-2px;display:inline-block;'></ha-icon></div>"
+                                  ~ "<div style='display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:3px 8px;'><span style='min-width:0;max-width:100%;font-size:15px;line-height:1.15;font-weight:800;color:var(--primary-text-color);white-space:normal;overflow-wrap:anywhere;word-break:break-word;'>" ~ rname ~ "</span><span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 8px;border-radius:999px;color:" ~ accent ~ ";border:1px solid " ~ accent ~ ";'>" ~ (reward_state_display | string | upper) ~ "</span></div>"
+                                  ~ "<div style='margin-top:2px;display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:14px;color:var(--secondary-text-color);'><span>" ~ ui.get('cost', 'Cost') ~ ": <b style='color:var(--primary-text-color);'>" ~ ('%g' | format(reward_cost | round(2))) ~ "</b></span><ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;color:var(--primary-color);display:block;transform:translateY(-2px);'></ha-icon></div>"
                                   ~ "</div></div>" -%}
                               {%- set desc_row = ("<div style='margin-top:8px;font-size:11px;line-height:1.3;color:var(--secondary-text-color);text-align:left;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>" ~ rdesc ~ "</div>") if pref_show_reward_description and rdesc | length > 0 else '' -%}
                               {%- set bar = ("<div style='margin-top:10px;'><div style='display:flex;justify-content:space-between;align-items:baseline;font-size:11px;font-weight:700;color:var(--secondary-text-color);'><span>" ~ bar_label ~ "</span><span style='color:var(--primary-text-color);'>" ~ bar_value ~ "</span></div><div style='margin-top:4px;display:flex;align-items:center;gap:8px;'><div style='flex:1;height:10px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ pct ~ "%;min-width:" ~ ('10px' if pct > 0 else '0') ~ ";height:100%;background:" ~ bar_color ~ ";border-radius:999px;'></div></div><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ pct ~ "%</span></div><div style='margin-top:4px;font-size:12px;color:var(--secondary-text-color);text-align:left;'>" ~ bar_note ~ "</div></div>") if (reward_state in ['available', 'locked'] or is_pool) else ("<div style='margin-top:8px;font-size:12px;font-weight:700;color:var(--secondary-text-color);text-align:left;'>" ~ bar_note ~ "</div>") -%}
@@ -1519,19 +1519,18 @@ views:
                                   'tap_action': ({'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': primary_button_eid}} if primary_button_eid not in ['', none] and not primary_button_is_locked else {'action': 'none'})
                                 }}}) -%}
                               {%- endif -%}
-                              {%- set btn_fields = btn_fields | combine({'content': "<div style='width:100%;'>" ~ top ~ desc_row ~ bar ~ foot_row ~ "</div>"}) -%}
+                              {%- set btn_fields = btn_fields | combine({'top_c': "<div style='width:100%;white-space:normal;'>" ~ top ~ desc_row ~ "</div>", 'bar_c': "<div style='width:100%;white-space:normal;'>" ~ bar ~ foot_row ~ "</div>"}) -%}
 
                               {%- if has_secondary -%}
-                                {%- set areas = '"content btn_secondary btn_primary"' -%}
-                                {%- set cols = '1fr 34px 34px' -%}
+                              {%- set areas = '"top_c top_c top_c" "bar_c btn_secondary btn_primary"' -%}
+                              {%- set cols = '1fr 34px 34px' -%}
                               {%- elif has_primary -%}
-                                {%- set areas = '"content btn_primary"' -%}
-                                {%- set cols = '1fr 34px' -%}
+                              {%- set areas = '"top_c top_c" "bar_c btn_primary"' -%}
+                              {%- set cols = '1fr 34px' -%}
                               {%- else -%}
-                                {%- set areas = '"content"' -%}
-                                {%- set cols = '1fr' -%}
+                              {%- set areas = '"top_c" "bar_c"' -%}
+                              {%- set cols = '1fr' -%}
                               {%- endif -%}
-
                               {%- set ns.group_cards = ns.group_cards + [{
                                 'type': 'custom:button-card',
                                 'entity': reward_sensor_eid,
@@ -1550,18 +1549,21 @@ views:
                                     {'border-left': '4px solid ' ~ accent},
                                     {'border-radius': '16px'},
                                     {'padding': '12px 12px 12px 14px'},
+                                    {'height': '100%'},
                                     {'opacity': '0.9' if reward_state == 'locked' else '1.0'}
                                   ],
                                   'grid': [
                                     {'grid-template-areas': areas},
                                     {'grid-template-columns': cols},
+                                    {'grid-template-rows': '1fr auto'},
                                     {'column-gap': '8px'},
                                     {'align-items': 'center'}
                                   ],
                                   'custom_fields': {
-                                    'content': [{'width': '100%'}, {'justify-self': 'stretch'}],
-                                    'btn_primary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'start'}, {'justify-self': 'end'}],
-                                    'btn_secondary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'start'}, {'justify-self': 'end'}]
+                                    'top_c': [{'width': '100%'}, {'justify-self': 'stretch'}, {'align-self': 'start'}],
+                                    'bar_c': [{'width': '100%'}, {'justify-self': 'stretch'}, {'align-self': 'end'}],
+                                    'btn_primary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'end'}, {'justify-self': 'end'}],
+                                    'btn_secondary': [{'width': '34px'}, {'height': '34px'}, {'align-self': 'end'}, {'justify-self': 'end'}]
                                   }
                                 }
                               }] -%}
