@@ -2724,7 +2724,10 @@ views:
                       {%- endif -%}
 
                       {%- set achievement_attrs = states[achievement_eid].attributes | default({}, true) -%}
-                      {%- set achievement_name = (achievement_attrs.get('achievement_name') or (achievement.get('name') if achievement is mapping else none) or state_attr(achievement_eid, 'friendly_name') or '') | string -%}
+                      {%- if 'family_total' in achievement_attrs -%}
+                      {%- continue -%}
+                    {%- endif -%}
+                    {%- set achievement_name = (achievement_attrs.get('achievement_name') or (achievement.get('name') if achievement is mapping else none) or state_attr(achievement_eid, 'friendly_name') or '') | string -%}
                       {%- set assigned_raw = achievement_attrs.get('assigned_user_names', achievement_attrs.get('assigned_assignees')) -%}
                       {%- set assigned_users = [] -%}
                       {%- if assigned_raw is string -%}
@@ -2840,7 +2843,118 @@ views:
                       }},
 
                       {%- if not header_collapsed -%}
-                        {%- if sorted_achievements | length == 0 -%}
+                        {#-- FAMILY GOALS: sits under the header and hides when it is collapsed --#}
+                        {%- set family_sensors = integration_entities('choreops')
+                            | select('search', '^sensor\\.')
+                            | list
+                            | expand
+                            | selectattr('attributes.family_contributions', 'defined')
+                            | map(attribute='entity_id')
+                            | list -%}
+                        {%- for fe in family_sensors -%}
+                          {%- if states(fe) not in ['unknown', 'unavailable'] -%}
+                            {%- set fname = state_attr(fe, 'achievement_name') | default('Family Goal', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set ficon = state_attr(fe, 'icon') or 'mdi:trophy' -%}
+                            {%- set flevels = (state_attr(fe, 'family_levels') or []) | map('float', 0) | list -%}
+                            {%- set frewards = (state_attr(fe, 'family_level_rewards') or []) | map('float', 0) | list -%}
+                            {%- set flevel = state_attr(fe, 'family_level') | int(0) -%}
+                            {%- set fcount = flevels | length -%}
+                            {%- set fnext = state_attr(fe, 'family_next_target') | float(0) -%}
+                            {%- set ftarget = (fnext if fnext > 0 else (state_attr(fe, 'target_value') | float(0))) | round(0) | int -%}
+                            {%- set freward = state_attr(fe, 'family_next_reward') | float(0) | round(0) | int -%}
+                            {%- set fmult = state_attr(fe, 'family_top_multiplier') | float(1) -%}
+                            {%- set ftotal = state_attr(fe, 'family_total') | float(0) | round(0) | int -%}
+                            {#-- A goal that reset for a new period keeps its reached levels but starts a new total, so only call it done while the total is still at the last level --#}
+                            {%- set fraw_done = fcount > 0 and flevel >= fcount -%}
+                            {%- set fdone = fraw_done and ftotal >= ((flevels | last) | float(0)) -%}
+                            {%- set elevel = (fcount - 1) if (fraw_done and not fdone) else flevel -%}
+                            {%- set fshares = state_attr(fe, 'family_level_contributions') or state_attr(fe, 'family_contributions') or {} -%}
+                            {%- set wtarget = ((flevels | last) if (fdone and fcount > 0) else ftarget) | float(1) | round(0) | int -%}
+                            {%- set pidx = (elevel - 1) if not fdone else (fcount - 2) -%}
+                            {%- set fprev = ((flevels[pidx] | round(0) | int) if (fcount > 1 and pidx >= 0) else 0) -%}
+                            {%- set wspan = [wtarget - fprev, 1] | max -%}
+                            {%- set winto = [[ftotal - fprev, 0] | max, wspan] | min -%}
+                            {%- set bpct = ((winto / wspan) * 100) | round(1) -%}
+                            {%- set togo = [ftarget - ftotal, 0] | max -%}
+                            {%- set ftop = (fshares.values() | map('float', 0) | list | max) if fshares else 0 -%}
+                            {%- set accent = '#22c55e' if fdone else '#8b5cf6' -%}
+                            {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
+
+                            {%- set pips = namespace(v='') -%}
+                            {%- if fcount > 1 -%}
+                              {%- for lv in flevels -%}
+                                {%- set pcol_l = '#22c55e' if loop.index <= elevel else ('#8b5cf6' if loop.index == elevel + 1 else 'var(--divider-color)') -%}
+                                {%- set pips.v = pips.v ~ "<div style='flex:1;height:5px;border-radius:999px;background:" ~ pcol_l ~ ";'></div>" -%}
+                              {%- endfor -%}
+                            {%- endif -%}
+                            {%- set lvl_txt = ('✓ ALL ' ~ fcount ~ ' LEVELS' if fdone else ('LEVEL ' ~ (elevel + 1) ~ ' OF ' ~ fcount)) if fcount > 1 else '' -%}
+
+                            {%- set sub = '🎉 ALL LEVELS COMPLETE' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '') ~ (' · 🏆 top contributor ×' ~ ('%g' | format(fmult)) if fmult > 1 else '')) -%}
+
+                            {%- set fui = namespace(v='') -%}
+                            {%- set fui.v = "<div style='text-align:left;padding:14px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "55;'>"
+                              ~ "<div style='display:flex;align-items:center;gap:10px;margin-bottom:12px;'>"
+                              ~ "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>"
+                              ~ "<div style='flex:1;min-width:0;'><div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "</div>"
+                              ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ "</div></div></div>"
+                              ~ ("<div style='display:flex;gap:3px;margin-bottom:6px;'>" ~ pips.v ~ "</div><div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:" ~ accent ~ ";margin-bottom:6px;'>" ~ lvl_txt ~ "</div>" if fcount > 1 else '')
+                              ~ "<div style='position:relative;height:18px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;min-width:" ~ ('18px' if bpct > 0 else '0') ~ ";border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"
+                              ~ "<div style='display:flex;justify-content:space-between;margin-top:5px;font-size:10px;font-weight:800;color:var(--secondary-text-color);'><span>" ~ fprev ~ "</span><span>" ~ wtarget ~ "</span></div>"
+                              ~ "<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);margin-top:2px;'>" ~ sub ~ "</div></div>" -%}
+
+                            {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
+                            {%- set frecord_day = state_attr(fe, 'family_record_day') or '' -%}
+                            {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
+                            {%- if frecord > 0 -%}
+                              {%- set fui.v = fui.v ~ "<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);margin:6px 0 4px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>" -%}
+                            {%- endif -%}
+
+                            {%- if fshares -%}
+                              {%- set rows = namespace(v='') -%}
+                              {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
+                                {%- set p = pts | float(0) | round(0) | int -%}
+                                {%- set ppct = ([((p / ftop) * 100) | round(0) | int, 100] | min) if ftop > 0 else 0 -%}
+                                {%- set lead = (p > 0 and (pts | float(0)) == ftop) -%}
+                                {%- set pcol = 'var(--warning-color)' if lead else 'var(--primary-color)' -%}
+                                {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                                {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:8px;margin-bottom:8px;'>"
+                                  ~ "<div style='width:26px;height:26px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
+                                  ~ "<div style='flex:1;min-width:0;'><div style='display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--primary-text-color);'><span>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><span>" ~ p ~ "</span></div>"
+                                  ~ "<div style='height:6px;background:var(--divider-color);border-radius:999px;margin-top:3px;'><div style='width:" ~ ppct ~ "%;height:100%;border-radius:999px;background:" ~ pcol ~ ";'></div></div></div></div>" -%}
+                              {%- endfor -%}
+                              {%- set fui.v = fui.v ~ "<div style='text-align:left;margin:8px 2px 4px 2px;'>" ~ rows.v ~ "</div>" -%}
+                            {%- endif -%}
+
+                            {{
+                              {
+                                'type': 'custom:button-card',
+                                'show_name': false,
+                                'show_icon': false,
+                                'tap_action': {'action': 'none'},
+                                'hold_action': {'action': 'none'},
+                                'custom_fields': {'content': fui.v},
+                                'styles': {
+                                  'card': [
+                                    {'background': 'transparent'},
+                                    {'box-shadow': 'none'},
+                                    {'border': 'none'},
+                                    {'padding': '0px'},
+                                    {'min-height': 'unset'}
+                                  ],
+                                  'grid': [
+                                    {'grid-template-areas': '"content"'},
+                                    {'grid-template-columns': '1fr'}
+                                  ],
+                                  'custom_fields': {
+                                    'content': [{'width': '100%'}]
+                                  }
+                                }
+                              }
+                            }},
+                          {%- endif -%}
+                        {%- endfor -%}
+                        {%- if sorted_achievements | length == 0 and family_sensors | length == 0 -%}
                           {{
                             {
                               'type': 'custom:button-card',
@@ -2887,134 +3001,73 @@ views:
                           }},
                         {%- else -%}
                           {%- for achievement in sorted_achievements -%}
-                          {%- set status_label = ui.get('earned', 'err-earned') if achievement.awarded else ui.get('in_progress', 'err-in_progress') -%}
-                          {%- set status_color = 'var(--success-color)' if achievement.awarded else 'var(--primary-color)' -%}
-                          {%- set type_label =
-                            ui.get('streak', 'err-streak') if achievement.type == 'chore_streak'
-                            else ui.get('per_day_goal', 'err-per_day_goal') if achievement.type == 'daily_minimum'
-                            else ui.get('total_chores', 'err-total_chores') if achievement.type in ['total_within_window', 'total_chores']
-                            else ui.get(achievement.type, achievement.type | replace('_', ' ') | title)
-                          -%}
-                          {%- set description_safe = achievement.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                          {%- set criteria_safe = achievement.criteria | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                          {%- set chore_safe = achievement.associated_chore | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                          {%- set assigned_safe = achievement.assigned_users | join(', ') | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-
-                          {%- set details_line = '' -%}
-                          {%- if description_safe | length > 0 -%}
-                            {%- set details_line = description_safe -%}
-                          {%- endif -%}
-                          {%- if criteria_safe | length > 0 -%}
-                            {%- set details_line = details_line ~ ('<br>' if details_line | length > 0 else '') ~ "<span style='font-size:11px;line-height:1.3;'>📌 " ~ ui.get('criteria', 'err-criteria') ~ ": " ~ criteria_safe ~ "</span>" -%}
-                          {%- endif -%}
-                          {%- if achievement.reward_points > 0 -%}
-                            {%- set reward_text = ('%.1f' | format(achievement.reward_points)) | regex_replace('\.?0+$', '') -%}
-                            {%- set details_line = details_line ~ ('<br>' if details_line | length > 0 else '') ~ "<span style='display:inline-block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:700;color:var(--primary-text-color);'><ha-icon icon='mdi:diamond-stone' style='width:12px;height:12px;color:var(--primary-color);transform:translateY(-1px);'></ha-icon> " ~ ui.get('reward', 'err-reward') ~ ": " ~ reward_text ~ " <ha-icon icon='" ~ points_icon ~ "' style='width:12px;height:12px;color:var(--primary-color);transform:translateY(-2px);'></ha-icon></span>" -%}
-                          {%- endif -%}
-
-                          {%- set status_row = "<b style='color:" ~ status_color ~ ";'>" ~ ('✅ ' if achievement.awarded else '⏳ ') ~ status_label | upper ~ "</b>" -%}
-                          {%- set goal_text = '' -%}
-                          {%- if achievement.target_value > 0 -%}
-                            {%- set goal_text = ui.get('goal', 'err-goal') ~ ': ' ~ achievement.target_value|string ~ ' • ' ~ type_label -%}
-                          {%- elif type_label | length > 0 -%}
-                            {%- set goal_text = type_label -%}
-                          {%- endif -%}
-                          {%- if goal_text | length > 0 -%}
-                            {%- set status_row = status_row ~ " <span style='opacity:0.7;'>•</span> <span>🎯 " ~ goal_text ~ "</span>" -%}
-                          {%- endif -%}
-
-                          {%- set progress_html = '' -%}
-                          {%- if not achievement.awarded and achievement.target_value > 0 -%}
-                            {%- set progress_pct = achievement.progress_pct | float(default=0) -%}
-                            {%- if progress_pct < 0 -%}{%- set progress_pct = 0 -%}{%- endif -%}
-                            {%- if progress_pct > 100 -%}{%- set progress_pct = 100 -%}{%- endif -%}
-                            {%- set progress_display = ('%.0f' | format(progress_pct)) -%}
-                            {%- set progress_html = "<div style='margin-top:2px;padding:8px 10px;border-radius:8px;background:var(--secondary-background-color);border:1px solid var(--divider-color);'><div style='display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;'><span><ha-icon icon='mdi:trophy' style='width:14px;height:14px;color:" ~ status_color ~ ";transform:translateY(-1px);'></ha-icon> " ~ ui.get('progress', 'err-progress') ~ "</span><span style='font-weight:600;'>" ~ ((achievement.progress_clamped | round(2)) | string | regex_replace('\.?0+$', '')) ~ "/" ~ ((achievement.target_value | round(2)) | string | regex_replace('\.?0+$', '')) ~ "</span></div><div style='margin-top:6px;display:flex;align-items:center;gap:6px;'><div style='flex:1;height:6px;background:var(--divider-color);border-radius:999px;overflow:hidden;'><div style='width:" ~ progress_display ~ "%;height:100%;background:" ~ status_color ~ ";border-radius:999px;'></div></div><span style='font-size:10px;color:var(--secondary-text-color);line-height:1;'>" ~ progress_display ~ "%</span></div></div>" -%}
-                          {%- endif -%}
-
-                          {%- set stats_left = '' -%}
-                          {%- if chore_safe | length > 0 -%}
-                            {%- set stats_left = "🛠 " ~ ui.get('related_chore', 'err-related_chore') ~ ": " ~ chore_safe -%}
-                          {%- elif criteria_safe | length > 0 and details_line | length == 0 -%}
-                            {%- set stats_left = "📌 " ~ ui.get('criteria', 'err-criteria') ~ ": " ~ criteria_safe -%}
-                          {%- endif -%}
-                          {%- set stats_right = status_label -%}
-                          {%- set stats_html = '' -%}
-                          {%- if stats_left | length > 0 or stats_right | length > 0 -%}
-                            {%- set stats_html = "<div style='display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:8px;width:100%;'><span style='min-width:0;display:block;white-space:normal;'>" ~ stats_left ~ "</span><span style='display:block;font-size:10px;font-weight:700;color:" ~ status_color ~ ";text-align:right;white-space:nowrap;justify-self:end;'>" ~ stats_right ~ "</span></div>" -%}
-                          {%- endif -%}
-
-                          {{
-                            {
-                              'type': 'custom:button-card',
-                              'entity': achievement.entity_id,
-                              'name': achievement.name,
-                              'icon': achievement.icon,
-                              'show_name': true,
-                              'show_icon': true,
-                              'show_label': false,
-                              'tap_action': {'action': 'more-info'},
-                              'custom_fields': {
-                                'details': status_row ~ ('<br>' ~ details_line if details_line | length > 0 else ''),
-                                'progress': progress_html,
-                                'stats': stats_html
-                              },
-                              'styles': {
-                                'card': [
-                                  {'padding': '12px 14px'},
-                                  {'border-radius': '14px'},
-                                  {'background-color': 'var(--card-background-color)'},
-                                  {'border': ('1px solid var(--success-color)' if achievement.awarded else '1px solid var(--divider-color)')},
-                                  {'box-shadow': ('0 2px 6px rgba(0,0,0,0.08)' if achievement.awarded else 'none')}
-                                ],
-                                'grid': [
-                                  {'grid-template-areas': '"i n" "i details" "progress progress" "stats stats"'},
-                                  {'grid-template-columns': '44px 1fr'},
-                                  {'row-gap': '4px'},
-                                  {'column-gap': '10px'}
-                                ],
-                                'icon': [
-                                  {'width': '38px'},
-                                  {'height': '38px'},
-                                  {'color': status_color}
-                                ],
-                                'name': [
-                                  {'justify-self': 'start'},
-                                  {'font-size': '16px'},
-                                  {'font-weight': '600'},
-                                  {'color': 'var(--primary-text-color)'}
-                                ],
-                                'custom_fields': {
-                                  'details': [
-                                    {'justify-self': 'start'},
-                                    {'font-size': '11px'},
-                                    {'font-weight': '600'},
-                                    {'color': 'var(--secondary-text-color)'},
-                                    {'text-align': 'left'},
-                                    {'white-space': 'normal'},
-                                    {'line-height': '1.3'},
-                                    {'display': 'block'}
+                            {%- set a_accent = 'var(--success-color)' if achievement.awarded else 'var(--primary-color)' -%}
+                            {%- set a_fill = 100 if achievement.awarded else ([[achievement.progress_pct | float(0), 0] | max, 100] | min) -%}
+                            {%- set a_name = achievement.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set a_desc = achievement.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set a_crit = achievement.criteria | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set a_chore = achievement.associated_chore | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set a_type = (
+                              ui.get('streak', 'err-streak') if achievement.type == 'chore_streak'
+                              else ui.get('per_day_goal', 'err-per_day_goal') if achievement.type == 'daily_minimum'
+                              else ui.get('total_chores', 'err-total_chores') if achievement.type in ['total_within_window', 'total_chores']
+                              else ui.get(achievement.type, achievement.type | replace('_', ' ') | title)
+                            ) -%}
+                            {%- set a_sub = a_desc if a_desc | length > 0 else (a_crit if a_crit | length > 0 else a_type) -%}
+                            {%- set a_sub2 = '' -%}
+                            {%- if a_desc | length > 0 and a_crit | length > 0 -%}
+                              {%- set a_sub2 = "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;'>📌 " ~ ui.get('criteria', 'err-criteria') ~ ": " ~ a_crit ~ "</div>" -%}
+                            {%- endif -%}
+                            {%- if a_chore | length > 0 -%}
+                              {%- set a_sub2 = a_sub2 ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;'>🛠 " ~ ui.get('related_chore', 'err-related_chore') ~ ": " ~ a_chore ~ "</div>" -%}
+                            {%- endif -%}
+                            {%- if achievement.awarded -%}
+                              {%- set a_right = "<div style='font-size:11px;font-weight:800;color:var(--success-color);white-space:nowrap;'>✓ " ~ (ui.get('earned', 'err-earned') | upper) ~ "</div>" -%}
+                            {%- elif achievement.target_value > 0 -%}
+                              {%- set a_right = "<div style='font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ (achievement.progress_clamped | round(0) | int) ~ "<span style='opacity:0.6;font-weight:600;'> / " ~ achievement.target_value ~ "</span></div>" -%}
+                            {%- else -%}
+                              {%- set a_right = "<div style='font-size:11px;font-weight:800;color:var(--primary-color);white-space:nowrap;'>" ~ (ui.get('in_progress', 'err-in_progress') | upper) ~ "</div>" -%}
+                            {%- endif -%}
+                            {%- if achievement.reward_points > 0 -%}
+                              {%- set a_reward_text = ('%.1f' | format(achievement.reward_points)) | regex_replace('\\.?0+$', '') -%}
+                              {%- set a_right = a_right ~ "<div style='display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;color:var(--warning-color);white-space:nowrap;'>+" ~ a_reward_text ~ "<ha-icon icon='" ~ points_icon ~ "' style='width:13px;height:13px;--mdc-icon-size:13px;display:block;'></ha-icon></div>" -%}
+                            {%- endif -%}
+                            {%- set a_edge = "<div style='position:absolute;left:" ~ a_fill ~ "%;top:0;bottom:0;width:3px;margin-left:-3px;background:var(--primary-color);'></div>" if (not achievement.awarded and a_fill > 0 and a_fill < 100) else '' -%}
+                            {%- set a_html = "<div style='position:relative;overflow:hidden;border-radius:16px;text-align:left;'>"
+                              ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ a_fill ~ "%;background:linear-gradient(90deg,color-mix(in srgb," ~ a_accent ~ " 10%,transparent),color-mix(in srgb," ~ a_accent ~ " " ~ ('14' if achievement.awarded else '24') ~ "%,transparent));'></div>" ~ a_edge
+                              ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>"
+                              ~ "<div style='width:44px;height:44px;border-radius:14px;background:color-mix(in srgb," ~ a_accent ~ " 16%,var(--card-background-color));display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ achievement.icon ~ "' style='width:26px;height:26px;--mdc-icon-size:26px;color:" ~ a_accent ~ ";display:block;'></ha-icon></div>"
+                              ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ a_name ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;'>" ~ a_sub ~ "</div>" ~ a_sub2 ~ "</div>"
+                              ~ "<div style='text-align:right;flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px;'>" ~ a_right ~ "</div>"
+                              ~ "</div></div>" -%}
+                            {{
+                              {
+                                'type': 'custom:button-card',
+                                'entity': achievement.entity_id,
+                                'show_name': false,
+                                'show_icon': false,
+                                'show_label': false,
+                                'tap_action': {'action': 'more-info'},
+                                'custom_fields': {'content': a_html},
+                                'styles': {
+                                  'card': [
+                                    {'padding': '0px'},
+                                    {'border-radius': '16px'},
+                                    {'overflow': 'hidden'},
+                                    {'background-color': 'var(--card-background-color)'},
+                                    {'border': ('1px solid color-mix(in srgb, var(--success-color) 55%, var(--divider-color))' if achievement.awarded else '1px solid var(--divider-color)')},
+                                    {'box-shadow': 'none'}
                                   ],
-                                  'progress': [
-                                    {'width': '100%'},
-                                    {'text-align': 'left'},
-                                    {'display': 'block' if progress_html | length > 0 else 'none'}
+                                  'grid': [
+                                    {'grid-template-areas': '"content"'},
+                                    {'grid-template-columns': '1fr'}
                                   ],
-                                  'stats': [
-                                    {'justify-self': 'stretch'},
-                                    {'width': '100%'},
-                                    {'font-size': '11px'},
-                                    {'color': 'var(--secondary-text-color)'},
-                                    {'text-align': 'left'},
-                                    {'white-space': 'normal'},
-                                    {'line-height': '1.3'},
-                                    {'display': 'block' if stats_html | length > 0 else 'none'},
-                                    {'margin-top': '2px'}
-                                  ]
+                                  'custom_fields': {
+                                    'content': [{'width': '100%'}]
+                                  }
                                 }
                               }
-                            }
-                          }},
+                            }},
                           {%- endfor -%}
                         {%- endif -%}
                       {%- endif -%}
