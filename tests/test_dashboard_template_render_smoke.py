@@ -215,6 +215,7 @@ def _build_runtime_template_env(
     env = jinja2.Environment(undefined=jinja2.StrictUndefined)
     env.filters["expand"] = expand_filter
     env.filters["bool"] = bool_filter
+    env.filters["combine"] = lambda value, *others, **_kw: {**value, **{k: v for o in others for k, v in o.items()}}
     env.tests["search"] = lambda value, pattern: (
         __import__("re").search(pattern, value) is not None
     )
@@ -1560,3 +1561,53 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
     assert "user-family-home-v1" not in dh.get_assignee_template_ids()
     assert "user-family-home-v1" not in dh.get_admin_template_ids()
     assert dh.get_template_source_path("user-family-home-v1")
+
+
+def test_admin_family_goals_card_lists_goals_with_reset_service() -> None:
+    """Family goals card dedupes goals across people and wires the reset service."""
+
+    goals_template = _get_admin_filter_template(
+        "admin-shared-v1", "===== FAMILY GOALS (RESET) ====="
+    )
+    mock_states = _base_admin_system_administration_states()
+    mock_states["sensor.shared_admin_dashboard_helper"].attributes["ui_control"] = {
+        "admin-shared": {"family-goals": {"header-collapse": False}}
+    }
+    mock_states["sensor.alice_dashboard_helper"].attributes["achievements"] = [
+        {"eid": "sensor.goal_pizza"}
+    ]
+    mock_states["sensor.goal_pizza"] = _MockState(
+        entity_id="sensor.goal_pizza",
+        state="active",
+        attributes={
+            "achievement_name": "Pizza Night",
+            "family_contributions": {"Alice": 4},
+            "family_total": 4,
+            "family_levels": [10, 20],
+            "family_level": 0,
+            "family_next_target": 10,
+            "icon": "mdi:pizza",
+        },
+        name="Pizza Night",
+    )
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+
+    output = env.from_string(goals_template).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    parsed = yaml.safe_load(f"[{output}]")
+
+    assert len(parsed) == 2
+    assert parsed[0]["name"] == "Family goals"
+    reset_tap = parsed[1]["custom_fields"]["reset"]["card"]["tap_action"]
+    assert reset_tap["service"] == "choreops.reset_family_goal"
+    assert reset_tap["data"] == {
+        "achievement_name": "Pizza Night",
+        "config_entry_id": "entry-123",
+    }
+    assert "confirmation" in reset_tap
+    assert "4 / 10" in parsed[1]["custom_fields"]["label"]

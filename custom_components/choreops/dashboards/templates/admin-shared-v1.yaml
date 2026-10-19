@@ -880,6 +880,177 @@ views:
           card_param: cards
           filter:
             template: |-
+              {#-- ===== FAMILY GOALS (RESET) ===== --#}
+              << template_snippets.user_override_helper >>
+
+              << template_snippets.admin_setup_shared >>
+
+              {%- set pref_fg_ui_control_key_root = 'admin-shared/family-goals' -%}
+              {%- set pref_fg_default_collapsed = true -%}
+              {%- set fg_key = pref_fg_ui_control_key_root ~ '/header-collapse' -%}
+              {%- set fg_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set fg_ui = namespace(current=ui_root.shared_admin if ui_root.shared_admin is mapping else {}) -%}
+              {%- for segment in pref_fg_ui_control_key_root.split('/') -%}
+                {%- if fg_ui.current is mapping -%}
+                  {%- set fg_ui.current = fg_ui.current.get(segment, {}) -%}
+                {%- else -%}
+                  {%- set fg_ui.current = {} -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- set fg_has_override = fg_ui.current is mapping and 'header-collapse' in fg_ui.current -%}
+              {%- set fg_collapsed = fg_ui.current['header-collapse'] if fg_has_override else pref_fg_default_collapsed -%}
+              {%- set fg_collapsed = (fg_collapsed | string | lower) == 'true' -%}
+              {#-- Family goals show up in every person's achievement list; find them once by name --#}
+              {%- set fg = namespace(goals={}) -%}
+              {%- for h in helper_sensor_entities -%}
+                {%- for ach in (h.attributes.get('achievements') or []) -%}
+                  {%- set ach_eid = ach.get('eid') if ach is mapping else ach -%}
+                  {%- if ach_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(ach_eid) not in ['unknown', 'unavailable'] and state_attr(ach_eid, 'family_contributions') is defined and state_attr(ach_eid, 'family_contributions') is not none -%}
+                    {%- set ach_name = (state_attr(ach_eid, 'achievement_name') or 'Family Goal') | string -%}
+                    {%- if ach_name not in fg.goals -%}
+                      {%- set fg.goals = fg.goals | combine({ach_name: ach_eid}) -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {%- if fg.goals | length > 0 -%}
+              {{
+                {
+                  'type': 'custom:button-card',
+                  'show_name': true,
+                  'show_label': true,
+                  'show_state': false,
+                  'show_icon': true,
+                  'icon': 'mdi:flag-checkered',
+                  'name': 'Family goals',
+                  'label': (fg.goals | length) ~ (' goal' if fg.goals | length == 1 else ' goals') if fg_collapsed else 'Reset a goal to start it over',
+                  'tap_action': ({
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': fg_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'update',
+                      'key': fg_key,
+                      'value': false
+                    }
+                  } if fg_collapsed and fg_entry_id not in ['', none] else {
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': fg_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'remove',
+                      'key': fg_key
+                    }
+                  } if fg_entry_id not in ['', none] else {
+                    'action': 'none'
+                  }),
+                  'hold_action': {'action': 'none'},
+                  'custom_fields': {
+                    'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if fg_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                  },
+                  'styles': {
+                    'card': [
+                      {'margin-top': '12px'},
+                      {'padding': '14px 16px'},
+                      {'border-radius': '16px'},
+                      {'box-shadow': 'none'},
+                      {'border': '1px solid color-mix(in srgb, var(--primary-color) 14%, var(--divider-color))'},
+                      {'background-color': 'color-mix(in srgb, var(--primary-color) 14%, var(--card-background-color))'}
+                    ],
+                    'grid': [
+                      {'grid-template-areas': '"i n toggle" "i l toggle"'},
+                      {'grid-template-columns': '32px minmax(0, 1fr) min-content'},
+                      {'grid-template-rows': 'min-content min-content'},
+                      {'column-gap': '14px'},
+                      {'row-gap': '2px'},
+                      {'align-items': 'center'}
+                    ],
+                    'icon': [{'width': '24px'}, {'height': '24px'}, {'align-self': 'center'}],
+                    'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '14px'}, {'font-weight': '700'}, {'line-height': '1.2'}, {'text-transform': 'uppercase'}],
+                    'label': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'opacity': '0.7'}],
+                    'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                  }
+                }
+              }},
+              {%- if not fg_collapsed -%}
+              {%- for gname, geid in fg.goals.items() -%}
+                {%- set gtotal = state_attr(geid, 'family_total') | float(0) | round(0) | int -%}
+                {%- set glevels = (state_attr(geid, 'family_levels') or []) | map('float', 0) | list -%}
+                {%- set glevel = state_attr(geid, 'family_level') | int(0) -%}
+                {%- set gnext = state_attr(geid, 'family_next_target') | float(0) -%}
+                {%- set gtarget = (gnext if gnext > 0 else (state_attr(geid, 'target_value') | float(0))) | round(0) | int -%}
+                {%- set gicon = state_attr(geid, 'icon') or 'mdi:trophy' -%}
+                {%- set gsafe = gname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {%- set gprogress = (gtotal ~ ' / ' ~ gtarget) if gtarget > 0 else (gtotal | string) -%}
+                {%- set gsub = gprogress ~ ((' · Level ' ~ glevel ~ ' of ' ~ (glevels | length)) if glevels | length > 0 else '') -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'none'},
+                    'custom_fields': {
+                      'label': "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:34px;height:34px;border-radius:11px;background:var(--primary-color);display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ gicon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);white-space:normal;'>" ~ gsafe ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);'>" ~ gsub ~ "</div></div></div>",
+                      'reset': {'card': {
+                        'type': 'custom:button-card',
+                        'name': 'Reset',
+                        'icon': 'mdi:restart',
+                        'show_name': true,
+                        'show_icon': true,
+                        'tap_action': {
+                          'action': 'call-service',
+                          'service': 'choreops.reset_family_goal',
+                          'data': {
+                            'achievement_name': gname,
+                            'config_entry_id': fg_entry_id
+                          },
+                          'confirmation': {'text': 'Reset ' ~ gname ~ '? Progress and awards start over from zero. Points already paid are not taken back.'}
+                        },
+                        'styles': {
+                          'card': [
+                            {'padding': '6px 10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'},
+                            {'background': 'color-mix(in srgb, #ef4444 14%, transparent)'},
+                            {'border': '1.5px solid #ef4444'}
+                          ],
+                          'grid': [{'grid-template-areas': '"i n"'}, {'grid-template-columns': 'min-content min-content'}, {'column-gap': '4px'}],
+                          'icon': [{'width': '16px'}, {'color': '#ef4444'}],
+                          'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': '#ef4444'}]
+                        }
+                      }}
+                    },
+                    'styles': {
+                      'card': [
+                        {'background': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'},
+                        {'border': '1px solid var(--divider-color)'},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'padding': '8px 12px'},
+                        {'min-height': 'unset'}
+                      ],
+                      'grid': [
+                        {'grid-template-areas': '"label reset"'},
+                        {'grid-template-columns': '1fr auto'},
+                        {'column-gap': '8px'},
+                        {'align-items': 'center'}
+                      ],
+                      'custom_fields': {'label': [{'justify-self': 'start'}, {'min-width': '0'}]}
+                    }
+                  }
+                }},
+              {%- endfor -%}
+              {%- endif -%}
+              {%- endif -%}
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
               {#-- ===== MANAGEMENT ===== --#}
 
               << template_snippets.meta_stamp >>
