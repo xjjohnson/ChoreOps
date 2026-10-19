@@ -81,6 +81,7 @@ views:
                   lanes=[],
                   chore_groups=[],
                   reward_groups=[],
+                  all_ids=[],
                   total_chore_pending=0,
                   total_reward_pending=0,
                   pending_user_count=0,
@@ -525,6 +526,7 @@ views:
                           }
                         }
                       } -%}
+                      {%- set ns.all_ids = ns.all_ids + k_ids -%}
                       {%- if kind == 'chores' -%}
                         {%- set ns.chore_groups = ns.chore_groups + [group_card] -%}
                       {%- else -%}
@@ -655,6 +657,35 @@ views:
                       }
                     }
                   }},
+                  {%- if ns.all_ids | length > 0 -%}
+                  {{
+                    {
+                      'type': 'custom:button-card',
+                      'entity': ns.all_ids[0],
+                      'show_name': True,
+                      'show_label': True,
+                      'show_icon': True,
+                      'show_state': False,
+                      'icon': 'mdi:check-all',
+                      'name': ui.get('approve_all', 'Approve all') ~ ' (' ~ (ns.all_ids | length) ~ ')',
+                      'label': (ns.total_chore_pending | string) ~ ' ' ~ ui.get('chores', 'Chores') | lower ~ ' · ' ~ (ns.total_reward_pending | string) ~ ' ' ~ ui.get('rewards', 'Rewards') | lower ~ ' · ' ~ (ns.pending_user_count | string) ~ ' ' ~ ui.get('people', 'people'),
+                      'tap_action': {
+                        'action': 'call-service',
+                        'service': 'button.press',
+                        'data': {'entity_id': ns.all_ids},
+                        'confirmation': {'text': ui.get('approve', 'Approve') ~ ' ' ~ (ns.all_ids | length) ~ ' pending item(s) for everyone?'}
+                      },
+                      'hold_action': {'action': 'none'},
+                      'styles': {
+                        'card': [{'padding': '12px 14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'margin-top': '4px'}, {'background': 'var(--success-color)'}, {'border': 'none'}],
+                        'grid': [{'grid-template-areas': '"i n" "i l"'}, {'grid-template-columns': '32px 1fr'}, {'column-gap': '12px'}, {'align-items': 'center'}],
+                        'icon': [{'width': '24px'}, {'color': '#fff'}],
+                        'name': [{'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '800'}, {'color': '#fff'}],
+                        'label': [{'justify-self': 'start'}, {'font-size': '11px'}, {'color': 'rgba(255,255,255,0.85)'}, {'text-transform': 'none'}]
+                      }
+                    }
+                  }},
+                  {%- endif -%}
                   {%- for section in [['chores', ui.get('chores', 'Chores'), ns.chore_groups], ['rewards', ui.get('rewards', 'Rewards'), ns.reward_groups]] -%}
                     {%- if section[2] | length > 0 -%}
                       {{
