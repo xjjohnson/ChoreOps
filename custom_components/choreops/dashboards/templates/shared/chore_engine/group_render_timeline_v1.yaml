@@ -77,7 +77,7 @@
 						'gamification_enabled': gamification_enabled,
 						'points_label': points_label,
 						'points_icon': points_icon,
-						'timeline_group_id': group.id,
+						'timeline_group_id': (group.id | default('', true) | string),
 						'timeline_first': false,
 						'timeline_last': (tl.idx == tl.total and loop.last)
 					}
