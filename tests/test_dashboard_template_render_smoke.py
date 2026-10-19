@@ -1573,6 +1573,7 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
         release_version=None,
         generated_at="2026-10-19T00:00:00+00:00",
         root_button_card_templates=root_templates,
+        user_names=["Dad", "Lily"],
     )
 
     assert view["path"] == "home"
@@ -1591,6 +1592,8 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
         if card["type"] == "custom:auto-entities":
             env.parse(card["filter"]["template"])
     assert "family-hub-" in cards[1]["filter"]["template"]
+    assert '["Dad", "Lily"]' in cards[1]["filter"]["template"]
+    assert '["Dad", "Lily"]' in cards[3]["filter"]["template"]
     assert "user-family-home-v1" not in dh.get_assignee_template_ids()
     assert "user-family-home-v1" not in dh.get_admin_template_ids()
     assert dh.get_template_source_path("user-family-home-v1")
