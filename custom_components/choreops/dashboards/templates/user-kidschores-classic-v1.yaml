@@ -884,21 +884,11 @@ views:
                             {%- set reward_cost_display = (reward_cost_value | round(0) | int) | string -%}
                           {%- endif -%}
 
-                          {%- set reward_secondary = "💰 " ~ ui.get('cost', 'err-cost') ~ ": " ~ reward_cost_display ~ " | 👍 " ~ reward_approvals|string ~ " | 📥 " ~ reward_claims|string -%}
-                          {#-- Family pool: show pooled progress and your share instead of the cost --#}
-                          {%- if state_attr(reward_sensor_eid, 'pooled') | default(false, true) -%}
-                            {%- set pool_total = state_attr(reward_sensor_eid, 'pool_total') | float(default=0) | round(2) -%}
-                            {%- set pool_mine = state_attr(reward_sensor_eid, 'pool_my_contribution') | float(default=0) | round(2) -%}
-                            {%- set pool_total_text = (pool_total | int) | string if pool_total == (pool_total | int) else pool_total | string -%}
-                            {%- set pool_mine_text = (pool_mine | int) | string if pool_mine == (pool_mine | int) else pool_mine | string -%}
-                            {%- set reward_secondary = "💰 " ~ ui.get('pool', 'err-pool') ~ ": " ~ pool_total_text ~ " / " ~ reward_cost_display ~ " | 🙋 " ~ ui.get('you', 'err-you') ~ ": " ~ pool_mine_text -%}
-                          {%- endif -%}
-
                           {%- set ns.group_cards = ns.group_cards + [{
                             'type': 'custom:mushroom-template-card',
                             'entity': reward_sensor_eid,
                             'primary': reward_name ~ " ( " ~ reward_state_display ~ " )",
-                            'secondary': reward_secondary,
+                            'secondary': "💰 " ~ ui.get('cost', 'err-cost') ~ ": " ~ reward_cost_display ~ " | 👍 " ~ reward_approvals|string ~ " | 📥 " ~ reward_claims|string,
                             'icon': reward_icon,
                             'icon_color': icon_color,
                             'badge_color': badge_color,
