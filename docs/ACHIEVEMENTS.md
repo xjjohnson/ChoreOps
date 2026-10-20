@@ -33,10 +33,9 @@ the points again and adds one to the count (shown as ×N).
 
 ## How it looks
 
-On a person's Family Hub, earned achievements appear as **gold-framed badges**
-(newest first) on the showcase card and in the Achievements section, with a ×N marker
-when given more than once. Achievements not yet given show dimmed in the
-Achievements section.
+On a person's Family Hub, earned achievements appear as icons with a **gold ring**
+(newest first) in the badge area of the showcase card, with a ×N marker when given
+more than once. The family goals card below it no longer repeats them.
 
 ## Sensors
 

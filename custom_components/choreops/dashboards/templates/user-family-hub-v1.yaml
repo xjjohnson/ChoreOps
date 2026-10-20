@@ -2837,30 +2837,6 @@ views:
                     {%- set header_collapsed = header_collapsed | default(pref_default_header_collapsed, true) -%}
                     {%- set integration_entry_id = state_attr(dashboard_helper, 'integration_entry_id') -%}
                     {%- set dashboard_helper_user_id = state_attr(dashboard_helper, 'user_id') -%}
-                    {%- set achievement_list = state_attr(dashboard_helper, 'achievements') | default([], true) -%}
-
-                    {%- for achievement in achievement_list -%}
-                      {%- set achievement_eid = achievement.get('eid') if achievement is mapping else achievement -%}
-                      {%- if achievement_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(achievement_eid) not in ['unknown', 'unavailable'] -%}
-                        {%- set achievement_attrs = states[achievement_eid].attributes | default({}, true) -%}
-                        {%- set achievement_count = achievement_attrs.get('award_count', 0) | int(default=0) -%}
-                        {%- set ns.achievements = ns.achievements + [{
-                          'entity_id': achievement_eid,
-                          'name': ((achievement_attrs.get('achievement_name') or (achievement.get('name') if achievement is mapping else none) or state_attr(achievement_eid, 'friendly_name') or '') | string),
-                          'icon': (achievement_attrs.get('icon') or 'mdi:trophy') | string,
-                          'description': (achievement_attrs.get('description') or '') | string,
-                          'reward_points': achievement_attrs.get('reward_points', 0) | float(default=0),
-                          'count': achievement_count,
-                          'awarded': achievement_count > 0,
-                          'last': (achievement_attrs.get('last_awarded') or '') | string,
-                        }] -%}
-                      {%- endif -%}
-                    {%- endfor -%}
-
-                    {%- set earned_achievements = ns.achievements | selectattr('awarded') | sort(attribute='last', reverse=true) | list -%}
-                    {%- set open_achievements = ns.achievements | rejectattr('awarded') | sort(attribute='name') | list -%}
-                    {%- set sorted_achievements = earned_achievements + open_achievements -%}
-
                     {#-- 5. Render --#}
                     {%- if gamification_enabled -%}
                       {{
@@ -3121,96 +3097,6 @@ views:
                             }},
                           {%- endif -%}
                         {%- endfor -%}
-                        {%- if sorted_achievements | length == 0 and family_sensors | length == 0 -%}
-                          {{
-                            {
-                              'type': 'custom:button-card',
-                              'name': ui.get('no_achievements_found', 'err-no_achievements_found'),
-                              'label': ui.get('start_achievement_prompt', 'err-start_achievement_prompt'),
-                              'icon': 'mdi:trophy',
-                              'show_name': true,
-                              'show_icon': true,
-                              'show_label': true,
-                              'tap_action': {'action': 'none'},
-                              'styles': {
-                                'card': [
-                                  {'background': 'var(--secondary-background-color)'},
-                                  {'box-shadow': 'none'},
-                                  {'border': '1px solid var(--divider-color)'},
-                                  {'border-radius': '12px'},
-                                  {'padding': '10px 12px'}
-                                ],
-                                'grid': [
-                                  {'grid-template-areas': '"i n" "i l"'},
-                                  {'grid-template-columns': 'min-content 1fr'},
-                                  {'gap': '8px'},
-                                  {'align-items': 'center'}
-                                ],
-                                'icon': [
-                                  {'width': '18px'},
-                                  {'color': 'var(--secondary-text-color)'}
-                                ],
-                                'name': [
-                                  {'justify-self': 'start'},
-                                  {'font-size': '13px'},
-                                  {'font-weight': '600'},
-                                  {'color': 'var(--secondary-text-color)'}
-                                ],
-                                'label': [
-                                  {'justify-self': 'start'},
-                                  {'font-size': '11px'},
-                                  {'line-height': '1.3'},
-                                  {'color': 'var(--secondary-text-color)'},
-                                  {'white-space': 'normal'}
-                                ]
-                              }
-                            }
-                          }},
-                        {%- else -%}
-                          {%- for achievement in sorted_achievements -%}
-                            {%- set a_name = achievement.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set a_desc = achievement.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set a_icon_html = ("<ha-icon icon='" ~ achievement.icon ~ "' style='--mdc-icon-size:26px;width:26px;height:26px;color:" ~ ('#d4a017' if achievement.awarded else 'var(--secondary-text-color)') ~ ";'></ha-icon>") if achievement.icon[:4] == 'mdi:' else "<span style='font-size:24px;line-height:1;'>🏆</span>" -%}
-                            {%- set a_pts = ('%.1f' | format(achievement.reward_points)) | regex_replace('\\.?0+$', '') -%}
-                            {%- set a_meta = (("<span style='font-weight:800;color:#b8860b;'>+" ~ a_pts ~ " pts</span>") if achievement.reward_points > 0 else '') ~ (("<span style='font-weight:800;color:#b8860b;'>" ~ (' · ' if achievement.reward_points > 0 else '') ~ "×" ~ achievement.count ~ "</span>") if achievement.count > 1 else '') -%}
-                            {%- set a_html = "<div style='display:flex;align-items:center;gap:12px;padding:12px;text-align:left;'>"
-                              ~ "<div style='width:44px;height:44px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;" ~ ("background:var(--secondary-background-color);border:3px solid #d4a017;box-shadow:0 0 0 3px rgba(246,211,101,0.3);" if achievement.awarded else "background:var(--secondary-background-color);border:2px dashed var(--divider-color);") ~ "'>" ~ a_icon_html ~ "</div>"
-                              ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ a_name ~ "</div>"
-                              ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;margin-top:2px;'>" ~ a_desc ~ "</div>" if a_desc | length > 0 else '')
-                              ~ "</div>"
-                              ~ "<div style='text-align:right;flex:0 0 auto;font-size:11px;white-space:nowrap;'>" ~ (("<div style='font-weight:800;color:#b8860b;'>✓ " ~ (ui.get('earned', 'err-earned') | upper) ~ "</div>") if achievement.awarded else '') ~ "<div>" ~ a_meta ~ "</div></div>"
-                              ~ "</div>" -%}
-                            {{
-                              {
-                                'type': 'custom:button-card',
-                                'entity': achievement.entity_id,
-                                'show_name': false,
-                                'show_icon': false,
-                                'show_label': false,
-                                'tap_action': {'action': 'more-info'},
-                                'custom_fields': {'content': a_html},
-                                'styles': {
-                                  'card': [
-                                    {'padding': '0px'},
-                                    {'border-radius': '16px'},
-                                    {'overflow': 'hidden'},
-                                    {'background': ('linear-gradient(135deg, color-mix(in srgb, #f6d365 22%, var(--card-background-color)), var(--card-background-color))' if achievement.awarded else 'var(--card-background-color)')},
-                                    {'border': ('2px solid #d4a017' if achievement.awarded else '1px dashed var(--divider-color)')},
-                                    {'opacity': ('1' if achievement.awarded else '0.6')},
-                                    {'box-shadow': 'none'}
-                                  ],
-                                  'grid': [
-                                    {'grid-template-areas': '"content"'},
-                                    {'grid-template-columns': '1fr'}
-                                  ],
-                                  'custom_fields': {
-                                    'content': [{'width': '100%'}]
-                                  }
-                                }
-                              }
-                            }},
-                          {%- endfor -%}
-                        {%- endif -%}
                       {%- endif -%}
                     {%- endif -%}
                   {%- endif -%}
