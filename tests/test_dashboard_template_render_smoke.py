@@ -2568,3 +2568,54 @@ def test_family_hub_non_daily_goals_stay_full_width_cards() -> None:
     weekly_part = output[output.index("Perfect Week") :]
     assert "days done" in weekly_part
     assert "conic-gradient" not in weekly_part
+
+
+def test_family_hub_daily_goal_ring_shows_the_count() -> None:
+    """A daily goal's ring pill reads 3/7, not just a percent."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "badge_type": "daily",
+            "target_type": "chore_count",
+            "threshold_value": 7,
+        },
+        progress=43,
+    )
+    helper["badges"][0]["badge_type"] = "daily"
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert ">3/7</span>" in output
+
+
+def test_family_hub_long_goal_without_a_day_strip_shows_its_count() -> None:
+    """A goal too long for a day strip still reads 'x of N chores'."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "target_type": "chore_count",
+            "threshold_value": 10,
+            "recurring_frequency": "biweekly",
+            "start_date": "2026-09-01",
+            "end_date": "2026-12-31",
+        },
+        progress=30,
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "3 of 10</b> chores" in output
+
+
+def test_family_hub_open_ended_streak_shows_last_seven_days() -> None:
+    """A goal with no dates shows the last 7 days and its streak length."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "target_type": "streak_all_chores",
+            "threshold_value": 10,
+            "last_update_day": "2026-10-19",
+        },
+        progress=50,
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "5</b> day streak" in output
+    # The harness clock is 2026-10-19, so the last five days up to today are done.
+    assert output.count("✓") == 5
+    assert "✗" not in output
