@@ -1937,16 +1937,20 @@ views:
                       {%- set ach_pts = ach_attrs.get('reward_points', 0) | float(default=0) -%}
                       {%- set ach_n = ((ach_attrs.get('awarded_to') or {}).get(selected_user_name, 0)) | int(default=0) -%}
                       {%- set ach_icon = (ach_attrs.get('icon') or 'mdi:trophy') | string -%}
+                      {%- set ach_name_safe = ach_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                      {%- set ach_label = (('+' ~ ('%g' | format(ach_pts)) ~ ' pts') if ach_pts > 0 else 'no points') ~ ' · given ' ~ ach_n ~ '×' -%}
+                      {%- set ach_icon_html = ("<ha-icon icon='" ~ ach_icon ~ "' style='--mdc-icon-size:24px;width:24px;height:24px;color:#5b4300;display:block;'></ha-icon>") if ach_icon[:4] == 'mdi:' else "<span style='font-size:22px;line-height:1;'>🏆</span>" -%}
+                      {%- set ach_html = "<div style='display:flex;align-items:center;gap:12px;text-align:left;'><div style='flex:0 0 auto;width:44px;height:44px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#f6d365,#d4a017);border:3px solid #d4a017;'>" ~ ach_icon_html ~ "</div><div style='min-width:0;'><div style='font-size:13px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ ach_name_safe ~ "</div><div style='font-size:11px;opacity:0.75;color:var(--primary-text-color);'>" ~ ach_label ~ "</div></div></div>" -%}
                       {%- set ep_rows.c = ep_rows.c + [{
                         'type': 'custom:button-card',
                         'entity': it.entity_id,
-                        'icon': ach_icon,
-                        'name': ach_name,
-                        'label': (('+' ~ ('%g' | format(ach_pts)) ~ ' pts') if ach_pts > 0 else 'no points') ~ ' · given ' ~ ach_n ~ '×',
-                        'show_name': true,
-                        'show_icon': true,
-                        'show_label': true,
+                        'show_name': false,
+                        'show_icon': false,
+                        'show_label': false,
                         'show_state': false,
+                        'name': ach_name,
+                        'label': ach_label,
+                        'custom_fields': {'content': ach_html},
                         'tap_action': {'action': 'call-service', 'service': 'choreops.award_achievement', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'achievement_name': ach_name}, 'confirmation': {'text': 'Give ' ~ ach_name ~ ' to ' ~ selected_user_name ~ '?'}},
                         'hold_action': {'action': 'none'},
                         'styles': {
@@ -1958,15 +1962,12 @@ views:
                             {'background': 'linear-gradient(135deg, color-mix(in srgb, #f6d365 22%, var(--card-background-color)), var(--card-background-color))'}
                           ],
                           'grid': [
-                            {'grid-template-areas': '"i n" "i l"'},
-                            {'grid-template-columns': '40px minmax(0, 1fr)'},
-                            {'column-gap': '10px'},
-                            {'row-gap': '1px'},
-                            {'align-items': 'center'}
+                            {'grid-template-areas': '"content"'},
+                            {'grid-template-columns': '1fr'}
                           ],
-                          'icon': [{'width': '24px'}, {'color': '#5b4300'}, {'background': 'linear-gradient(145deg, #f6d365, #d4a017)'}, {'border-radius': '50%'}, {'padding': '7px'}],
-                          'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}, {'text-align': 'left'}],
-                          'label': [{'justify-self': 'start'}, {'font-size': '11px'}, {'opacity': '0.75'}]
+                          'custom_fields': {
+                            'content': [{'width': '100%'}]
+                          }
                         }
                       }] -%}
                     {%- endfor -%}
