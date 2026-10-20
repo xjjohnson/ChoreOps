@@ -36,8 +36,8 @@ def _manager(target_type: str, frequency: str) -> tuple[GamificationManager, Any
     return GamificationManager(MagicMock(), coordinator), progress
 
 
-def test_streak_with_no_reset_is_repeating_and_restarts() -> None:
-    """Streak + no reset repeats; restart zeroes the count and marks today counted."""
+def test_streak_with_no_reset_is_repeating_and_holds_the_day() -> None:
+    """Streak + no reset repeats; the award keeps today's achieved state."""
     manager, progress = _manager(
         const.BADGE_TARGET_THRESHOLD_TYPE_STREAK_SELECTED_CHORES, const.FREQUENCY_NONE
     )
@@ -46,9 +46,46 @@ def test_streak_with_no_reset_is_repeating_and_restarts() -> None:
 
     manager._restart_streak_after_award(ASSIGNEE_ID, BADGE_ID)
 
+    # Still shows as achieved, not zeroed.
+    assert progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] == 7
+    assert progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] is True
+    assert progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] == 1.0
+    assert progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] == dt_today_iso()
+    assert progress[const.DATA_USER_BADGE_PROGRESS_STREAK_HELD_DAY] == dt_today_iso()
+
+
+def test_held_streak_blocks_evaluation_for_the_rest_of_the_day() -> None:
+    """Re-evaluating on the day it was earned neither restarts nor re-awards."""
+    manager, progress = _manager(
+        const.BADGE_TARGET_THRESHOLD_TYPE_STREAK_SELECTED_CHORES, const.FREQUENCY_NONE
+    )
+    manager._restart_streak_after_award(ASSIGNEE_ID, BADGE_ID)
+
+    assert manager._streak_hold_blocks_evaluation(ASSIGNEE_ID, BADGE_ID, dt_today_iso())
+    assert progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] == 7
+    assert progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] is True
+
+
+def test_held_streak_restarts_on_the_next_day() -> None:
+    """The first evaluation on a later day zeroes the streak and clears the hold."""
+    manager, progress = _manager(
+        const.BADGE_TARGET_THRESHOLD_TYPE_STREAK_SELECTED_CHORES, const.FREQUENCY_NONE
+    )
+    manager._restart_streak_after_award(ASSIGNEE_ID, BADGE_ID)
+    held_day = dt_today_iso()
+
+    assert not manager._streak_hold_blocks_evaluation(
+        ASSIGNEE_ID, BADGE_ID, "2999-01-01"
+    )
     assert progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] == 0
     assert progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] is False
-    assert progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] == dt_today_iso()
+    assert progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] == 0.0
+    assert progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] == held_day
+    assert not progress[const.DATA_USER_BADGE_PROGRESS_STREAK_HELD_DAY]
+    # Released: a later evaluation proceeds normally.
+    assert not manager._streak_hold_blocks_evaluation(
+        ASSIGNEE_ID, BADGE_ID, "2999-01-01"
+    )
 
 
 def test_recurring_or_non_streak_badges_do_not_repeat() -> None:

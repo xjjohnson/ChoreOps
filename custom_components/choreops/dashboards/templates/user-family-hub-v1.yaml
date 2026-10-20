@@ -2521,6 +2521,8 @@ views:
                           'start': ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', ''),
                           'end': ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', ''),
                           'days_left': b_days_left,
+                          'days_done': (ba.get('days_done') if ba.get('days_done') is iterable and ba.get('days_done') is not string else []),
+                          'day_based': ((ba.get('target_type') or '') | string | lower).startswith(('days_', 'streak_')),
                           'starts_future': b_starts_future,
                           'points': awards.get('award_points', 0) | float(default=0),
                           'mult': awards.get('points_multiplier', 0) | float(default=0),
@@ -2646,6 +2648,8 @@ views:
                           } -%}
                           {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);" -%}
                           {%- set emit = namespace(items=[]) -%}
+                          {#-- daily cards stack (ring above, text below) when their own column is narrow --#}
+                          {%- set dstyle = "<style>@container (max-width:170px){.dc{flex-direction:column !important;align-items:center !important;text-align:center !important;gap:6px !important;}.dt{width:100% !important;margin-top:6px !important;}.dd{display:none !important;}.dx{justify-content:center !important;}}</style>" -%}
                           {%- for g in groups -%}
                             {%- set glabel = ui.get('special_occasion', 'Special') if g == 'special' else ('Longer' if g == 'longer' else ui.get(g, g | replace('_', ' ') | title)) -%}
                             {%- set gstat = namespace(total=0, done=0, keys=[], earned=[]) -%}
@@ -2662,6 +2666,7 @@ views:
                               {%- endif -%}
                             {%- endfor -%}
                             {%- set ghead = namespace(v="<div style='display:flex;justify-content:space-between;align-items:baseline;margin:6px 2px 6px;text-align:left;'><span style='" ~ head_style ~ "'>" ~ glabel ~ "</span><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ gstat.done ~ ' / ' ~ gstat.total ~ ' ' ~ ui.get('done', 'done') ~ "</span></div>") -%}
+                            {%- set dgrid = namespace(cells=[]) -%}
 
                             {%- for k in gstat.keys | sort -%}
                               {%- set b = ns.badges[k[5]] -%}
@@ -2720,15 +2725,79 @@ views:
 
                               {%- set tile = "<div style='flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb, " ~ row_col ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ row_col ~ ";display:block;'></ha-icon></div>" -%}
                               {%- set reward_pill = ("<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>+" ~ ('%g' | format(b.points | round(2))) ~ "</div>") if b.points > 0 else '' -%}
+                              {#-- day-by-day strip: done / missed / today / still ahead --#}
+                              {%- set day_strip = '' -%}
+                              {%- if b.start | length > 0 and b.end | length > 0 and not b.starts_future -%}
+                                {%- set start_ts = as_timestamp(b.start ~ 'T12:00:00') -%}
+                                {%- set n_days = (((as_timestamp(b.end ~ 'T12:00:00') - start_ts) / 86400) | round(0) | int) + 1 -%}
+                                {%- if n_days >= 2 and n_days <= 42 -%}
+                                  {%- set dcount = namespace(done=0, cells='') -%}
+                                  {%- for i in range(n_days) -%}
+                                    {%- set d_ts = start_ts + (i * 86400) -%}
+                                    {%- set d_iso = d_ts | timestamp_custom('%Y-%m-%d') -%}
+                                    {%- set d_done = d_iso in b.days_done -%}
+                                    {%- set d_today = d_iso == current_date -%}
+                                    {%- set d_past = d_iso < current_date -%}
+                                    {%- if d_done -%}
+                                      {%- set dcount.done = dcount.done + 1 -%}
+                                      {%- set c_bg = 'color-mix(in srgb, var(--success-color) 22%, var(--card-background-color))' -%}
+                                      {%- set c_bd = '1px solid color-mix(in srgb, var(--success-color) 55%, transparent)' -%}
+                                      {%- set c_fg = 'var(--success-color)' -%}
+                                      {%- set c_mark = '✓' -%}
+                                    {%- elif d_today -%}
+                                      {%- set c_bg = 'transparent' -%}
+                                      {%- set c_bd = '2px dashed var(--primary-color)' -%}
+                                      {%- set c_fg = 'var(--primary-color)' -%}
+                                      {%- set c_mark = '•' -%}
+                                    {%- elif d_past and b.day_based -%}
+                                      {%- set c_bg = 'color-mix(in srgb, var(--error-color) 18%, var(--card-background-color))' -%}
+                                      {%- set c_bd = '1px solid color-mix(in srgb, var(--error-color) 45%, transparent)' -%}
+                                      {%- set c_fg = 'var(--error-color)' -%}
+                                      {%- set c_mark = '✗' -%}
+                                    {%- else -%}
+                                      {%- set c_bg = 'var(--secondary-background-color)' -%}
+                                      {%- set c_bd = '1px solid transparent' -%}
+                                      {%- set c_fg = 'var(--secondary-text-color)' -%}
+                                      {%- set c_mark = '' -%}
+                                    {%- endif -%}
+                                    {%- if n_days <= 7 -%}
+                                      {%- set dcount.cells = dcount.cells ~ "<div style='text-align:center;'><div style='font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;margin-bottom:3px;'>" ~ (d_ts | timestamp_custom('%a')) ~ "</div><div style='height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";color:" ~ c_fg ~ ";'>" ~ c_mark ~ "</div></div>" -%}
+                                    {%- else -%}
+                                      {%- set dcount.cells = dcount.cells ~ "<div title='" ~ d_iso ~ "' style='width:18px;height:18px;border-radius:5px;box-sizing:border-box;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";'></div>" -%}
+                                    {%- endif -%}
+                                  {%- endfor -%}
+                                  {%- set strip_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'><b style='color:var(--primary-text-color);'>" ~ dcount.done ~ (' of ' ~ n_days if b.day_based else '') ~ "</b> " ~ ('days done' if b.day_based else ('day active' if dcount.done == 1 else 'days active')) ~ "</div>" -%}
+                                  {%- if n_days <= 7 -%}
+                                    {%- set day_strip = "<div style='margin-top:10px;display:grid;grid-template-columns:repeat(" ~ n_days ~ ",1fr);gap:6px;'>" ~ dcount.cells ~ "</div>" ~ strip_note -%}
+                                  {%- else -%}
+                                    {%- set day_strip = "<div style='margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;'>" ~ dcount.cells ~ "</div>" ~ strip_note -%}
+                                  {%- endif -%}
+                                {%- endif -%}
+                              {%- endif -%}
                               {%- set sub_txt = bdesc if bdesc | length > 0 else ui.get('complete_to_earn', 'Complete to earn') -%}
                               {%- set row_html = "<div style='position:relative;overflow:hidden;box-sizing:border-box;width:100%;border-radius:16px;border:" ~ ('1px solid var(--warning-color)' if is_urgent else '1px solid var(--divider-color)') ~ ";background:linear-gradient(90deg, color-mix(in srgb, " ~ row_col ~ " 34%, var(--card-background-color)) 0%, color-mix(in srgb, " ~ row_col ~ " 13%, var(--card-background-color)) " ~ pct ~ "%, var(--card-background-color) " ~ pct ~ "%);padding:12px;text-align:left;'>"
                                   ~ "<div style='display:flex;align-items:center;gap:10px;'>" ~ tile
                                   ~ "<div style='flex:1;min-width:0;'><div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;'><span style='font-size:15px;line-height:1.2;font-weight:800;color:var(--primary-text-color);'>" ~ bname ~ "</span>" ~ badge_html ~ "</div>"
                                   ~ "<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ sub_txt ~ "</div>"
                                   ~ ("<div style='margin-top:3px;font-size:11px;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ (bits | join(' &nbsp;·&nbsp; ')) ~ "</div>" if bits | length > 0 else '')
-                                  ~ "</div>" ~ reward_pill ~ "</div></div>" -%}
-                              {%- set emit.items = emit.items + [{'eid': b.eid, 'html': row_html, 'head': ghead.v}] -%}
-                              {%- set ghead.v = '' -%}
+                                  ~ "</div>" ~ reward_pill ~ "</div>" ~ day_strip ~ "</div>" -%}
+                              {%- if g == 'daily' -%}
+                                {#-- daily goals: compact two-column card with the progress ring on the left --#}
+                                {%- set ring_col = 'var(--warning-color)' if is_urgent else row_col -%}
+                                {%- set ring_html = "<div style='position:relative;flex:0 0 auto;width:50px;height:50px;border-radius:50%;background:conic-gradient(" ~ ring_col ~ " " ~ pct ~ "%, color-mix(in srgb, var(--secondary-text-color) 25%, transparent) 0);display:flex;align-items:center;justify-content:center;'>"
+                                    ~ "<div style='width:39px;height:39px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ ring_col ~ ";display:block;'></ha-icon></div>"
+                                    ~ "<span style='position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;line-height:1.3;padding:0 6px;border-radius:999px;background:var(--secondary-background-color);border:1px solid var(--divider-color);color:var(--primary-text-color);'>" ~ pct ~ "%</span></div>" -%}
+                                {%- set reward_chip = ("<span style='display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:800;padding:1px 7px;border-radius:999px;background:rgba(0,0,0,0.25);color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:11px;height:11px;--mdc-icon-size:11px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>+" ~ ('%g' | format(b.points | round(2))) ~ "</span>") if b.points > 0 else '' -%}
+                                {%- set daily_html = "<div style='container-type:inline-size;width:100%;'>" ~ dstyle ~ "<div class='dc' style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:10px 10px 12px;border-radius:14px;text-align:left;border:" ~ ('1px solid var(--warning-color)' if is_urgent else '1px solid var(--divider-color)') ~ ";background:var(--card-background-color);'>" ~ ring_html
+                                    ~ "<div class='dt' style='flex:1;min-width:0;'><div style='font-size:13px;line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</div>"
+                                    ~ "<div class='dd' style='font-size:11px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ sub_txt ~ "</div>"
+                                    ~ ("<div class='dx' style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px;white-space:nowrap;'>" ~ badge_html ~ reward_chip ~ "</div>" if (badge_html | length > 0 or reward_chip | length > 0) else '')
+                                    ~ "</div></div></div>" -%}
+                                {%- set dgrid.cells = dgrid.cells + [{'eid': b.eid, 'html': daily_html}] -%}
+                              {%- else -%}
+                                {%- set emit.items = emit.items + [{'eid': b.eid, 'html': row_html, 'head': ghead.v}] -%}
+                                {%- set ghead.v = '' -%}
+                              {%- endif -%}
                             {%- endfor -%}
 
                             {%- for idx in gstat.earned -%}
@@ -2738,24 +2807,79 @@ views:
                                   ~ "<ha-icon icon='" ~ b.icon ~ "' style='flex:0 0 auto;width:20px;height:20px;--mdc-icon-size:20px;color:var(--success-color);display:block;'></ha-icon>"
                                   ~ "<span style='min-width:0;font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>"
                                   ~ "<span style='margin-left:auto;flex:0 0 auto;font-size:12px;color:var(--secondary-text-color);'>✓ " ~ (b.last_awarded if b.last_awarded | length > 0 else ui.get('earned', 'Earned')) ~ "</span></div>" -%}
-                              {%- set emit.items = emit.items + [{'eid': b.eid, 'html': slim_html, 'head': ghead.v}] -%}
-                              {%- set ghead.v = '' -%}
+                              {%- if g == 'daily' -%}
+                                {%- set e_ring = "<div style='position:relative;flex:0 0 auto;width:50px;height:50px;border-radius:50%;background:var(--success-color);display:flex;align-items:center;justify-content:center;'>"
+                                    ~ "<div style='width:39px;height:39px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:var(--success-color);display:block;'></ha-icon></div>"
+                                    ~ "<span style='position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;line-height:1.3;padding:0 6px;border-radius:999px;background:var(--secondary-background-color);border:1px solid var(--success-color);color:var(--success-color);'>✓</span></div>" -%}
+                                {%- set e_desc = b.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                                {%- set e_html = "<div style='container-type:inline-size;width:100%;'>" ~ dstyle ~ "<div class='dc' style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:10px 10px 12px;border-radius:14px;text-align:left;border:1px solid color-mix(in srgb, var(--success-color) 45%, transparent);background:color-mix(in srgb, var(--success-color) 10%, var(--card-background-color));'>" ~ e_ring
+                                    ~ "<div class='dt' style='flex:1;min-width:0;'><div style='font-size:13px;line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</div>"
+                                    ~ "<div class='dd' style='font-size:11px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ (e_desc if e_desc | length > 0 else ui.get('earned', 'Earned')) ~ "</div>"
+                                    ~ "<div class='dx' style='display:flex;margin-top:4px;white-space:nowrap;'><span style='font-size:10px;font-weight:800;padding:1px 7px;border-radius:999px;background:rgba(34,197,94,0.18);color:var(--success-color);'>✓ " ~ (b.last_awarded if b.last_awarded | length > 0 else ui.get('earned', 'Earned')) ~ "</span></div>"
+                                    ~ "</div></div></div>" -%}
+                                {%- set dgrid.cells = dgrid.cells + [{'eid': b.eid, 'html': e_html}] -%}
+                              {%- else -%}
+                                {%- set emit.items = emit.items + [{'eid': b.eid, 'html': slim_html, 'head': ghead.v}] -%}
+                                {%- set ghead.v = '' -%}
+                              {%- endif -%}
                             {%- endfor -%}
+
+                            {%- if dgrid.cells | length > 0 -%}
+                              {%- set emit.items = emit.items + [{'eid': '', 'html': '', 'head': ghead.v, 'cells': dgrid.cells}] -%}
+                              {%- set ghead.v = '' -%}
+                            {%- endif -%}
                           {%- endfor -%}
 
                           {%- for it in emit.items -%}
-                            {{
-                              {
-                                'type': 'custom:button-card',
-                                'entity': it.eid,
-                                'show_name': false,
-                                'show_icon': false,
-                                'show_state': false,
-                                'tap_action': {'action': 'more-info'},
-                                'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ it.html ~ "</div>"},
-                                'styles': row_styles
-                              }
-                            }},
+                            {%- if it.get('cells') -%}
+                              {%- if it.head | length > 0 -%}
+                                {{
+                                  {
+                                    'type': 'custom:button-card',
+                                    'show_name': false,
+                                    'show_icon': false,
+                                    'show_state': false,
+                                    'tap_action': {'action': 'none'},
+                                    'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ "</div>"},
+                                    'styles': row_styles
+                                  }
+                                }},
+                              {%- endif -%}
+                              {%- set gc = namespace(l=[]) -%}
+                              {%- for c in it.cells -%}
+                                {%- set gc.l = gc.l + [{
+                                  'type': 'custom:button-card',
+                                  'entity': c.eid,
+                                  'show_name': false,
+                                  'show_icon': false,
+                                  'show_state': false,
+                                  'tap_action': {'action': 'more-info'},
+                                  'custom_fields': {'content': "<div style='width:100%;'>" ~ c.html ~ "</div>"},
+                                  'styles': row_styles
+                                }] -%}
+                              {%- endfor -%}
+                              {{
+                                {
+                                  'type': 'grid',
+                                  'columns': 2,
+                                  'square': false,
+                                  'cards': gc.l
+                                }
+                              }},
+                            {%- else -%}
+                              {{
+                                {
+                                  'type': 'custom:button-card',
+                                  'entity': it.eid,
+                                  'show_name': false,
+                                  'show_icon': false,
+                                  'show_state': false,
+                                  'tap_action': {'action': 'more-info'},
+                                  'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ it.html ~ "</div>"},
+                                  'styles': row_styles
+                                }
+                              }},
+                            {%- endif -%}
                           {%- endfor -%}
                         {%- endif -%}
                       {%- endif -%}
