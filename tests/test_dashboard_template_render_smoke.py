@@ -1488,7 +1488,6 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
         ["heading", "custom:auto-entities", "custom:auto-entities"],
         ["heading", "custom:auto-entities", "heading", "custom:auto-entities"],
         ["heading", "custom:auto-entities"],
-        ["heading", "custom:auto-entities"],
     ]
     env = jinja2.Environment(extensions=["jinja2.ext.loopcontrols"])
     autos = [
@@ -1497,7 +1496,7 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
         for c in sec["cards"]
         if c["type"] == "custom:auto-entities"
     ]
-    assert len(autos) == 6
+    assert len(autos) == 5
     for card in autos:
         env.parse(card["filter"]["template"])
         assert (
