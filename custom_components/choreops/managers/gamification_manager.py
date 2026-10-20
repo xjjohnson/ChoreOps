@@ -3598,6 +3598,40 @@ class GamificationManager(BaseManager):
 
         return structured_awards
 
+    def get_badge_today_chore_count(
+        self, assignee_id: str, badge_id: str
+    ) -> tuple[int, int] | None:
+        """Return (approved today, required) for a "minimum N chores a day" badge.
+
+        Read-only. The badge itself only stores whole days, so the dashboard
+        needs this to show how far along today is. Returns None for any other
+        target type.
+        """
+        badge_info = cast("BadgeData", self.coordinator.badges_data.get(badge_id, {}))
+        target = cast("dict[str, Any]", badge_info.get(const.DATA_BADGE_TARGET, {}))
+        required = {
+            const.BADGE_TARGET_THRESHOLD_TYPE_DAYS_MIN_3_CHORES: 3,
+            const.BADGE_TARGET_THRESHOLD_TYPE_DAYS_MIN_5_CHORES: 5,
+            const.BADGE_TARGET_THRESHOLD_TYPE_DAYS_MIN_7_CHORES: 7,
+        }.get(str(target.get(const.DATA_BADGE_TARGET_TYPE, "")))
+        if required is None:
+            return None
+        today_iso = dt_today_iso()
+        progress = self._get_badge_progress(assignee_id, badge_id) or {}
+        snapshot = (
+            self.coordinator.statistics_manager.get_badge_scoped_today_completion(
+                assignee_id,
+                self.get_badge_in_scope_chores_list(badge_info, assignee_id),
+                today_iso=today_iso,
+                cycle_start_iso=today_iso,
+                only_due_today=False,
+                last_update_day_iso=str(
+                    progress.get(const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY, "")
+                ),
+            )
+        )
+        return int(snapshot.get("approved_count", 0)), required
+
     def get_badge_in_scope_chores_list(
         self,
         badge_info: BadgeData,

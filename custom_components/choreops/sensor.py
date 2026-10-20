@@ -2268,6 +2268,18 @@ class AssigneeBadgeProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         )
         return round(progress * 100, const.DATA_FLOAT_PRECISION)
 
+    def _today_chore_attributes(self) -> dict[str, int]:
+        """Return today's chore count and the daily minimum, when the badge has one."""
+        counts = self.coordinator.gamification_manager.get_badge_today_chore_count(
+            self._assignee_id, self._badge_id
+        )
+        if counts is None:
+            return {}
+        return {
+            const.ATTR_BADGE_TODAY_CHORES_DONE: counts[0],
+            const.ATTR_BADGE_TODAY_CHORES_REQUIRED: counts[1],
+        }
+
     @property
     def extra_state_attributes(self) -> dict:
         """Return the badge progress details as attributes."""
@@ -2406,6 +2418,9 @@ class AssigneeBadgeProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE: badge_progress.get(
                 const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE, ""
             ),
+            # Chores approved today versus the daily minimum, for "N chores a
+            # day" badges (absent for other target types).
+            **self._today_chore_attributes(),
             # Group 3: Target definition
             const.DATA_BADGE_TARGET_TYPE: target.get(const.DATA_BADGE_TARGET_TYPE),
             const.DATA_BADGE_TARGET_THRESHOLD_VALUE: target.get(
