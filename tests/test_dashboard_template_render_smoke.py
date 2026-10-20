@@ -2473,3 +2473,98 @@ def test_family_hub_goal_without_dates_has_no_day_strip() -> None:
     output = _render_hub_card(tpl, helper, extra, real_dates=True)
     assert "Perfect Week" in output
     assert "days done" not in output and "✗" not in output
+
+
+def _daily_goal_states():
+    """One in-progress daily goal, one earned daily goal and one weekly goal."""
+
+    def state(eid: str, name: str, status: str, progress: int, **attrs: object):
+        return _MockState(
+            entity_id=eid,
+            state=str(progress),
+            attributes={
+                "badge_name": name,
+                "badge_type": "daily",
+                "status": status,
+                "icon": "mdi:medal",
+                "description": f"{name} description",
+                **attrs,
+            },
+            name=name,
+        )
+
+    return (
+        {
+            "badges": [
+                {
+                    "eid": "sensor.lily_d1",
+                    "name": "Chores Seven",
+                    "badge_type": "daily",
+                },
+                {"eid": "sensor.lily_d2", "name": "Five A Day", "badge_type": "daily"},
+                {
+                    "eid": "sensor.lily_w1",
+                    "name": "Perfect Week",
+                    "badge_type": "periodic",
+                },
+            ]
+        },
+        {
+            "sensor.lily_d1": state(
+                "sensor.lily_d1",
+                "Chores Seven",
+                "in_progress",
+                40,
+                awards={"award_points": 25},
+            ),
+            "sensor.lily_d2": state(
+                "sensor.lily_d2",
+                "Five A Day",
+                "earned",
+                100,
+                last_awarded_date="2026-10-19T09:00:00",
+            ),
+            "sensor.lily_w1": state(
+                "sensor.lily_w1",
+                "Perfect Week",
+                "in_progress",
+                20,
+                badge_type="periodic",
+                recurring_frequency="weekly",
+                target_type="days_all_chores",
+                start_date="2026-10-19",
+                end_date="2026-10-25",
+                days_done=["2026-10-19"],
+            ),
+        },
+    )
+
+
+def test_family_hub_daily_goals_are_two_column_ring_cards() -> None:
+    """Daily goals share a two-column grid; each card has a ring and stays tappable."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _daily_goal_states()
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+
+    assert "'columns': 2" in output
+    # In-progress daily goal: ring filled to its percent, percent pill, reward chip.
+    assert "conic-gradient(var(--primary-color) 40%" in output
+    assert ">40%</span>" in output
+    assert "+25" in output
+    # Earned daily goal: solid green ring, check pill and award date.
+    assert "background:var(--success-color)" in output
+    assert "✓ 2026-10-19" in output
+    # Both cards keep their own tap target.
+    assert "'entity': 'sensor.lily_d1'" in output
+    assert "'entity': 'sensor.lily_d2'" in output
+
+
+def test_family_hub_non_daily_goals_stay_full_width_cards() -> None:
+    """Weekly goals keep the wide card with its day strip, outside the daily grid."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _daily_goal_states()
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+
+    weekly_part = output[output.index("Perfect Week") :]
+    assert "days done" in weekly_part
+    assert "conic-gradient" not in weekly_part

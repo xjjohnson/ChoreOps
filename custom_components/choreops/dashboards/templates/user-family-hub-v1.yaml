@@ -2648,6 +2648,8 @@ views:
                           } -%}
                           {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);" -%}
                           {%- set emit = namespace(items=[]) -%}
+                          {#-- daily cards stack (ring above, text below) when their own column is narrow --#}
+                          {%- set dstyle = "<style>@container (max-width:170px){.dc{flex-direction:column !important;align-items:center !important;text-align:center !important;gap:6px !important;}.dt{width:100% !important;margin-top:6px !important;}.dd{display:none !important;}.dx{justify-content:center !important;}}</style>" -%}
                           {%- for g in groups -%}
                             {%- set glabel = ui.get('special_occasion', 'Special') if g == 'special' else ('Longer' if g == 'longer' else ui.get(g, g | replace('_', ' ') | title)) -%}
                             {%- set gstat = namespace(total=0, done=0, keys=[], earned=[]) -%}
@@ -2664,6 +2666,7 @@ views:
                               {%- endif -%}
                             {%- endfor -%}
                             {%- set ghead = namespace(v="<div style='display:flex;justify-content:space-between;align-items:baseline;margin:6px 2px 6px;text-align:left;'><span style='" ~ head_style ~ "'>" ~ glabel ~ "</span><span style='font-size:11px;font-weight:700;color:var(--secondary-text-color);'>" ~ gstat.done ~ ' / ' ~ gstat.total ~ ' ' ~ ui.get('done', 'done') ~ "</span></div>") -%}
+                            {%- set dgrid = namespace(cells=[]) -%}
 
                             {%- for k in gstat.keys | sort -%}
                               {%- set b = ns.badges[k[5]] -%}
@@ -2778,8 +2781,23 @@ views:
                                   ~ "<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ sub_txt ~ "</div>"
                                   ~ ("<div style='margin-top:3px;font-size:11px;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ (bits | join(' &nbsp;·&nbsp; ')) ~ "</div>" if bits | length > 0 else '')
                                   ~ "</div>" ~ reward_pill ~ "</div>" ~ day_strip ~ "</div>" -%}
-                              {%- set emit.items = emit.items + [{'eid': b.eid, 'html': row_html, 'head': ghead.v}] -%}
-                              {%- set ghead.v = '' -%}
+                              {%- if g == 'daily' -%}
+                                {#-- daily goals: compact two-column card with the progress ring on the left --#}
+                                {%- set ring_col = 'var(--warning-color)' if is_urgent else row_col -%}
+                                {%- set ring_html = "<div style='position:relative;flex:0 0 auto;width:50px;height:50px;border-radius:50%;background:conic-gradient(" ~ ring_col ~ " " ~ pct ~ "%, color-mix(in srgb, var(--secondary-text-color) 25%, transparent) 0);display:flex;align-items:center;justify-content:center;'>"
+                                    ~ "<div style='width:39px;height:39px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ ring_col ~ ";display:block;'></ha-icon></div>"
+                                    ~ "<span style='position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;line-height:1.3;padding:0 6px;border-radius:999px;background:var(--secondary-background-color);border:1px solid var(--divider-color);color:var(--primary-text-color);'>" ~ pct ~ "%</span></div>" -%}
+                                {%- set reward_chip = ("<span style='display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:800;padding:1px 7px;border-radius:999px;background:rgba(0,0,0,0.25);color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:11px;height:11px;--mdc-icon-size:11px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>+" ~ ('%g' | format(b.points | round(2))) ~ "</span>") if b.points > 0 else '' -%}
+                                {%- set daily_html = "<div style='container-type:inline-size;width:100%;'>" ~ dstyle ~ "<div class='dc' style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:10px 10px 12px;border-radius:14px;text-align:left;border:" ~ ('1px solid var(--warning-color)' if is_urgent else '1px solid var(--divider-color)') ~ ";background:var(--card-background-color);'>" ~ ring_html
+                                    ~ "<div class='dt' style='flex:1;min-width:0;'><div style='font-size:13px;line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</div>"
+                                    ~ "<div class='dd' style='font-size:11px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ sub_txt ~ "</div>"
+                                    ~ ("<div class='dx' style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px;white-space:nowrap;'>" ~ badge_html ~ reward_chip ~ "</div>" if (badge_html | length > 0 or reward_chip | length > 0) else '')
+                                    ~ "</div></div></div>" -%}
+                                {%- set dgrid.cells = dgrid.cells + [{'eid': b.eid, 'html': daily_html}] -%}
+                              {%- else -%}
+                                {%- set emit.items = emit.items + [{'eid': b.eid, 'html': row_html, 'head': ghead.v}] -%}
+                                {%- set ghead.v = '' -%}
+                              {%- endif -%}
                             {%- endfor -%}
 
                             {%- for idx in gstat.earned -%}
@@ -2789,24 +2807,79 @@ views:
                                   ~ "<ha-icon icon='" ~ b.icon ~ "' style='flex:0 0 auto;width:20px;height:20px;--mdc-icon-size:20px;color:var(--success-color);display:block;'></ha-icon>"
                                   ~ "<span style='min-width:0;font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>"
                                   ~ "<span style='margin-left:auto;flex:0 0 auto;font-size:12px;color:var(--secondary-text-color);'>✓ " ~ (b.last_awarded if b.last_awarded | length > 0 else ui.get('earned', 'Earned')) ~ "</span></div>" -%}
-                              {%- set emit.items = emit.items + [{'eid': b.eid, 'html': slim_html, 'head': ghead.v}] -%}
-                              {%- set ghead.v = '' -%}
+                              {%- if g == 'daily' -%}
+                                {%- set e_ring = "<div style='position:relative;flex:0 0 auto;width:50px;height:50px;border-radius:50%;background:var(--success-color);display:flex;align-items:center;justify-content:center;'>"
+                                    ~ "<div style='width:39px;height:39px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:var(--success-color);display:block;'></ha-icon></div>"
+                                    ~ "<span style='position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;line-height:1.3;padding:0 6px;border-radius:999px;background:var(--secondary-background-color);border:1px solid var(--success-color);color:var(--success-color);'>✓</span></div>" -%}
+                                {%- set e_desc = b.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                                {%- set e_html = "<div style='container-type:inline-size;width:100%;'>" ~ dstyle ~ "<div class='dc' style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:10px 10px 12px;border-radius:14px;text-align:left;border:1px solid color-mix(in srgb, var(--success-color) 45%, transparent);background:color-mix(in srgb, var(--success-color) 10%, var(--card-background-color));'>" ~ e_ring
+                                    ~ "<div class='dt' style='flex:1;min-width:0;'><div style='font-size:13px;line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</div>"
+                                    ~ "<div class='dd' style='font-size:11px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ (e_desc if e_desc | length > 0 else ui.get('earned', 'Earned')) ~ "</div>"
+                                    ~ "<div class='dx' style='display:flex;margin-top:4px;white-space:nowrap;'><span style='font-size:10px;font-weight:800;padding:1px 7px;border-radius:999px;background:rgba(34,197,94,0.18);color:var(--success-color);'>✓ " ~ (b.last_awarded if b.last_awarded | length > 0 else ui.get('earned', 'Earned')) ~ "</span></div>"
+                                    ~ "</div></div></div>" -%}
+                                {%- set dgrid.cells = dgrid.cells + [{'eid': b.eid, 'html': e_html}] -%}
+                              {%- else -%}
+                                {%- set emit.items = emit.items + [{'eid': b.eid, 'html': slim_html, 'head': ghead.v}] -%}
+                                {%- set ghead.v = '' -%}
+                              {%- endif -%}
                             {%- endfor -%}
+
+                            {%- if dgrid.cells | length > 0 -%}
+                              {%- set emit.items = emit.items + [{'eid': '', 'html': '', 'head': ghead.v, 'cells': dgrid.cells}] -%}
+                              {%- set ghead.v = '' -%}
+                            {%- endif -%}
                           {%- endfor -%}
 
                           {%- for it in emit.items -%}
-                            {{
-                              {
-                                'type': 'custom:button-card',
-                                'entity': it.eid,
-                                'show_name': false,
-                                'show_icon': false,
-                                'show_state': false,
-                                'tap_action': {'action': 'more-info'},
-                                'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ it.html ~ "</div>"},
-                                'styles': row_styles
-                              }
-                            }},
+                            {%- if it.get('cells') -%}
+                              {%- if it.head | length > 0 -%}
+                                {{
+                                  {
+                                    'type': 'custom:button-card',
+                                    'show_name': false,
+                                    'show_icon': false,
+                                    'show_state': false,
+                                    'tap_action': {'action': 'none'},
+                                    'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ "</div>"},
+                                    'styles': row_styles
+                                  }
+                                }},
+                              {%- endif -%}
+                              {%- set gc = namespace(l=[]) -%}
+                              {%- for c in it.cells -%}
+                                {%- set gc.l = gc.l + [{
+                                  'type': 'custom:button-card',
+                                  'entity': c.eid,
+                                  'show_name': false,
+                                  'show_icon': false,
+                                  'show_state': false,
+                                  'tap_action': {'action': 'more-info'},
+                                  'custom_fields': {'content': "<div style='width:100%;'>" ~ c.html ~ "</div>"},
+                                  'styles': row_styles
+                                }] -%}
+                              {%- endfor -%}
+                              {{
+                                {
+                                  'type': 'grid',
+                                  'columns': 2,
+                                  'square': false,
+                                  'cards': gc.l
+                                }
+                              }},
+                            {%- else -%}
+                              {{
+                                {
+                                  'type': 'custom:button-card',
+                                  'entity': it.eid,
+                                  'show_name': false,
+                                  'show_icon': false,
+                                  'show_state': false,
+                                  'tap_action': {'action': 'more-info'},
+                                  'custom_fields': {'content': "<div style='width:100%;'>" ~ it.head ~ it.html ~ "</div>"},
+                                  'styles': row_styles
+                                }
+                              }},
+                            {%- endif -%}
                           {%- endfor -%}
                         {%- endif -%}
                       {%- endif -%}
