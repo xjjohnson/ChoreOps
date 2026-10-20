@@ -594,7 +594,7 @@ views:
                           {%- set quest_has_window = quest_start | length > 0 or quest_end | length > 0 -%}
                           {%- set quest_is_active = quest_window_active if quest_has_window else (quest_status in ['in_progress', 'active'] or (quest_progress > 0 and quest_progress <= 100)) -%}
                           {%- if quest_is_active and (quest_window_active or quest_status not in ['locked', 'inactive']) -%}
-                            {%- set quest_name_raw = ((quest_attrs.get('badge_name') or badge.get('name') or state_attr(quest_eid, 'friendly_name') or ui.get('quests', 'err-quests')) | string | trim) -%}
+                            {%- set quest_name_raw = ((quest_attrs.get('badge_name') or badge.get('name') or state_attr(quest_eid, 'friendly_name') or ui.get('goals_heading', 'Goals')) | string | trim) -%}
                             {%- set quest_name = quest_name_raw[8:] if quest_name_raw[:8] == 'Badge - ' else quest_name_raw -%}
                             {%- set quest_name_safe = quest_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set quest_icon = (quest_attrs.get('icon') or 'mdi:calendar-refresh-outline') | string -%}
@@ -605,7 +605,7 @@ views:
                         {%- endif -%}
                       {%- endif -%}
                     {%- endfor -%}
-                    {%- set quest_progress_section = "<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('quests', 'err-quests') ~ "</div>" ~ quest_ns.rows_html if quest_ns.rows_html | length > 0 else '' -%}
+                    {%- set quest_progress_section = "<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('goals_heading', 'Goals') ~ "</div>" ~ quest_ns.rows_html if quest_ns.rows_html | length > 0 else '' -%}
 
                     {#-- ACHIEVEMENTS: given by an approver, shown as gold-framed badges (newest first) --#}
                     {%- set ach_ns = namespace(items=[]) -%}
@@ -2545,7 +2545,7 @@ views:
                       {{
                         {
                           'type': 'custom:button-card',
-                          'name': ui.get('quests', 'Quests'),
+                          'name': ui.get('goals_heading', 'Goals'),
                           'icon': 'mdi:calendar-refresh-outline',
                           'show_name': true,
                           'show_icon': true,
@@ -2596,7 +2596,7 @@ views:
                           {{
                             {
                               'type': 'custom:button-card',
-                              'name': ui.get('no_periodic_badges_found', 'No quests yet'),
+                              'name': ui.get('no_goals_yet', 'No goals yet'),
                               'label': ui.get('periodic_badge_setup_prompt', ''),
                               'icon': 'mdi:medal-outline',
                               'show_name': true, 'show_icon': true, 'show_label': true,
@@ -3155,7 +3155,7 @@ views:
                         {%- set col = 'var(--success-color)' if amt >= 0 else 'var(--error-color)' -%}
                         {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><ha-icon icon='" ~ icons.get(it.get('source', ''), 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:var(--secondary-text-color);flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ lbl ~ (' · ' if lbl and when_txt else '') ~ when_txt ~ "</div></div><div style='font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ "</div></div>" -%}
                       {%- endfor -%}
-                      {%- set html = "<div style='width:100%;text-align:left;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px;'>" ~ ui.get('recent_activity', 'Recent activity') ~ "</div>" ~ rows.v ~ "</div>" -%}
+                      {%- set html = "<div style='width:100%;text-align:left;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px;'>" ~ ui.get('points_history', 'Points history') ~ "</div>" ~ rows.v ~ "</div>" -%}
                       {{
                         {
                           'type': 'custom:button-card',

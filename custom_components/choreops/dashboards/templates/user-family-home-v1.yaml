@@ -304,7 +304,7 @@ views:
                 }},
               {%- endif -%}
         - type: heading
-          heading: Family Goals
+          heading: Goals
           heading_style: title
           icon: mdi:flag-checkered
         - type: custom:auto-entities
@@ -429,7 +429,7 @@ views:
     - type: grid
       cards:
         - type: heading
-          heading: Family Pool Goals
+          heading: Family Goals
           heading_style: title
           icon: mdi:trophy
         - type: custom:auto-entities
