@@ -960,7 +960,7 @@ views:
 
                   {%- set pref_show_reward_description = true -%}
 
-                  {%- set pref_default_header_collapsed = true -%}
+                  {%- set pref_default_header_collapsed = false -%}
 
                   {%- set pref_claim_accent = '#a957fa' -%}  {#-- Accent color for requested reward state and actions. --#}
 
@@ -1641,7 +1641,7 @@ views:
 
                   {%- set pref_show_next_higher_badge = true -%}
                   {%- set pref_show_next_lower_badge = true -%}
-                  {%- set pref_default_header_collapsed = true -%}
+                  {%- set pref_default_header_collapsed = false -%}
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Cumulative header background when fill is enabled. Allowed: 0-100. --#}
                   {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the main Cumulative header background fill and leave it transparent. Allowed: true, false. --#}
                   {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
@@ -2442,7 +2442,7 @@ views:
 
                   << template_snippets.user_override_helper >>
 
-                  {%- set pref_default_header_collapsed = true -%}
+                  {%- set pref_default_header_collapsed = false -%}
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Periodic header background when fill is enabled. Allowed: 0-100. --#}
                   {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the main Periodic header background fill and leave it transparent. Allowed: true, false. --#}
                   {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
@@ -2785,7 +2785,7 @@ views:
 
                   << template_snippets.user_override_helper >>
 
-                  {%- set pref_default_header_collapsed = true -%}
+                  {%- set pref_default_header_collapsed = false -%}
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Achievements header background when fill is enabled. Allowed: 0-100. --#}
                   {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the main Achievements header background fill and leave it transparent. Allowed: true, false. --#}
                   {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
@@ -3123,7 +3123,7 @@ views:
 
                   << template_snippets.user_override_helper >>
 
-                  {%- set pref_default_header_collapsed = true -%}  {#-- Allowed: true, false --#}
+                  {%- set pref_default_header_collapsed = false -%}  {#-- Allowed: true, false --#}
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- 0-100: percent of var(--primary-color) mixed into the header background. --#}
                   {%- set pref_activity_count = 5 -%}  {#-- How many recent events to show. Allowed: 1-5. --#}
 
