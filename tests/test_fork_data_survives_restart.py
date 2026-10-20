@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.helpers import entity_registry as er
 import pytest
 
 from custom_components.choreops import const
@@ -93,3 +94,12 @@ async def test_goal_pool_and_achievement_data_survive_two_restarts(
             const.DATA_ACHIEVEMENT_PROGRESS
         ][zoe]
         assert progress[const.DATA_ACHIEVEMENT_AWARD_COUNT] == 2
+
+        # Every person keeps their own achievement sensor (no assignment needed)
+        registry = er.async_get(hass)
+        for person_id in (zoe, max_):
+            unique_id = (
+                f"{entry.entry_id}_{person_id}_{achievement_id}"
+                f"{const.SENSOR_KC_UID_SUFFIX_ACHIEVEMENT_PROGRESS_SENSOR}"
+            )
+            assert registry.async_get_entity_id("sensor", const.DOMAIN, unique_id)

@@ -886,11 +886,12 @@ async def remove_orphaned_progress_entities(
     *,
     entity_type: str,
     progress_suffix: str,
-    assigned_assignees_key: str,
+    assigned_assignees_key: str | None,
 ) -> int:
     """Remove progress entities for assignees no longer assigned (generic).
 
-    Used for badges, achievements, and challenges.
+    Used for badges, achievements, and challenges. Pass None for items that
+    are open to everyone (manual achievements): only a missing item is an orphan.
 
     Args:
         hass: HomeAssistant instance.
@@ -898,7 +899,8 @@ async def remove_orphaned_progress_entities(
         domain_data: Dict of approver_entity_id → entity_info (e.g., badges_data).
         entity_type: Display name for logging (e.g., "badge", "achievement").
         progress_suffix: Suffix for progress sensors.
-        assigned_assignees_key: Key in entity_info for assigned assignees list.
+        assigned_assignees_key: Key in entity_info for assigned assignees list,
+            or None when the item has no assignment.
 
     Returns:
         Count of removed entities.
@@ -913,6 +915,8 @@ async def remove_orphaned_progress_entities(
 
         assignee_id, approver_entity_id = parts
         approver_info = domain_data.get(approver_entity_id)
+        if assigned_assignees_key is None:
+            return bool(approver_info)
         return bool(
             approver_info
             and assignee_id in approver_info.get(assigned_assignees_key, [])
