@@ -540,7 +540,7 @@ class SystemManager(BaseManager):
             self.coordinator.achievements_data,
             entity_type="achievement",
             progress_suffix=const.DATA_ACHIEVEMENT_PROGRESS_SUFFIX,
-            assigned_assignees_key=const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS,
+            assigned_assignees_key=None,  # achievements are open to everyone
         )
 
         # Challenge progress orphans
