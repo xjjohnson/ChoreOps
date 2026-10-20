@@ -2054,6 +2054,9 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
                 "dashboard_lookup_key": "entry-123:user-lily",
                 "user_name": "Lily",
                 "dashboard_helpers": {},
+                "ui_control": {
+                    "gamification": {"points_history": {"header_collapse": False}}
+                },
                 "points_summary": {"today": 1510.0, "week": 1600.0, "balance": 8668.0},
                 "recent_activity": [
                     {
@@ -2095,7 +2098,9 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
         state_attr=state_attr,
     )
     parsed = yaml.safe_load(f"[{output}]")
-    html = parsed[0]["custom_fields"]["content"]
+    assert parsed[0]["name"] == "Points history"
+    assert parsed[0]["custom_fields"]["toggle"].count("chevron-up") == 1
+    html = parsed[1]["custom_fields"]["content"]
     assert "Dishes" in html and "+10" in html and "Today" in html
     assert "Late" in html and "Yesterday" in html and "-2" in html
     # Goal payouts show the goal name, a level tag and the balance after.
@@ -2106,6 +2111,17 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     assert "Today +1,510" in html
     assert "This week +1,600" in html
     assert "Balance 8,668" in html
+
+    # With no saved state the card starts collapsed: header only, no rows.
+    mock_states["sensor.lily_helper"].attributes.pop("ui_control")
+    collapsed = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    parsed_collapsed = yaml.safe_load(f"[{collapsed}]")
+    assert len(parsed_collapsed) == 1
+    assert "chevron-down" in parsed_collapsed[0]["custom_fields"]["toggle"]
 
 
 def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> None:
