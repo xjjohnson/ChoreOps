@@ -281,6 +281,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ChoreOpsConfigEntry) -> 
             "Gamification manager setup failed (badges/achievements disabled): %s", err
         )
 
+    # NON-CRITICAL: Family goals (group goals optional)
+    try:
+        await coordinator.family_goal_manager.async_setup()
+    except Exception as err:
+        const.LOGGER.warning(
+            "Family goal manager setup failed (family goals disabled): %s", err
+        )
+
     # NON-CRITICAL: Statistics (historical data optional)
     try:
         await coordinator.statistics_manager.async_setup()
