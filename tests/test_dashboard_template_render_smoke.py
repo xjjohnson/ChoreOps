@@ -2604,8 +2604,8 @@ def test_family_hub_long_goal_without_a_day_strip_shows_its_count() -> None:
     assert "3 of 10</b> chores" in output
 
 
-def test_family_hub_open_ended_streak_shows_last_seven_days() -> None:
-    """A goal with no dates shows the last 7 days and its streak length."""
+def test_family_hub_open_ended_streak_shows_one_circle_per_day() -> None:
+    """A streak goal shows a circle per day it needs, filled to the streak."""
     tpl = _hub_card_template("pref_urgent_days")
     helper, extra = _goal_badge_states(
         {
@@ -2613,13 +2613,58 @@ def test_family_hub_open_ended_streak_shows_last_seven_days() -> None:
             "threshold_value": 10,
             "last_update_day": "2026-10-19",
         },
+        progress=40,
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "4 of 10</b> days in a row" in output
+    assert "6 more to earn" in output
+    assert output.count("border:2px solid var(--success-color)") == 4
+    assert output.count("border:2px dashed var(--primary-color)") == 1
+    assert output.count("border:2px solid var(--divider-color)") == 5
+
+
+def test_family_hub_two_day_streak_shows_two_circles() -> None:
+    """A 2-day streak goal at one day has one filled circle and one to fill."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {"target_type": "streak_all_chores", "threshold_value": 2},
         progress=50,
     )
     output = _render_hub_card(tpl, helper, extra, real_dates=True)
-    assert "5</b> day streak" in output
-    # The harness clock is 2026-10-19, so the last five days up to today are done.
-    assert output.count("✓") == 5
-    assert "✗" not in output
+    assert "1 of 2</b> days in a row" in output
+    assert output.count("border:2px solid var(--success-color)") == 1
+    assert output.count("border:2px dashed var(--primary-color)") == 1
+
+
+def test_family_hub_open_ended_non_streak_keeps_the_seven_day_strip() -> None:
+    """Open-ended goals that are not streaks still show the last seven days."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {"target_type": "days_all_chores", "threshold_value": 10},
+        progress=0,
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "of the last 7 days" in output
+    assert "days in a row" not in output
+
+
+def test_family_hub_chores_a_day_ring_follows_todays_count() -> None:
+    """A 'N chores a day' goal shows today's count on the ring, not whole days."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "badge_type": "daily",
+            "target_type": "days_min_7_chores",
+            "threshold_value": 1,
+            "today_chores_done": 5,
+            "today_chores_required": 7,
+        },
+        progress=0,
+    )
+    helper["badges"][0]["badge_type"] = "daily"
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert ">5/7</span>" in output
+    assert "conic-gradient(var(--primary-color) 71%" in output
 
 
 def _long_goal(progress: int, **attrs: object):

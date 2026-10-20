@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from custom_components.choreops import const
 from tests.test_badge_streak_midnight_reset import (
+    ASSIGNEE_NAME,
     STREAK_THRESHOLD,
     PeriodicDayReplay,
     _add_periodic_badge,
@@ -82,3 +83,29 @@ async def test_earned_streak_holds_until_the_next_day(
     # Completing the new day is day one of the next streak.
     await replay.complete_day(day_key(0))
     assert replay.days_cycle_count == 1
+
+
+async def test_minimum_chores_badge_reports_todays_count(
+    hass: HomeAssistant,
+    streak_scenario: SetupResult,  # noqa: F811
+) -> None:
+    """A "N chores a day" badge exposes today's approved count; others do not."""
+    gamification = streak_scenario.coordinator.gamification_manager
+    assignee_id = streak_scenario.assignee_ids[ASSIGNEE_NAME]
+
+    assert gamification.get_badge_today_chore_count(assignee_id, "no-such") is None
+
+    badge_id = await _add_periodic_badge(
+        hass,
+        streak_scenario,
+        target_type=const.BADGE_TARGET_THRESHOLD_TYPE_DAYS_MIN_7_CHORES,
+        threshold=1,
+    )
+    assert gamification.get_badge_today_chore_count(assignee_id, badge_id) == (0, 7)
+
+    replay = PeriodicDayReplay(streak_scenario, badge_id)
+    await replay.start_day(day_key(0))
+    await replay.complete_day(day_key(0))
+    done, required = gamification.get_badge_today_chore_count(assignee_id, badge_id)
+    assert required == 7
+    assert done >= 1

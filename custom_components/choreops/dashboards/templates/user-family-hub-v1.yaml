@@ -2527,6 +2527,8 @@ views:
                           'day_based': b_tt.startswith(('days_', 'streak_')),
                           'streak': b_tt.startswith('streak_'),
                           'tracked_since': ((ba.get('days_tracked_since') or '') | string),
+                          'today_done': ba.get('today_chores_done') | int(default=0),
+                          'today_req': ba.get('today_chores_required') | int(default=0),
                           'threshold': b_thr,
                           'current': ((progress / 100 * b_thr) | round(0) | int),
                           'unit': 'pts' if b_tt.startswith('points') else ('chores' if b_tt.startswith('chore') else 'days'),
@@ -2860,7 +2862,22 @@ views:
                                 {%- endif -%}
                               {%- endif -%}
                               {%- if day_strip | length == 0 and b.rank != 2 -%}
-                                {%- if b.start | length == 0 and b.end | length == 0 -%}
+                                {%- if b.start | length == 0 and b.end | length == 0 and b.streak and b.threshold >= 1 and b.threshold <= 60 -%}
+                                  {#-- open-ended streak: one circle per day the goal needs, filled as the streak grows --#}
+                                  {%- set s_need = b.threshold | round(0) | int -%}
+                                  {%- set s_have = [b.current, s_need] | min -%}
+                                  {%- set sc = namespace(cells='') -%}
+                                  {%- for i in range(s_need) -%}
+                                    {%- if i < s_have -%}
+                                      {%- set sc.cells = sc.cells ~ "<span style='width:26px;height:26px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;background:color-mix(in srgb, var(--success-color) 25%, var(--card-background-color));border:2px solid var(--success-color);color:var(--success-color);'>✓</span>" -%}
+                                    {%- elif i == s_have -%}
+                                      {%- set sc.cells = sc.cells ~ "<span style='width:26px;height:26px;box-sizing:border-box;border-radius:50%;border:2px dashed var(--primary-color);'></span>" -%}
+                                    {%- else -%}
+                                      {%- set sc.cells = sc.cells ~ "<span style='width:26px;height:26px;box-sizing:border-box;border-radius:50%;border:2px solid var(--divider-color);'></span>" -%}
+                                    {%- endif -%}
+                                  {%- endfor -%}
+                                  {%- set day_strip = "<div style='margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;'>" ~ sc.cells ~ "</div><div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'><b style='color:var(--primary-text-color);'>" ~ s_have ~ " of " ~ s_need ~ "</b> " ~ ('day in a row' if s_need == 1 else 'days in a row') ~ ((' · ' ~ (s_need - s_have) ~ ' more to earn') if s_have < s_need else '') ~ "</div>" -%}
+                                {%- elif b.start | length == 0 and b.end | length == 0 -%}
                                   {#-- open-ended goal: the last 7 days as checkmarks and dots --#}
                                   {%- set today_ts = as_timestamp(current_date ~ 'T12:00:00') -%}
                                   {%- set streak_from = (as_timestamp(b.last_update_day ~ 'T12:00:00') - ((b.current - 1) * 86400)) | timestamp_custom('%Y-%m-%d') if (b.streak and b.current > 0 and b.last_update_day | length > 0) else '' -%}
@@ -2904,10 +2921,14 @@ views:
                                   ~ "</div>" ~ reward_pill ~ "</div>" ~ day_strip ~ "</div>" -%}
                               {%- if g == 'daily' -%}
                                 {#-- daily goals: compact two-column card with the progress ring on the left --#}
-                                {%- set ring_col = 'var(--warning-color)' if is_urgent else row_col -%}
-                                {%- set ring_html = "<div style='position:relative;flex:0 0 auto;width:50px;height:50px;border-radius:50%;background:conic-gradient(" ~ ring_col ~ " " ~ pct ~ "%, color-mix(in srgb, var(--secondary-text-color) 25%, transparent) 0);display:flex;align-items:center;justify-content:center;'>"
+                                {%- set ring_col = 'var(--warning-color)' if is_urgent else ('var(--primary-color)' if (started or (b.today_done > 0 and b.rank != 2)) else row_col) -%}
+                                {#-- "N chores a day" goals: the ring follows today's chore count, not whole days --#}
+                                {%- set by_today = b.today_req > 0 and b.threshold <= 1 and b.rank != 2 -%}
+                                {%- set ring_pct = ([100, ((b.today_done * 100 / b.today_req) | round(0) | int)] | min) if by_today else pct -%}
+                                {%- set ring_txt = (b.today_done ~ '/' ~ b.today_req) if by_today else ((('%g' | format(b.current)) ~ '/' ~ ('%g' | format(b.threshold | round(2)))) if b.threshold > 0 else (pct ~ '%')) -%}
+                                {%- set ring_html = "<div style='position:relative;flex:0 0 auto;width:50px;height:50px;border-radius:50%;background:conic-gradient(" ~ ring_col ~ " " ~ ring_pct ~ "%, color-mix(in srgb, var(--secondary-text-color) 25%, transparent) 0);display:flex;align-items:center;justify-content:center;'>"
                                     ~ "<div style='width:39px;height:39px;border-radius:50%;background:var(--card-background-color);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ ring_col ~ ";display:block;'></ha-icon></div>"
-                                    ~ "<span style='position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;line-height:1.3;padding:0 6px;border-radius:999px;background:var(--secondary-background-color);border:1px solid var(--divider-color);color:var(--primary-text-color);'>" ~ ((('%g' | format(b.current)) ~ '/' ~ ('%g' | format(b.threshold | round(2)))) if b.threshold > 0 else (pct ~ '%')) ~ "</span></div>" -%}
+                                    ~ "<span style='position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:10px;font-weight:800;line-height:1.3;padding:0 6px;border-radius:999px;background:var(--secondary-background-color);border:1px solid var(--divider-color);color:var(--primary-text-color);'>" ~ ring_txt ~ "</span></div>" -%}
                                 {%- set reward_chip = ("<span style='display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:800;padding:1px 7px;border-radius:999px;background:rgba(0,0,0,0.25);color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:11px;height:11px;--mdc-icon-size:11px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>+" ~ ('%g' | format(b.points | round(2))) ~ "</span>") if b.points > 0 else '' -%}
                                 {%- set daily_html = "<div style='container-type:inline-size;width:100%;'>" ~ dstyle ~ "<div class='dc' style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:10px 10px 12px;border-radius:14px;text-align:left;border:" ~ ('1px solid var(--warning-color)' if is_urgent else '1px solid var(--divider-color)') ~ ";background:var(--card-background-color);'>" ~ ring_html
                                     ~ "<div class='dt' style='flex:1;min-width:0;'><div style='font-size:13px;line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</div>"
