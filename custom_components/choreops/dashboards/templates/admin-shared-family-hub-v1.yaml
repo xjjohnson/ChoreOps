@@ -1923,15 +1923,23 @@ views:
                     }},
                   {%- elif ep_tab == 'achievements' -%}
                     {#-- Achievements are given by hand: tap a gold tile to give it to the selected person --#}
-                    {%- for it in qa_achievements if it is mapping and it.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] -%}
-                      {%- set ach_attrs = states[it.get('eid')].attributes | default({}, true) -%}
-                      {%- set ach_name = ((ach_attrs.get('achievement_name') or it.get('name') or '') | string) -%}
+                    {#-- Read the family-wide achievement sensors (one per achievement) so every achievement is listed for everyone --#}
+                    {%- set ach_sys = integration_entities('choreops')
+                      | select('search', '^sensor\\.')
+                      | list
+                      | expand
+                      | selectattr('attributes.purpose', 'defined')
+                      | selectattr('attributes.purpose', 'eq', 'purpose_achievement')
+                      | list -%}
+                    {%- for it in ach_sys | sort(attribute='attributes.achievement_name') -%}
+                      {%- set ach_attrs = it.attributes -%}
+                      {%- set ach_name = ((ach_attrs.get('achievement_name') or '') | string) -%}
                       {%- set ach_pts = ach_attrs.get('reward_points', 0) | float(default=0) -%}
-                      {%- set ach_n = ach_attrs.get('award_count', 0) | int(default=0) -%}
+                      {%- set ach_n = ((ach_attrs.get('awarded_to') or {}).get(selected_user_name, 0)) | int(default=0) -%}
                       {%- set ach_icon = (ach_attrs.get('icon') or 'mdi:trophy') | string -%}
                       {%- set ep_rows.c = ep_rows.c + [{
                         'type': 'custom:button-card',
-                        'entity': it.get('eid'),
+                        'entity': it.entity_id,
                         'icon': ach_icon,
                         'name': ach_name,
                         'label': (('+' ~ ('%g' | format(ach_pts)) ~ ' pts') if ach_pts > 0 else 'no points') ~ ' · given ' ~ ach_n ~ '×',

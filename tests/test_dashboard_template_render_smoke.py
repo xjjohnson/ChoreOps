@@ -1502,6 +1502,7 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
         assert (
             '["Dad", "Lily"]' in card["filter"]["template"]
             or "Achievements" in str(card["filter"]["template"])
+            or "ACHIEVEMENTS" in str(card["filter"]["template"])
             or "family_total" in card["filter"]["template"]
         )
     assert "family-hub-" in autos[1]["filter"]["template"]
@@ -2098,9 +2099,10 @@ def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> 
             entity_id=eid,
             state=str(count),
             attributes={
+                "purpose": "purpose_achievement",
                 "achievement_name": name,
                 "reward_points": points,
-                "award_count": count,
+                "awarded_to": {"Alice": count} if count else {},
                 "icon": "mdi:trophy",
             },
             name=name,
@@ -2109,12 +2111,7 @@ def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> 
     eco = _render_quick_actions(
         "economy",
         {"econ-tab": "achievements"},
-        {
-            "achievements": [
-                {"eid": "sensor.alice_ach_kitchen", "name": "Kitchen Hero"},
-                {"eid": "sensor.alice_ach_help", "name": "Helped a Sibling"},
-            ]
-        },
+        {},
         {
             "sensor.alice_ach_kitchen": ach(
                 "sensor.alice_ach_kitchen", "Kitchen Hero", 20, 3
@@ -2133,7 +2130,8 @@ def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> 
     ]
     assert seg[3]["styles"]["card"][-1]["background"] == "var(--primary-color)"
     rows = eco[2]["cards"]
-    assert [r["name"] for r in rows] == ["Kitchen Hero", "Helped a Sibling"]
+    assert sorted(r["name"] for r in rows) == ["Helped a Sibling", "Kitchen Hero"]
+    rows = sorted(rows, key=lambda r: r["name"] != "Kitchen Hero")
     assert rows[0]["label"] == "+20 pts · given 3×"
     assert rows[1]["label"] == "no points · given 0×"
     tap = rows[0]["tap_action"]
