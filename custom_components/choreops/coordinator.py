@@ -43,6 +43,7 @@ from .managers import (
     UIManager,
     UserManager,
 )
+from .reward_pools.manager import RewardPoolManager
 from .store import ChoreOpsStore
 from .type_defs import (
     AchievementsCollection,
@@ -146,6 +147,9 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
 
         # Family goals: group goals pooled across everyone assigned
         self.family_goal_manager = FamilyGoalManager(hass, self)
+
+        # Reward pools: families chip in points toward one shared reward
+        self.reward_pool_manager = RewardPoolManager(hass, self)
 
         # Statistics engine for unified period-based tracking (v0.5.0+)
         self.stats = StatisticsEngine()

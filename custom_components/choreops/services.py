@@ -28,6 +28,7 @@ from .helpers.auth_helpers import (
     is_user_authorized_for_action,
 )
 from .helpers.entity_helpers import get_item_id_by_name, get_item_id_or_raise
+from .reward_pools.services import POOL_SERVICE_NAMES, register_pool_services
 from .utils.dt_utils import dt_parse, dt_to_utc_iso
 from .utils.math_utils import parse_points_value
 
@@ -528,34 +529,6 @@ RESET_FAMILY_GOAL_SCHEMA = vol.Schema(
                 cv.string,
                 vol.Length(min=1),
             ),
-        }
-    )
-)
-
-CONTRIBUTE_TO_REWARD_POOL_SCHEMA = vol.Schema(
-    _with_service_target_fields(
-        {
-            vol.Required(const.SERVICE_FIELD_USER_NAME): cv.string,
-            vol.Required(const.SERVICE_FIELD_REWARD_NAME): cv.string,
-            vol.Optional(const.SERVICE_FIELD_POINTS_AMOUNT): vol.All(
-                vol.Coerce(float), vol.Range(min=0, min_included=False)
-            ),
-        }
-    )
-)
-
-_REWARD_POOL_BASE = {
-    vol.Optional(const.SERVICE_FIELD_APPROVER_NAME): cv.string,
-    vol.Required(const.SERVICE_FIELD_REWARD_NAME): cv.string,
-}
-
-APPROVE_REWARD_POOL_SCHEMA = vol.Schema(_with_service_target_fields(_REWARD_POOL_BASE))
-
-REFUND_REWARD_POOL_SCHEMA = vol.Schema(
-    _with_service_target_fields(
-        {
-            **_REWARD_POOL_BASE,
-            vol.Optional(const.SERVICE_FIELD_USER_NAME): cv.string,
         }
     )
 )
@@ -3119,139 +3092,8 @@ def async_setup_services(hass: HomeAssistant):
         schema=DISAPPROVE_REWARD_SCHEMA,
     )
 
-    # ==========================================================================
-    # FAMILY POOL SERVICE HANDLERS
-    # ==========================================================================
-
-    async def handle_contribute_to_reward_pool(
-        call: ServiceCall,
-    ) -> dict[str, Any] | None:
-        """Pay points from a user's balance into a pooled reward."""
-        entry_id = _resolve_target_entry_id(hass, dict(call.data))
-        if not entry_id:
-            const.LOGGER.warning(
-                "Contribute To Reward Pool: %s",
-                const.TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND,
-            )
-            return None
-
-        coordinator = _get_coordinator_by_entry_id(hass, entry_id)
-        assignee_id = get_item_id_or_raise(
-            coordinator,
-            const.ITEM_TYPE_USER,
-            call.data[const.SERVICE_FIELD_USER_NAME],
-            role=const.ROLE_ASSIGNEE,
-        )
-        reward_id = get_item_id_or_raise(
-            coordinator,
-            const.ITEM_TYPE_REWARD,
-            call.data[const.SERVICE_FIELD_REWARD_NAME],
-        )
-
-        user_id = call.context.user_id
-        if user_id and not await is_user_authorized_for_action(
-            hass,
-            user_id,
-            AUTH_ACTION_PARTICIPATION,
-            target_user_id=assignee_id,
-        ):
-            raise HomeAssistantError(
-                translation_domain=const.DOMAIN,
-                translation_key=const.TRANS_KEY_ERROR_NOT_AUTHORIZED_ACTION,
-                translation_placeholders={
-                    "action": const.ERROR_ACTION_CONTRIBUTE_REWARD_POOL
-                },
-            )
-
-        contributed = await coordinator.reward_manager.contribute_to_pool(
-            assignee_id,
-            reward_id,
-            call.data.get(const.SERVICE_FIELD_POINTS_AMOUNT),
-        )
-        return {const.SERVICE_FIELD_POINTS_AMOUNT: contributed}
-
-    hass.services.async_register(
-        const.DOMAIN,
-        const.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
-        handle_contribute_to_reward_pool,
-        schema=CONTRIBUTE_TO_REWARD_POOL_SCHEMA,
-        supports_response=SupportsResponse.OPTIONAL,
-    )
-
-    async def _resolve_reward_pool_call(
-        call: ServiceCall, log_label: str
-    ) -> tuple["ChoreOpsDataCoordinator", str] | None:
-        """Resolve coordinator and reward for an approver pool action."""
-        entry_id = _resolve_target_entry_id(hass, dict(call.data))
-        if not entry_id:
-            const.LOGGER.warning(
-                "%s: %s", log_label, const.TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND
-            )
-            return None
-
-        coordinator = _get_coordinator_by_entry_id(hass, entry_id)
-        user_id = call.context.user_id
-        if user_id and not await is_user_authorized_for_action(
-            hass,
-            user_id,
-            AUTH_ACTION_MANAGEMENT,
-        ):
-            raise HomeAssistantError(
-                translation_domain=const.DOMAIN,
-                translation_key=const.TRANS_KEY_ERROR_NOT_AUTHORIZED_ACTION,
-                translation_placeholders={
-                    "action": const.ERROR_ACTION_MANAGE_REWARD_POOL
-                },
-            )
-
-        reward_id = get_item_id_or_raise(
-            coordinator,
-            const.ITEM_TYPE_REWARD,
-            call.data[const.SERVICE_FIELD_REWARD_NAME],
-        )
-        return coordinator, reward_id
-
-    async def handle_approve_reward_pool(call: ServiceCall) -> None:
-        """Confirm a full family pool's reward was delivered."""
-        resolved = await _resolve_reward_pool_call(call, "Approve Reward Pool")
-        if resolved is None:
-            return
-        coordinator, reward_id = resolved
-        approver_name = call.data.get(const.SERVICE_FIELD_APPROVER_NAME)
-        if not approver_name and call.context.user_id:
-            user_obj = await hass.auth.async_get_user(call.context.user_id)
-            approver_name = user_obj.name if user_obj else None
-        await coordinator.reward_manager.approve_pool(
-            approver_name or const.DISPLAY_UNKNOWN, reward_id
-        )
-
-    hass.services.async_register(
-        const.DOMAIN,
-        const.SERVICE_APPROVE_REWARD_POOL,
-        handle_approve_reward_pool,
-        schema=APPROVE_REWARD_POOL_SCHEMA,
-    )
-
-    async def handle_refund_reward_pool(call: ServiceCall) -> None:
-        """Cancel a family pool, or refund one person's share of it."""
-        resolved = await _resolve_reward_pool_call(call, "Refund Reward Pool")
-        if resolved is None:
-            return
-        coordinator, reward_id = resolved
-        user_name = call.data.get(const.SERVICE_FIELD_USER_NAME)
-        user_id = (
-            get_item_id_or_raise(coordinator, const.ITEM_TYPE_USER, user_name)
-            if user_name
-            else None
-        )
-        await coordinator.reward_manager.refund_pool(reward_id, user_id)
-
-    hass.services.async_register(
-        const.DOMAIN,
-        const.SERVICE_REFUND_REWARD_POOL,
-        handle_refund_reward_pool,
-        schema=REFUND_REWARD_POOL_SCHEMA,
-    )
+    # Family reward pool services live in the reward_pools package
+    register_pool_services(hass)
 
     # NOTE: reset_rewards service REMOVED - superseded by reset_transactional_data
     # with scope="assignee" or scope="global" and item_type="rewards"
@@ -4383,9 +4225,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         const.SERVICE_APPLY_BONUS,
         const.SERVICE_MANUAL_ADJUST_POINTS,
         const.SERVICE_APPROVE_REWARD,
-        const.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
-        const.SERVICE_APPROVE_REWARD_POOL,
-        const.SERVICE_REFUND_REWARD_POOL,
+        *POOL_SERVICE_NAMES,
         const.SERVICE_MANAGE_UI_CONTROL,
         const.SERVICE_RESET_CHORES_TO_PENDING_STATE,  # Renamed from SERVICE_RESET_ALL_CHORES
         const.SERVICE_RESET_OVERDUE_CHORES,

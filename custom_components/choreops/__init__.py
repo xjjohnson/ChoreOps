@@ -281,6 +281,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ChoreOpsConfigEntry) -> 
             "Gamification manager setup failed (badges/achievements disabled): %s", err
         )
 
+    # Reward pools move points on contribute/refund, so they are not optional
+    await coordinator.reward_pool_manager.async_setup()
+
     # NON-CRITICAL: Family goals (group goals optional)
     try:
         await coordinator.family_goal_manager.async_setup()
