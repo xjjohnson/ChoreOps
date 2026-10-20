@@ -2290,7 +2290,11 @@ def _hub_card_template(marker: str) -> str:
 
 
 def _render_hub_card(
-    tpl: str, helper_attrs: dict[str, object], extra: dict[str, _MockState]
+    tpl: str,
+    helper_attrs: dict[str, object],
+    extra: dict[str, _MockState],
+    *,
+    real_dates: bool = False,
 ):
     import datetime as _dt
 
@@ -2316,6 +2320,13 @@ def _render_hub_card(
     env.globals["now"] = lambda: _dt.datetime(2026, 10, 19, 13, 0)
     env.globals["as_datetime"] = lambda v: _dt.datetime.fromisoformat(str(v))
     env.globals["as_timestamp"] = lambda v: 0
+    if real_dates:
+        env.globals["as_timestamp"] = lambda v: _dt.datetime.fromisoformat(
+            str(v)
+        ).timestamp()
+        env.filters["timestamp_custom"] = lambda v, f="%Y-%m-%d", local=True: (
+            _dt.datetime.fromtimestamp(float(v)).strftime(f)
+        )
     env.filters["as_local"] = lambda v: v
     output = env.from_string(tpl).render(
         integration_entities=integration_entities,
@@ -2391,3 +2402,74 @@ def test_family_hub_showcase_lists_earned_achievements_as_gold_tiles() -> None:
     assert "×2" in output
     assert "#d4a017" in output
     assert "Not Yet" not in output
+
+
+def _goal_badge_states(attrs: dict[str, object], progress: int = 20):
+    return (
+        {
+            "badges": [
+                {
+                    "eid": "sensor.lily_goal",
+                    "name": "Perfect Week",
+                    "badge_type": "periodic",
+                }
+            ]
+        },
+        {
+            "sensor.lily_goal": _MockState(
+                entity_id="sensor.lily_goal",
+                state=str(progress),
+                attributes={
+                    "badge_name": "Perfect Week",
+                    "badge_type": "periodic",
+                    "status": "in_progress",
+                    "icon": "mdi:medal",
+                    **attrs,
+                },
+                name="goal",
+            )
+        },
+    )
+
+
+def test_family_hub_goal_shows_done_missed_today_and_ahead_days() -> None:
+    """A weekly goal shows each day of its cycle: done, missed, today, ahead."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "target_type": "days_all_chores",
+            "start_date": "2026-10-17",
+            "end_date": "2026-10-23",
+            "days_done": ["2026-10-17", "2026-10-19"],
+        }
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "Sat" in output and "Fri" in output
+    assert output.count("✓") == 2  # Sat and today's done day
+    assert output.count("✗") == 1  # Sun passed with nothing recorded
+    assert "2 of 7" in output and "days done" in output
+
+
+def test_family_hub_count_goal_does_not_mark_days_as_missed() -> None:
+    """Goals that count chores or points show active days, never red misses."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "target_type": "chores_all_chores",
+            "start_date": "2026-10-12",
+            "end_date": "2026-10-25",
+            "days_done": ["2026-10-13"],
+        }
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "✗" not in output
+    assert "1</b> day active" in output
+
+
+def test_family_hub_goal_without_dates_has_no_day_strip() -> None:
+    """A goal with no start or end date keeps the plain card."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states({"target_type": "days_all_chores"})
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "Perfect Week" in output
+    assert "days done" not in output and "✗" not in output

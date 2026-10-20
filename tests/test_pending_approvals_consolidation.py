@@ -155,6 +155,27 @@ def test_recent_manual_adjustments_keep_only_manual_entries() -> None:
     assert [m["item_name"] for m in manual] == ["Left shoes out", "Helped out"]
 
 
+def test_badge_progress_remembers_each_day_once() -> None:
+    """The days-done list records a day once and never grows without bound."""
+    from custom_components.choreops import const
+    from custom_components.choreops.managers.gamification_manager import (
+        GamificationManager,
+    )
+
+    progress: dict = {}
+    GamificationManager._record_day_done(progress, "2026-10-19")
+    GamificationManager._record_day_done(progress, "2026-10-19")
+    GamificationManager._record_day_done(progress, "2026-10-20")
+    assert progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE] == [
+        "2026-10-19",
+        "2026-10-20",
+    ]
+
+    for i in range(400):
+        GamificationManager._record_day_done(progress, f"d{i}")
+    assert len(progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE]) == 366
+
+
 def test_shared_admin_helper_lists_family_goals() -> None:
     """Family goals are exposed straight from the goal manager for the reset card."""
     from types import SimpleNamespace

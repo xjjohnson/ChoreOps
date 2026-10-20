@@ -2521,6 +2521,8 @@ views:
                           'start': ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', ''),
                           'end': ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', ''),
                           'days_left': b_days_left,
+                          'days_done': (ba.get('days_done') if ba.get('days_done') is iterable and ba.get('days_done') is not string else []),
+                          'day_based': ((ba.get('target_type') or '') | string | lower).startswith(('days_', 'streak_')),
                           'starts_future': b_starts_future,
                           'points': awards.get('award_points', 0) | float(default=0),
                           'mult': awards.get('points_multiplier', 0) | float(default=0),
@@ -2720,13 +2722,62 @@ views:
 
                               {%- set tile = "<div style='flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb, " ~ row_col ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ row_col ~ ";display:block;'></ha-icon></div>" -%}
                               {%- set reward_pill = ("<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>+" ~ ('%g' | format(b.points | round(2))) ~ "</div>") if b.points > 0 else '' -%}
+                              {#-- day-by-day strip: done / missed / today / still ahead --#}
+                              {%- set day_strip = '' -%}
+                              {%- if b.start | length > 0 and b.end | length > 0 and not b.starts_future -%}
+                                {%- set start_ts = as_timestamp(b.start ~ 'T12:00:00') -%}
+                                {%- set n_days = (((as_timestamp(b.end ~ 'T12:00:00') - start_ts) / 86400) | round(0) | int) + 1 -%}
+                                {%- if n_days >= 2 and n_days <= 42 -%}
+                                  {%- set dcount = namespace(done=0, cells='') -%}
+                                  {%- for i in range(n_days) -%}
+                                    {%- set d_ts = start_ts + (i * 86400) -%}
+                                    {%- set d_iso = d_ts | timestamp_custom('%Y-%m-%d') -%}
+                                    {%- set d_done = d_iso in b.days_done -%}
+                                    {%- set d_today = d_iso == current_date -%}
+                                    {%- set d_past = d_iso < current_date -%}
+                                    {%- if d_done -%}
+                                      {%- set dcount.done = dcount.done + 1 -%}
+                                      {%- set c_bg = 'color-mix(in srgb, var(--success-color) 22%, var(--card-background-color))' -%}
+                                      {%- set c_bd = '1px solid color-mix(in srgb, var(--success-color) 55%, transparent)' -%}
+                                      {%- set c_fg = 'var(--success-color)' -%}
+                                      {%- set c_mark = '✓' -%}
+                                    {%- elif d_today -%}
+                                      {%- set c_bg = 'transparent' -%}
+                                      {%- set c_bd = '2px dashed var(--primary-color)' -%}
+                                      {%- set c_fg = 'var(--primary-color)' -%}
+                                      {%- set c_mark = '•' -%}
+                                    {%- elif d_past and b.day_based -%}
+                                      {%- set c_bg = 'color-mix(in srgb, var(--error-color) 18%, var(--card-background-color))' -%}
+                                      {%- set c_bd = '1px solid color-mix(in srgb, var(--error-color) 45%, transparent)' -%}
+                                      {%- set c_fg = 'var(--error-color)' -%}
+                                      {%- set c_mark = '✗' -%}
+                                    {%- else -%}
+                                      {%- set c_bg = 'var(--secondary-background-color)' -%}
+                                      {%- set c_bd = '1px solid transparent' -%}
+                                      {%- set c_fg = 'var(--secondary-text-color)' -%}
+                                      {%- set c_mark = '' -%}
+                                    {%- endif -%}
+                                    {%- if n_days <= 7 -%}
+                                      {%- set dcount.cells = dcount.cells ~ "<div style='text-align:center;'><div style='font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;margin-bottom:3px;'>" ~ (d_ts | timestamp_custom('%a')) ~ "</div><div style='height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";color:" ~ c_fg ~ ";'>" ~ c_mark ~ "</div></div>" -%}
+                                    {%- else -%}
+                                      {%- set dcount.cells = dcount.cells ~ "<div title='" ~ d_iso ~ "' style='width:18px;height:18px;border-radius:5px;box-sizing:border-box;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";'></div>" -%}
+                                    {%- endif -%}
+                                  {%- endfor -%}
+                                  {%- set strip_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'><b style='color:var(--primary-text-color);'>" ~ dcount.done ~ (' of ' ~ n_days if b.day_based else '') ~ "</b> " ~ ('days done' if b.day_based else ('day active' if dcount.done == 1 else 'days active')) ~ "</div>" -%}
+                                  {%- if n_days <= 7 -%}
+                                    {%- set day_strip = "<div style='margin-top:10px;display:grid;grid-template-columns:repeat(" ~ n_days ~ ",1fr);gap:6px;'>" ~ dcount.cells ~ "</div>" ~ strip_note -%}
+                                  {%- else -%}
+                                    {%- set day_strip = "<div style='margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;'>" ~ dcount.cells ~ "</div>" ~ strip_note -%}
+                                  {%- endif -%}
+                                {%- endif -%}
+                              {%- endif -%}
                               {%- set sub_txt = bdesc if bdesc | length > 0 else ui.get('complete_to_earn', 'Complete to earn') -%}
                               {%- set row_html = "<div style='position:relative;overflow:hidden;box-sizing:border-box;width:100%;border-radius:16px;border:" ~ ('1px solid var(--warning-color)' if is_urgent else '1px solid var(--divider-color)') ~ ";background:linear-gradient(90deg, color-mix(in srgb, " ~ row_col ~ " 34%, var(--card-background-color)) 0%, color-mix(in srgb, " ~ row_col ~ " 13%, var(--card-background-color)) " ~ pct ~ "%, var(--card-background-color) " ~ pct ~ "%);padding:12px;text-align:left;'>"
                                   ~ "<div style='display:flex;align-items:center;gap:10px;'>" ~ tile
                                   ~ "<div style='flex:1;min-width:0;'><div style='display:flex;align-items:center;gap:6px;flex-wrap:wrap;'><span style='font-size:15px;line-height:1.2;font-weight:800;color:var(--primary-text-color);'>" ~ bname ~ "</span>" ~ badge_html ~ "</div>"
                                   ~ "<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ sub_txt ~ "</div>"
                                   ~ ("<div style='margin-top:3px;font-size:11px;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ (bits | join(' &nbsp;·&nbsp; ')) ~ "</div>" if bits | length > 0 else '')
-                                  ~ "</div>" ~ reward_pill ~ "</div></div>" -%}
+                                  ~ "</div>" ~ reward_pill ~ "</div>" ~ day_strip ~ "</div>" -%}
                               {%- set emit.items = emit.items + [{'eid': b.eid, 'html': row_html, 'head': ghead.v}] -%}
                               {%- set ghead.v = '' -%}
                             {%- endfor -%}

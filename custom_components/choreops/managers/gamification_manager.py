@@ -1308,10 +1308,26 @@ class GamificationManager(BaseManager):
             return
         progress[const.DATA_USER_BADGE_PROGRESS_STATUS] = const.BADGE_STATE_ACTIVE_CYCLE
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] = 0
+        progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE] = []
         progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] = 0.0
         progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] = False
         progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = dt_today_iso()
         self.coordinator._persist_and_update()
+
+    @staticmethod
+    def _record_day_done(progress: dict[str, Any], day_iso: str) -> None:
+        """Remember that progress went up on this local day (once per day).
+
+        Lets a dashboard show which days of the cycle counted. The list is cleared
+        when the cycle resets and never grows past a year of days.
+        """
+        days_done = progress.setdefault(const.DATA_USER_BADGE_PROGRESS_DAYS_DONE, [])
+        if not isinstance(days_done, list):
+            days_done = []
+            progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE] = days_done
+        if day_iso not in days_done:
+            days_done.append(day_iso)
+            del days_done[:-366]
 
     def _is_periodic_award_recorded_for_current_cycle(
         self,
@@ -1555,6 +1571,7 @@ class GamificationManager(BaseManager):
         progress[const.DATA_USER_BADGE_PROGRESS_POINTS_CYCLE_COUNT] = 0.0
         progress[const.DATA_USER_BADGE_PROGRESS_CHORES_CYCLE_COUNT] = 0
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] = 0
+        progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE] = []
         progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] = 0.0
         progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] = False
         progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = ""
@@ -2206,16 +2223,16 @@ class GamificationManager(BaseManager):
             )
 
         if persist_bucket == "points_cycle":
-            if (
-                float(
-                    progress.get(const.DATA_USER_BADGE_PROGRESS_POINTS_CYCLE_COUNT, 0.0)
-                )
-                != criterion_current_value
-            ):
+            previous_points = float(
+                progress.get(const.DATA_USER_BADGE_PROGRESS_POINTS_CYCLE_COUNT, 0.0)
+            )
+            if previous_points != criterion_current_value:
                 progress[const.DATA_USER_BADGE_PROGRESS_POINTS_CYCLE_COUNT] = (
                     criterion_current_value
                 )
                 changed = True
+                if criterion_current_value > previous_points:
+                    self._record_day_done(progress, today_iso)
                 if (
                     progress.get(const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY)
                     != today_iso
@@ -2225,14 +2242,16 @@ class GamificationManager(BaseManager):
 
         elif persist_bucket == "chores_cycle":
             chores_count = int(criterion_current_value)
-            if (
-                int(progress.get(const.DATA_USER_BADGE_PROGRESS_CHORES_CYCLE_COUNT, 0))
-                != chores_count
-            ):
+            previous_chores = int(
+                progress.get(const.DATA_USER_BADGE_PROGRESS_CHORES_CYCLE_COUNT, 0)
+            )
+            if previous_chores != chores_count:
                 progress[const.DATA_USER_BADGE_PROGRESS_CHORES_CYCLE_COUNT] = (
                     chores_count
                 )
                 changed = True
+                if chores_count > previous_chores:
+                    self._record_day_done(progress, today_iso)
                 if (
                     progress.get(const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY)
                     != today_iso
@@ -2248,6 +2267,8 @@ class GamificationManager(BaseManager):
             if previous_days != days_count:
                 progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] = days_count
                 changed = True
+                if days_count > previous_days:
+                    self._record_day_done(progress, today_iso)
 
             # Retain today's count, including the 0 written on a break, so the
             # pre-break value survives in an earlier entry and can be restored.

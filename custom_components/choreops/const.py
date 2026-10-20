@@ -1072,6 +1072,9 @@ DATA_USER_BADGE_PROGRESS_CHORES_CYCLE_COUNT: Final = "chores_cycle_count"
 DATA_USER_BADGE_PROGRESS_CRITERIA_MET: Final = "criteria_met"
 DATA_USER_BADGE_PROGRESS_CYCLE_COUNT: Final = "cycle_count"
 DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT: Final = "days_cycle_count"
+# Local dates (YYYY-MM-DD) on which this cycle's progress went up, so a dashboard
+# can show which days counted. Cleared whenever the cycle resets.
+DATA_USER_BADGE_PROGRESS_DAYS_DONE: Final = "days_done"
 DATA_USER_BADGE_PROGRESS_END_DATE: Final = "end_date"
 DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY: Final = "last_update_day"
 DATA_USER_BADGE_PROGRESS_NAME: Final = "name"
