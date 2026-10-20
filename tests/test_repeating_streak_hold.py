@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from custom_components.choreops import const
 from tests.test_badge_streak_midnight_reset import (
     STREAK_THRESHOLD,
     PeriodicDayReplay,
@@ -51,6 +52,11 @@ async def test_earned_streak_holds_until_the_next_day(
         await replay.start_day(day_key(offset))
         await replay.complete_day(day_key(offset))
 
+    # Tracking began the first day the badge was evaluated.
+    assert replay._progress()[const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE] == day_key(
+        -3
+    )
+
     # Earned on the last day: the progress still shows the reached target.
     assert replay.earned is True
     assert len(awards) == 1
@@ -68,6 +74,10 @@ async def test_earned_streak_holds_until_the_next_day(
     assert replay.days_cycle_count == 0
     assert replay.criteria_met is False
     assert len(awards) == 1
+    # The restarted streak is tracked from the new day.
+    assert replay._progress()[const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE] == day_key(
+        0
+    )
 
     # Completing the new day is day one of the next streak.
     await replay.complete_day(day_key(0))
