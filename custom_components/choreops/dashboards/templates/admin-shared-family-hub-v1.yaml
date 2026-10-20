@@ -1840,21 +1840,21 @@ views:
                       'hold_action': {'action': 'none'},
                       'styles': {
                         'card': [
-                          {'padding': '8px 4px'},
-                          {'border-radius': '999px'},
+                          {'padding': '6px 2px'},
+                          {'border-radius': '16px'},
                           {'box-shadow': 'none'},
                           {'border': '1px solid var(--primary-color)' if ep_on else '1px solid transparent'},
                           {'background': 'var(--primary-color)' if ep_on else 'transparent'}
                         ],
                         'grid': [
-                          {'grid-template-areas': '"i n"'},
-                          {'grid-template-columns': 'min-content min-content'},
-                          {'column-gap': '6px'},
+                          {'grid-template-areas': '"i" "n"'},
+                          {'grid-template-columns': '1fr'},
+                          {'row-gap': '2px'},
                           {'align-items': 'center'},
-                          {'justify-content': 'center'}
+                          {'justify-items': 'center'}
                         ],
-                        'icon': [{'width': '16px'}, {'color': 'var(--text-primary-color)' if ep_on else 'var(--primary-color)'}],
-                        'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'white-space': 'nowrap'}, {'color': 'var(--text-primary-color)' if ep_on else 'var(--primary-text-color)'}]
+                        'icon': [{'width': '18px'}, {'color': 'var(--text-primary-color)' if ep_on else 'var(--primary-color)'}],
+                        'name': [{'font-size': '11px'}, {'font-weight': '700'}, {'white-space': 'nowrap'}, {'color': 'var(--text-primary-color)' if ep_on else 'var(--primary-text-color)'}]
                       }
                     }] -%}
                   {%- endfor -%}
