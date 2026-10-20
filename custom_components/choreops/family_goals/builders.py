@@ -175,9 +175,7 @@ def build_goal(
         fg.DATA_SELECTED_CHORE_ID: str(
             get_field(fg.DATA_SELECTED_CHORE_ID, base.SENTINEL_EMPTY)
         ),
-        fg.DATA_TARGET_VALUE: float(
-            get_field(fg.DATA_TARGET_VALUE, fg.DEFAULT_TARGET)
-        ),
+        fg.DATA_TARGET_VALUE: float(get_field(fg.DATA_TARGET_VALUE, fg.DEFAULT_TARGET)),
         fg.DATA_LEVELS: str(get_field(fg.DATA_LEVELS, base.SENTINEL_EMPTY)).strip(),
         fg.DATA_TOP_MULTIPLIER: float(get_field(fg.DATA_TOP_MULTIPLIER, 1.0) or 1.0),
         fg.DATA_REWARD_POINTS: parse_points_value(

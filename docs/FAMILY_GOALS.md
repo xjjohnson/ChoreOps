@@ -1,13 +1,14 @@
-# Family Goal Achievements
+# Family Goals
 
-A **family goal** is an achievement the whole household works on together. Instead of
+A **family goal** is a goal the whole household works on together. Instead of
 each person tracking their own progress toward their own copy of a target, every
 assigned person's contribution is added into **one pooled total**. When the pooled
 total reaches the target, **everyone assigned is awarded at the same time**.
 
 ## Creating one
 
-1. **Settings → Devices & Services → ChoreOps → Configure → Manage Achievement → Add Achievement**
+1. **Settings → Devices & Services → ChoreOps → Configure → Manage Family Goals → Add**
+   (family goals are stored separately from achievements, which are untouched)
 2. Under **Type**, choose one of:
    - **Family Goal: Total Points Earned** - pools all-time points earned by everyone assigned.
    - **Family Goal: Total Chores Completed** - pools all-time approved chores by everyone assigned.
@@ -29,7 +30,7 @@ total reaches the target, **everyone assigned is awarded at the same time**.
 
 ## What you can see
 
-The achievement sensor's state is the pooled percentage (0-100) toward the single
+The family goal sensor's state is the pooled percentage (0-100) toward the single
 target. It also exposes:
 
 | Attribute | Meaning |
@@ -37,7 +38,7 @@ target. It also exposes:
 | `family_total` | Pooled total so far |
 | `family_contributions` | Each person's share, keyed by display name |
 
-Each person's achievement progress sensor shows the same pooled percentage and
+Each person's goal progress sensor shows the same pooled percentage and
 exposes `family_total`; its `raw_progress` attribute is that person's own share.
 
 ## Things to know
@@ -47,12 +48,13 @@ exposes `family_total`; its `raw_progress` attribute is that person's own share.
   whose target is already met will be awarded again on the next evaluation.
 - A person added to a goal that is already complete is awarded on the next
   evaluation.
-- Existing achievement types are unchanged.
+- Goals pay out through the same completion signal as challenges, so points and
+  notifications work the same way. Existing achievements are unchanged.
 
 ## Restarting a goal
 
 Call the `choreops.reset_family_goal` service with the goal's name
-(`achievement_name`). Points and chores goals remember what each person had
+(`goal_name`). Points and chores goals remember what each person had
 already contributed and count only new activity from then on; the caught-up goal
 clears its streak (tomorrow is day one). Everyone's award is cleared so the goal
 can be earned again. Reward points already paid out are kept.

@@ -124,3 +124,5 @@ ATTR_RECORD_TOP: Final = "family_record_top"
 # Services
 # ---------------------------------------------------------------------------
 SERVICE_RESET_FAMILY_GOAL: Final = "reset_family_goal"
+SERVICE_FIELD_GOAL_NAME: Final = "goal_name"
+ERROR_ACTION_RESET_FAMILY_GOAL: Final = "reset_family_goal"

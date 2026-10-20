@@ -758,17 +758,6 @@ class AchievementData(TypedDict):
     target_value: int
     baseline: NotRequired[int]
     selected_chore_id: NotRequired[str]  # Chore UUID for chore-specific
-    # Family goals only (see GamificationManager family goal section)
-    family_baseline: NotRequired[dict[str, float]]  # assignee_id -> amount at restart
-    family_level: NotRequired[int]  # levels completed so far
-    levels: NotRequired[str]  # comma-separated level targets
-    top_multiplier: NotRequired[float]  # top contributor reward multiplier (1 = off)
-    family_level_start: NotRequired[dict[str, float]]  # contributions at level start
-    family_record: NotRequired[float]  # best one-day total
-    family_record_day: NotRequired[str]  # ISO date of the record
-    family_record_top: NotRequired[str]  # assignee id of that day's top contributor
-    family_streak_count: NotRequired[int]  # pooled caught-up streak (days)
-    family_streak_last_day: NotRequired[str]  # ISO date the streak last advanced
 
     # Assignment
     assigned_assignees: list[str]  # Assignee UUIDs

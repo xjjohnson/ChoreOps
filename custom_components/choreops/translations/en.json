@@ -404,13 +404,7 @@
           "criteria": "Criteria (optional)",
           "target_value": "Achievement Target",
           "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID",
-          "levels": "Levels (family goals, optional)",
-          "top_multiplier": "Top contributor reward multiplier (family goals, optional)"
-        },
-        "data_description": {
-          "levels": "Family goals only. One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the Extra Points amount above. Leave blank for a single level at the target value.",
-          "top_multiplier": "Family goals only. The person who added the most during a level gets that level's reward multiplied by this (for example 2 = double). Ties share it. Leave at 1 to turn it off."
+          "internal_id": "Internal ID"
         }
       },
       "challenge_count": {
@@ -539,9 +533,7 @@
       "invalid_calendar_show_period": "Invalid calendar show period. Must be a positive integer.",
       "invalid_default_chore_points": "Invalid default chore points. Must be a positive number greater than 0 with at most 2 decimal places.",
       "invalid_retention_period": "Invalid retention period. Must be a positive integer.",
-      "invalid_points_adjust_values": "Invalid points adjust values. Must be a list.",
-      "invalid_achievement_levels": "Levels must look like 100:10, 250:25, 500:50 - targets above zero that increase, rewards zero or more",
-      "invalid_achievement_top_multiplier": "Top contributor multiplier must be a number, 1 or higher"
+      "invalid_points_adjust_values": "Invalid points adjust values. Must be a list."
     },
     "abort": {
       "single_instance_allowed": "Only a single ChoreOps instance can be configured.",
@@ -568,11 +560,6 @@
         "data": {
           "manage_action": "Select an Action"
         }
-      },
-      "challenge_coming_soon": {
-        "title": "Challenges coming soon",
-        "description": "Challenges will be made available in future update.\n\nDuring migration, existing Challenge records are converted to equivalent Periodic Badge tracking to preserve intent and progress behavior where possible. Challenge-linked badges are removed in this release.\n\n ℹ️ [Configuration Guide]({documentation_url})",
-        "data": {}
       },
       "select_entity": {
         "title": "Select {entity_type}",
@@ -1041,32 +1028,31 @@
           "criteria": "Criteria (optional)",
           "target_value": "Achievement Target",
           "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID",
-          "levels": "Levels (family goals, optional)",
-          "top_multiplier": "Top contributor reward multiplier (family goals, optional)"
-        },
-        "data_description": {
-          "levels": "Family goals only. One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the Extra Points amount above. Leave blank for a single level at the target value.",
-          "top_multiplier": "Family goals only. The person who added the most during a level gets that level's reward multiplied by this (for example 2 = double). Ties share it. Leave at 1 to turn it off."
+          "internal_id": "Internal ID"
         }
       },
       "add_challenge": {
-        "title": "Define Challenge",
-        "description": "Enter details for each challenge.\n\n ℹ️ [Configuration Guide]({documentation_url})",
+        "title": "Add Family Goal",
+        "description": "Everyone assigned adds to ONE shared total. When it reaches the target, everyone is rewarded together.\n\n ℹ️ [Configuration Guide]({documentation_url})",
         "data": {
-          "name": "Challenge Name",
+          "name": "Goal name",
           "description": "Description (optional)",
-          "challenge_labels": "Challenge Labels",
+          "challenge_labels": "Labels (optional)",
           "icon": "Icon (mdi:xxx)",
-          "assigned_user_ids": "Assigned to",
-          "type": "Type of Challenge",
-          "selected_chore_id": "Select Chore Associated with Challenge (Optional)",
-          "criteria": "Criteria (optional)",
-          "target_value": "Challenges Target",
-          "reward_points": "Extra Points for Completing Challenge",
-          "start_date": "Start Date",
-          "end_date": "End Date",
-          "internal_id": "Internal ID"
+          "assigned_user_ids": "People working on this goal",
+          "type": "Type of goal",
+          "selected_chore_id": "Count only this chore (Total Chores Completed goals, optional)",
+          "target_value": "Target",
+          "levels": "Levels (optional)",
+          "top_multiplier": "Top contributor reward multiplier",
+          "reward_points": "Points each person earns when the goal is reached"
+        },
+        "data_description": {
+          "type": "How the shared total is counted. Everyone assigned adds to one pooled total, and everyone is rewarded together.",
+          "target_value": "The pooled total to reach. For the day-streak goals this is a number of days. Ignored when levels are entered.",
+          "levels": "One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the base reward. Leave empty for a single level.",
+          "top_multiplier": "The person who added the most during a level gets that level's reward multiplied by this (for example 2 = double). Ties share it. Leave at 1 to turn it off.",
+          "reward_points": "Each assigned person receives this once per level, unless the level lists its own reward."
         }
       },
       "edit_user": {
@@ -1545,32 +1531,31 @@
           "criteria": "Criteria (optional)",
           "target_value": "Achievement Target",
           "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID",
-          "levels": "Levels (family goals, optional)",
-          "top_multiplier": "Top contributor reward multiplier (family goals, optional)"
-        },
-        "data_description": {
-          "levels": "Family goals only. One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the Extra Points amount above. Leave blank for a single level at the target value.",
-          "top_multiplier": "Family goals only. The person who added the most during a level gets that level's reward multiplied by this (for example 2 = double). Ties share it. Leave at 1 to turn it off."
+          "internal_id": "Internal ID"
         }
       },
       "edit_challenge": {
-        "title": "Define Challenge",
-        "description": "Enter details for each challenge.\n\n ℹ️ [Configuration Guide]({documentation_url})",
+        "title": "Edit Family Goal",
+        "description": "Everyone assigned adds to ONE shared total. When it reaches the target, everyone is rewarded together.\n\n ℹ️ [Configuration Guide]({documentation_url})",
         "data": {
-          "name": "Challenge Name",
+          "name": "Goal name",
           "description": "Description (optional)",
-          "challenge_labels": "Challenge Labels",
+          "challenge_labels": "Labels (optional)",
           "icon": "Icon (mdi:xxx)",
-          "assigned_user_ids": "Assigned to",
-          "type": "Type of Challenge",
-          "selected_chore_id": "Select Chore Associated with Challenge (Optional)",
-          "criteria": "Criteria (optional)",
-          "target_value": "Challenges Target",
-          "reward_points": "Extra Points for Completing Challenge",
-          "start_date": "Start Date",
-          "end_date": "End Date",
-          "internal_id": "Internal ID"
+          "assigned_user_ids": "People working on this goal",
+          "type": "Type of goal",
+          "selected_chore_id": "Count only this chore (Total Chores Completed goals, optional)",
+          "target_value": "Target",
+          "levels": "Levels (optional)",
+          "top_multiplier": "Top contributor reward multiplier",
+          "reward_points": "Points each person earns when the goal is reached"
+        },
+        "data_description": {
+          "type": "How the shared total is counted. Everyone assigned adds to one pooled total, and everyone is rewarded together.",
+          "target_value": "The pooled total to reach. For the day-streak goals this is a number of days. Ignored when levels are entered.",
+          "levels": "One entry per level as target:reward, separated by commas, for example 100:10, 250:25, 500:50. A level with no reward (just 250) pays the base reward. Leave empty for a single level.",
+          "top_multiplier": "The person who added the most during a level gets that level's reward multiplied by this (for example 2 = double). Ties share it. Leave at 1 to turn it off.",
+          "reward_points": "Each assigned person receives this once per level, unless the level lists its own reward."
         }
       },
       "delete_user": {
@@ -1609,8 +1594,8 @@
         "data": {}
       },
       "delete_challenge": {
-        "title": "Delete Challenge",
-        "description": "Are you sure you want to delete the challenge {challenge_name}?",
+        "title": "Delete Family Goal",
+        "description": "Are you sure you want to delete the family goal {challenge_name}? Its progress is lost; points already paid stay.",
         "data": {}
       },
       "dashboard_generator": {
@@ -1977,8 +1962,14 @@
       "dashboard_nonselectable_templates": "One or more selected templates are unavailable for generation.",
       "dashboard_release_strict_pin_failed": "The selected dashboard release must be pinned exactly, but no effective release reference was available at execution time. Re-select the release in Step 1 and try again.",
       "dashboard_release_asset_prep_failed": "Unable to prepare selected online dashboard assets. Choose a different release or use latest compatible/current local templates and try again.",
-      "invalid_achievement_levels": "Levels must look like 100:10, 250:25, 500:50 - targets above zero that increase, rewards zero or more",
-      "invalid_achievement_top_multiplier": "Top contributor multiplier must be a number, 1 or higher"
+      "family_goal_name_required": "Enter a name for the goal",
+      "family_goal_name_duplicate": "A family goal with this name already exists",
+      "family_goal_no_assignees": "Choose at least one person for the goal",
+      "family_goal_invalid_type": "Choose a goal type",
+      "family_goal_invalid_target": "The target must be a number above zero",
+      "family_goal_invalid_levels": "Levels must look like 100:10, 250:25, 500:50 - targets above zero that increase, rewards zero or more",
+      "family_goal_invalid_top_multiplier": "Top contributor multiplier must be a number, 1 or higher",
+      "family_goal_invalid_reward_points": "Points must be zero or more"
     },
     "abort": {
       "invalid_action": "Invalid Action",
@@ -2019,7 +2010,7 @@
         "manage_penalty": "Manage Penalty",
         "manage_bonus": "Manage Bonus",
         "manage_achievement": "Manage Achievement",
-        "manage_challenge": "Manage Challenge",
+        "manage_challenge": "Manage Family Goals",
         "dashboard_generator": "Manage Dashboard",
         "general_options": "General Options",
         "done": "Finish Setup"
@@ -3611,8 +3602,8 @@
           "description": "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID.",
           "example": "Family Chores"
         },
-        "achievement_name": {
-          "name": "Achievement Name",
+        "goal_name": {
+          "name": "Goal Name",
           "description": "The name of the family goal to restart.",
           "example": "Total Chores"
         }
@@ -5084,12 +5075,12 @@
         }
       },
       "system_challenge_sensor": {
-        "name": "Challenge - {challenge_name}",
+        "name": "Family Goal - {challenge_name}",
         "state_attributes": {
           "purpose": {
             "name": "Purpose",
             "state": {
-              "purpose_challenge": "Challenge progress percentage (0-100) aggregated across all assigned users within date window, with challenge configuration including type, target, criteria, dates, and list of users who earned it"
+              "purpose_challenge": "Family goal progress percentage (0-100) toward the current level of one pooled total, with each person's share and the people who earned it"
             }
           },
           "challenge_name": {
@@ -5191,12 +5182,12 @@
         }
       },
       "assignee_challenge_progress_sensor": {
-        "name": "Progress - {challenge_name}",
+        "name": "Family Goal Progress - {challenge_name}",
         "state_attributes": {
           "purpose": {
             "name": "Purpose",
             "state": {
-              "purpose_challenge_progress": "Individual user's progress percentage (0-100) toward completing this challenge within the date window, with current raw progress count and award status"
+              "purpose_challenge_progress": "Family goal progress percentage (0-100) toward the current level of the shared total, with this person's own share and award status"
             }
           },
           "user_name": {

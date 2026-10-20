@@ -72,6 +72,7 @@ from . import const
 from .coordinator import ChoreOpsConfigEntry, ChoreOpsDataCoordinator
 from .engines.chore_engine import ChoreEngine
 from .entity import ChoreOpsCoordinatorEntity
+from .family_goals.sensor import build_family_goal_sensors
 from .helpers.device_helpers import (
     create_assignee_device_info_from_coordinator,
     create_system_device_info,
@@ -571,6 +572,7 @@ async def async_setup_entry(
     # First batch: all non-dashboard entities must be registered in HA before
     # computing the shard plan, so chore status sensor entity IDs are resolvable
     # in the registry for accurate payload size estimation.
+    entities.extend(build_family_goal_sensors(coordinator, entry))
     async_add_entities(entities)
 
     # Compute shard plan AFTER entities are registered. At this point the chore
@@ -3327,25 +3329,6 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                 else const.DEFAULT_ZERO
             )
 
-        elif ach_type in const.FAMILY_ACHIEVEMENT_TYPES:
-            # Family goal: ONE pooled total vs ONE target (not target x people).
-            family_total = (
-                self.coordinator.gamification_manager.get_family_achievement_total(
-                    self._achievement_id
-                )
-            )
-            level_target = float(
-                self.coordinator.gamification_manager.get_family_level_info(
-                    self._achievement_id
-                )["next_target"]
-                or target
-            )
-            percent = (
-                (family_total / level_target * 100)
-                if level_target > const.DEFAULT_ZERO
-                else const.DEFAULT_ZERO
-            )
-
         elif ach_type == const.ACHIEVEMENT_TYPE_STREAK:
             total_current = const.DEFAULT_ZERO
 
@@ -3476,7 +3459,7 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             for label in cast("list", stored_labels)
         ]
 
-        attributes: dict[str, Any] = {
+        return {
             const.ATTR_PURPOSE: const.TRANS_KEY_PURPOSE_ACHIEVEMENT,
             const.ATTR_ACHIEVEMENT_NAME: self._achievement_name,
             const.ATTR_DESCRIPTION: achievement.get(
@@ -3497,53 +3480,6 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             const.ATTR_USERS_EARNED: earned_by,
             const.ATTR_LABELS: friendly_labels,
         }
-
-        if ach_type in const.FAMILY_ACHIEVEMENT_TYPES:
-            # Pooled total plus each person's share, keyed by display name.
-            contributions = (
-                self.coordinator.gamification_manager.get_family_contributions(
-                    self._achievement_id
-                )
-            )
-            attributes[const.ATTR_FAMILY_TOTAL] = (
-                self.coordinator.gamification_manager.get_family_achievement_total(
-                    self._achievement_id
-                )
-            )
-            level_info = self.coordinator.gamification_manager.get_family_level_info(
-                self._achievement_id
-            )
-            attributes[const.ATTR_FAMILY_LEVEL] = level_info["level"]
-            attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
-            attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
-            attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
-            attributes.update(
-                self.coordinator.gamification_manager.get_family_day_record(
-                    self._achievement_id
-                )
-            )
-            attributes[const.ATTR_FAMILY_TOP_MULTIPLIER] = float(
-                achievement.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0)
-            )
-            attributes[const.ATTR_FAMILY_LEVEL_CONTRIBUTIONS] = {
-                (get_assignee_name_by_id(self.coordinator, a_id) or a_id): value
-                for a_id, value in self.coordinator.gamification_manager.get_family_level_contributions(
-                    self._achievement_id
-                ).items()
-            }
-            attributes[const.ATTR_FAMILY_LEVEL_REWARDS] = level_info["rewards"]
-            if ach_type == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP:
-                attributes[const.ATTR_FAMILY_CAUGHT_UP_TODAY] = (
-                    self.coordinator.gamification_manager.get_family_caught_up_status(
-                        self._achievement_id
-                    )
-                )
-            attributes[const.ATTR_FAMILY_CONTRIBUTIONS] = {
-                (get_assignee_name_by_id(self.coordinator, a_id) or a_id): value
-                for a_id, value in contributions.items()
-            }
-
-        return attributes
 
     @property
     def icon(self) -> str | None:
@@ -3886,26 +3822,6 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
                 else const.DEFAULT_ZERO
             )
 
-        elif ach_type in const.FAMILY_ACHIEVEMENT_TYPES:
-            # Family goal: every person's progress sensor shows the shared
-            # pooled progress, so the whole family watches the same bar.
-            family_total = (
-                self.coordinator.gamification_manager.get_family_achievement_total(
-                    self._achievement_id
-                )
-            )
-            level_target = float(
-                self.coordinator.gamification_manager.get_family_level_info(
-                    self._achievement_id
-                )["next_target"]
-                or target
-            )
-            percent = (
-                (family_total / level_target * 100)
-                if level_target > const.DEFAULT_ZERO
-                else const.DEFAULT_ZERO
-            )
-
         elif ach_type == const.ACHIEVEMENT_TYPE_STREAK:
             progress_data_elif: AchievementProgress = achievement.get(
                 const.DATA_ACHIEVEMENT_PROGRESS, {}
@@ -3956,7 +3872,7 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
         progress_data: AchievementProgress = achievement.get(
             const.DATA_ACHIEVEMENT_PROGRESS, {}
         ).get(self._assignee_id, {})
-        raw_progress: float = const.DEFAULT_ZERO
+        raw_progress = const.DEFAULT_ZERO
 
         awarded = (
             progress_data.get(const.DATA_ACHIEVEMENT_AWARDED, False)
@@ -4002,27 +3918,6 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
                 const.PRES_USER_CHORES_APPROVED_TODAY, const.DEFAULT_ZERO
             )
 
-        elif achievement.get(const.DATA_ACHIEVEMENT_TYPE) in (
-            const.FAMILY_ACHIEVEMENT_TYPES
-        ):
-            if (
-                achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-                in const.FAMILY_STREAK_ACHIEVEMENT_TYPES
-            ):
-                # Shared streak: everyone sees the same day count.
-                raw_progress = (
-                    self.coordinator.gamification_manager.get_family_achievement_total(
-                        self._achievement_id
-                    )
-                )
-            else:
-                # This person's own share of the family total.
-                raw_progress = (
-                    self.coordinator.gamification_manager.get_family_contributions(
-                        self._achievement_id
-                    ).get(self._assignee_id, const.DEFAULT_ZERO)
-                )
-
         associated_chore = const.SENTINEL_EMPTY
         selected_chore_id = achievement.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID)
         if selected_chore_id:
@@ -4055,7 +3950,7 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
             for label in cast("list", stored_labels)
         ]
 
-        attributes: dict[str, Any] = {
+        return {
             const.ATTR_PURPOSE: const.TRANS_KEY_PURPOSE_ACHIEVEMENT_PROGRESS,
             const.ATTR_USER_NAME: self._assignee_name,
             const.ATTR_ACHIEVEMENT_NAME: self._achievement_name,
@@ -4076,48 +3971,6 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
             const.ATTR_AWARDED: awarded,
             const.ATTR_LABELS: friendly_labels,
         }
-
-        if achievement.get(const.DATA_ACHIEVEMENT_TYPE) in (
-            const.FAMILY_ACHIEVEMENT_TYPES
-        ):
-            attributes[const.ATTR_FAMILY_TOTAL] = (
-                self.coordinator.gamification_manager.get_family_achievement_total(
-                    self._achievement_id
-                )
-            )
-            level_info = self.coordinator.gamification_manager.get_family_level_info(
-                self._achievement_id
-            )
-            attributes[const.ATTR_FAMILY_LEVEL] = level_info["level"]
-            attributes[const.ATTR_FAMILY_LEVELS] = level_info["levels"]
-            attributes[const.ATTR_FAMILY_NEXT_TARGET] = level_info["next_target"]
-            attributes[const.ATTR_FAMILY_NEXT_REWARD] = level_info["next_reward"]
-            attributes.update(
-                self.coordinator.gamification_manager.get_family_day_record(
-                    self._achievement_id
-                )
-            )
-            attributes[const.ATTR_FAMILY_TOP_MULTIPLIER] = float(
-                achievement.get(const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1.0)
-            )
-            attributes[const.ATTR_FAMILY_LEVEL_CONTRIBUTIONS] = {
-                (get_assignee_name_by_id(self.coordinator, a_id) or a_id): value
-                for a_id, value in self.coordinator.gamification_manager.get_family_level_contributions(
-                    self._achievement_id
-                ).items()
-            }
-            attributes[const.ATTR_FAMILY_LEVEL_REWARDS] = level_info["rewards"]
-            if (
-                achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-                == const.ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP
-            ):
-                attributes[const.ATTR_FAMILY_CAUGHT_UP_TODAY] = (
-                    self.coordinator.gamification_manager.get_family_caught_up_status(
-                        self._achievement_id
-                    )
-                )
-
-        return attributes
 
     @property
     def icon(self) -> str | None:
@@ -4690,31 +4543,8 @@ class SystemDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         return self.coordinator.ui_manager.get_translation_sensor_eid(language_code)
 
     def _build_family_goals(self) -> list[dict[str, Any]]:
-        """Return every family goal for the OpsCenter reset card.
-
-        Read straight from storage so the card does not depend on per-person
-        entity lookups.
-        """
-        goals: list[dict[str, Any]] = []
-        manager = self.coordinator.gamification_manager
-        for achievement_id, info in self.coordinator.achievements_data.items():
-            if info.get(const.DATA_ACHIEVEMENT_TYPE) not in const.FAMILY_ACHIEVEMENT_TYPES:
-                continue
-            name = str(info.get(const.DATA_ACHIEVEMENT_NAME, "")).strip()
-            if not name:
-                continue
-            target = float(info.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 0) or 0)
-            total = float(manager.get_family_achievement_total(achievement_id))
-            goals.append(
-                {
-                    "name": name,
-                    "type": str(info.get(const.DATA_ACHIEVEMENT_TYPE, "")),
-                    "total": round(total, 2),
-                    "target": round(target, 2),
-                }
-            )
-        goals.sort(key=lambda goal: goal["name"].lower())
-        return goals
+        """Return every family goal for the OpsCenter reset card."""
+        return self.coordinator.family_goal_manager.get_overview()
 
     def _get_user_dashboard_helpers(self) -> dict[str, str]:
         """Return a minimal user-to-helper entity map for shared admin templates."""

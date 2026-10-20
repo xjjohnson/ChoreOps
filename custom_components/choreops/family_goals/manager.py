@@ -184,7 +184,9 @@ class FamilyGoalManager(BaseManager):
             challenge_id=goal_id,
             challenge_name=str(goal[fg.DATA_NAME]),
         )
-        base.LOGGER.info("Created family goal '%s' (ID: %s)", goal[fg.DATA_NAME], goal_id)
+        base.LOGGER.info(
+            "Created family goal '%s' (ID: %s)", goal[fg.DATA_NAME], goal_id
+        )
         return goal_id
 
     def update_goal(
@@ -289,7 +291,9 @@ class FamilyGoalManager(BaseManager):
             "dict[str, Any]",
             chore_periods.get(base.DATA_USER_CHORE_DATA_PERIODS_ALL_TIME, {}),
         )
-        bucket = cast("dict[str, Any]", all_time_container.get(base.PERIOD_ALL_TIME, {}))
+        bucket = cast(
+            "dict[str, Any]", all_time_container.get(base.PERIOD_ALL_TIME, {})
+        )
         return float(bucket.get(base.DATA_USER_CHORE_DATA_PERIOD_APPROVED, 0))
 
     def _contribution(self, assignee_id: str, goal: dict[str, Any]) -> float:
@@ -604,9 +608,7 @@ class FamilyGoalManager(BaseManager):
         goal = self.goals.get(goal_id)
         if not goal or goal.get(fg.DATA_TYPE) != fg.GOAL_TYPE_DAY:
             return {}
-        top_ids = [
-            a for a in str(goal.get(fg.DATA_RECORD_TOP, "")).split(",") if a
-        ]
+        top_ids = [a for a in str(goal.get(fg.DATA_RECORD_TOP, "")).split(",") if a]
         return {
             fg.ATTR_RECORD: float(goal.get(fg.DATA_RECORD, 0.0)),
             fg.ATTR_RECORD_DAY: str(goal.get(fg.DATA_RECORD_DAY, "")),
@@ -708,9 +710,9 @@ class FamilyGoalManager(BaseManager):
             self.coordinator._persist_and_update()
         if goal_type == fg.GOAL_TYPE_DAY and self._update_day_record(goal_id, goal):
             self.coordinator._persist_and_update()
-        if (goal_type == fg.GOAL_TYPE_CAUGHT_UP and self._update_caught_up_streak(goal)) or (
-            goal_type == fg.GOAL_TYPE_ACTIVE and self._update_active_streak(goal)
-        ):
+        if (
+            goal_type == fg.GOAL_TYPE_CAUGHT_UP and self._update_caught_up_streak(goal)
+        ) or (goal_type == fg.GOAL_TYPE_ACTIVE and self._update_active_streak(goal)):
             self.coordinator._persist_and_update()
 
         total = self.get_total(goal_id)
@@ -794,3 +796,29 @@ class FamilyGoalManager(BaseManager):
             challenge_name=name,
             challenge_points=reward,
         )
+
+    # ------------------------------------------------------------------
+    # Overview (OpsCenter reset card)
+    # ------------------------------------------------------------------
+
+    def get_overview(self) -> list[dict[str, Any]]:
+        """Return every goal as name/type/total/target for the OpsCenter card.
+
+        Read straight from storage so the card does not depend on per-person
+        entity lookups.
+        """
+        overview: list[dict[str, Any]] = []
+        for goal_id, goal in self.goals.items():
+            name = str(goal.get(fg.DATA_NAME, "")).strip()
+            if not name:
+                continue
+            overview.append(
+                {
+                    "name": name,
+                    "type": str(goal.get(fg.DATA_TYPE, "")),
+                    "total": round(float(self.get_total(goal_id)), 2),
+                    "target": round(float(goal.get(fg.DATA_TARGET_VALUE, 0) or 0), 2),
+                }
+            )
+        overview.sort(key=lambda item: item["name"].lower())
+        return overview

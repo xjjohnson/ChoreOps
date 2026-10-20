@@ -1053,8 +1053,8 @@ reset_family_goal:
       example: "Family Chores"
       selector:
         text:
-    achievement_name:
-      name: "Achievement Name"
+    goal_name:
+      name: "Goal Name"
       description: "The name of the family goal to restart."
       example: "Total Chores"
       required: true

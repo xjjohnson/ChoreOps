@@ -19,6 +19,7 @@ import voluptuous as vol
 from . import const
 from .engines.chore_engine import ChoreEngine
 from .engines.schedule_engine import coerce_applicable_days
+from .family_goals import const as fg
 from .helpers import flow_helpers, report_helpers, translation_helpers
 from .helpers.auth_helpers import (
     AUTH_ACTION_APPROVAL,
@@ -523,7 +524,7 @@ REPAIR_BADGE_STREAK_SCHEMA = vol.All(
 RESET_FAMILY_GOAL_SCHEMA = vol.Schema(
     _with_service_target_fields(
         {
-            vol.Required(const.SERVICE_FIELD_ACHIEVEMENT_NAME): vol.All(
+            vol.Required(fg.SERVICE_FIELD_GOAL_NAME): vol.All(
                 cv.string,
                 vol.Length(min=1),
             ),
@@ -3652,21 +3653,19 @@ def async_setup_services(hass: HomeAssistant):
             raise HomeAssistantError(
                 translation_domain=const.DOMAIN,
                 translation_key=const.TRANS_KEY_ERROR_NOT_AUTHORIZED_ACTION,
-                translation_placeholders={
-                    "action": const.ERROR_ACTION_RESET_FAMILY_GOAL
-                },
+                translation_placeholders={"action": fg.ERROR_ACTION_RESET_FAMILY_GOAL},
             )
 
-        achievement_name = str(call.data[const.SERVICE_FIELD_ACHIEVEMENT_NAME])
-        achievement_id = get_item_id_or_raise(
-            coordinator, const.ITEM_TYPE_ACHIEVEMENT, achievement_name
+        goal_name = str(call.data[fg.SERVICE_FIELD_GOAL_NAME])
+        goal_id = get_item_id_or_raise(
+            coordinator, const.ITEM_TYPE_CHALLENGE, goal_name
         )
-        coordinator.gamification_manager.reset_family_goal(achievement_id)
+        coordinator.family_goal_manager.reset_goal(goal_id)
         await coordinator.async_request_refresh()
 
     hass.services.async_register(
         const.DOMAIN,
-        const.SERVICE_RESET_FAMILY_GOAL,
+        fg.SERVICE_RESET_FAMILY_GOAL,
         handle_reset_family_goal,
         schema=RESET_FAMILY_GOAL_SCHEMA,
     )
@@ -4404,6 +4403,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         const.SERVICE_OPEN_ROTATION_CYCLE,
         const.SERVICE_GENERATE_ACTIVITY_REPORT,
         const.SERVICE_PAUSE_USER_CHORES,
+        fg.SERVICE_RESET_FAMILY_GOAL,
     ]
 
     for service in services:

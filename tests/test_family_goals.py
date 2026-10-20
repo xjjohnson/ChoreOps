@@ -293,13 +293,11 @@ async def test_reset_service_restarts_goal_by_name(
     await _earn_points(scenario_full, zoe, 40.0)
     assert gm.get_total(goal_id) == pytest.approx(40.0)
 
-    name = scenario_full.coordinator.challenges_data[goal_id][
-        fg.DATA_NAME
-    ]
+    name = scenario_full.coordinator.challenges_data[goal_id][fg.DATA_NAME]
     await hass.services.async_call(
         const.DOMAIN,
         fg.SERVICE_RESET_FAMILY_GOAL,
-        {const.SERVICE_FIELD_ACHIEVEMENT_NAME: name},
+        {fg.SERVICE_FIELD_GOAL_NAME: name},
         blocking=True,
     )
     assert gm.get_total(goal_id) == pytest.approx(0.0)
@@ -468,9 +466,7 @@ async def test_editing_goal_keeps_family_runtime_state(
     existing[fg.DATA_BASELINE] = {zoe: 12.0}
     existing[fg.DATA_LEVEL] = 1
 
-    rebuilt = builders.build_goal(
-        {fg.DATA_LEVELS: "40:5, 90"}, existing=existing
-    )
+    rebuilt = builders.build_goal({fg.DATA_LEVELS: "40:5, 90"}, existing=existing)
     assert rebuilt[fg.DATA_BASELINE] == {zoe: 12.0}
     assert rebuilt[fg.DATA_LEVEL] == 1
     assert rebuilt[fg.DATA_TARGET_VALUE] == 40.0

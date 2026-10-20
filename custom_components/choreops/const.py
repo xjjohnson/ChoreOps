@@ -769,8 +769,6 @@ CFOF_ACHIEVEMENTS_INPUT_CRITERIA: Final = "criteria"
 CFOF_ACHIEVEMENTS_INPUT_DESCRIPTION: Final = "description"
 CFOF_ACHIEVEMENTS_INPUT_ICON: Final = "icon"
 CFOF_ACHIEVEMENTS_INPUT_LABELS: Final = "achievement_labels"
-CFOF_ACHIEVEMENTS_INPUT_LEVELS: Final = "levels"
-CFOF_ACHIEVEMENTS_INPUT_TOP_MULTIPLIER: Final = "top_multiplier"
 CFOF_ACHIEVEMENTS_INPUT_NAME: Final = "name"
 CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS: Final = "reward_points"
 CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID: Final = "selected_chore_id"
@@ -1002,50 +1000,6 @@ BADGE_TYPE_SPECIAL_OCCASION: Final = "special_occasion"
 ACHIEVEMENT_TYPE_DAILY_MIN: Final = "daily_minimum"
 ACHIEVEMENT_TYPE_STREAK: Final = "chore_streak"
 ACHIEVEMENT_TYPE_TOTAL: Final = "chore_total"
-# Family goals: one pooled total across every assigned person. When the pooled
-# total reaches the target, everyone assigned is awarded together.
-ACHIEVEMENT_TYPE_FAMILY_POINTS: Final = "family_points_total"
-ACHIEVEMENT_TYPE_FAMILY_CHORES: Final = "family_chore_total"
-# Pooled streak: consecutive days on which EVERY assigned person finished all
-# the chores that were due. The target value is the number of days.
-ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP: Final = "family_caught_up_days"
-# Pooled total where the SMALLEST share counts: every assigned person must
-# complete at least the target number of chores.
-ACHIEVEMENT_TYPE_FAMILY_EVERYONE: Final = "family_everyone_contributes"
-# Chores the whole family completes in a single day (resets each day; levels
-# already reached are kept).
-ACHIEVEMENT_TYPE_FAMILY_DAY: Final = "family_chores_in_day"
-# Pooled streak: consecutive days on which EVERY assigned person completed at
-# least one chore. The target value is the number of days.
-ACHIEVEMENT_TYPE_FAMILY_ACTIVE: Final = "family_active_days"
-FAMILY_ACHIEVEMENT_TYPES: Final = frozenset(
-    {
-        ACHIEVEMENT_TYPE_FAMILY_POINTS,
-        ACHIEVEMENT_TYPE_FAMILY_CHORES,
-        ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
-        ACHIEVEMENT_TYPE_FAMILY_EVERYONE,
-        ACHIEVEMENT_TYPE_FAMILY_DAY,
-        ACHIEVEMENT_TYPE_FAMILY_ACTIVE,
-    }
-)
-# Family goals whose total is a shared day streak rather than a sum of shares.
-FAMILY_STREAK_ACHIEVEMENT_TYPES: Final = frozenset(
-    {ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP, ACHIEVEMENT_TYPE_FAMILY_ACTIVE}
-)
-# Stored on the achievement itself (not per person): the amount each person had
-# already contributed when the goal was last restarted, and the pooled
-# caught-up streak state.
-DATA_ACHIEVEMENT_FAMILY_BASELINE: Final = "family_baseline"
-DATA_ACHIEVEMENT_FAMILY_STREAK_COUNT: Final = "family_streak_count"
-# Number of levels completed so far (0 = none yet)
-DATA_ACHIEVEMENT_FAMILY_LEVEL: Final = "family_level"
-# Each person's contribution when the current level began (per-level top contributor)
-DATA_ACHIEVEMENT_FAMILY_LEVEL_START: Final = "family_level_start"
-# Best one-day total ever reached by the one-day family goal, and who/when.
-DATA_ACHIEVEMENT_FAMILY_RECORD: Final = "family_record"
-DATA_ACHIEVEMENT_FAMILY_RECORD_DAY: Final = "family_record_day"
-DATA_ACHIEVEMENT_FAMILY_RECORD_TOP: Final = "family_record_top"
-DATA_ACHIEVEMENT_FAMILY_STREAK_LAST_DAY: Final = "family_streak_last_day"
 
 # Challenge Types
 CHALLENGE_TYPE_DAILY_MIN: Final = "daily_minimum"
@@ -1845,10 +1799,6 @@ DATA_ACHIEVEMENT_REWARD_POINTS: Final = "reward_points"
 DATA_ACHIEVEMENT_SELECTED_CHORE_ID: Final = "selected_chore_id"
 DATA_ACHIEVEMENT_SOURCE_BADGE_ID: Final = "source_badge_id"
 DATA_ACHIEVEMENT_TARGET_VALUE: Final = "target_value"
-# Family goals: comma-separated level targets, e.g. "100, 250, 500"
-DATA_ACHIEVEMENT_LEVELS: Final = "levels"
-# Family goals: reward multiplier for the top contributor of each level (1 = off)
-DATA_ACHIEVEMENT_TOP_MULTIPLIER: Final = "top_multiplier"
 DATA_ACHIEVEMENT_TYPE: Final = "type"
 
 # CHALLENGES
@@ -2858,19 +2808,6 @@ ATTR_PENALTY_POINTS: Final = "penalty_points"
 ATTR_POINTS_MULTIPLIER: Final = "points_multiplier"
 ATTR_POINTS_TO_NEXT_BADGE: Final = "points_to_next_badge"
 ATTR_RAW_PROGRESS: Final = "raw_progress"
-ATTR_FAMILY_TOTAL: Final = "family_total"
-ATTR_FAMILY_CONTRIBUTIONS: Final = "family_contributions"
-ATTR_FAMILY_CAUGHT_UP_TODAY: Final = "family_caught_up_today"
-ATTR_FAMILY_LEVEL: Final = "family_level"
-ATTR_FAMILY_LEVEL_CONTRIBUTIONS: Final = "family_level_contributions"
-ATTR_FAMILY_TOP_MULTIPLIER: Final = "family_top_multiplier"
-ATTR_FAMILY_RECORD: Final = "family_record"
-ATTR_FAMILY_RECORD_DAY: Final = "family_record_day"
-ATTR_FAMILY_RECORD_TOP: Final = "family_record_top"
-ATTR_FAMILY_LEVELS: Final = "family_levels"
-ATTR_FAMILY_NEXT_TARGET: Final = "family_next_target"
-ATTR_FAMILY_NEXT_REWARD: Final = "family_next_reward"
-ATTR_FAMILY_LEVEL_REWARDS: Final = "family_level_rewards"
 ATTR_RECURRING_FREQUENCY: Final = "recurring_frequency"
 ATTR_OVERDUE_HANDLING_TYPE: Final = "overdue_handling_type"
 ATTR_REQUIRED_CHORES: Final = "required_chores"
@@ -3145,7 +3082,6 @@ SERVICE_DISAPPROVE_REWARD: Final = "disapprove_reward"
 SERVICE_REDEEM_REWARD: Final = "redeem_reward"
 SERVICE_REMOVE_AWARDED_BADGES: Final = "remove_awarded_badges"
 SERVICE_REPAIR_BADGE_STREAK: Final = "repair_badge_streak"
-SERVICE_RESET_FAMILY_GOAL: Final = "reset_family_goal"
 SERVICE_CONTRIBUTE_TO_REWARD_POOL: Final = "contribute_to_reward_pool"
 SERVICE_APPROVE_REWARD_POOL: Final = "approve_reward_pool"
 SERVICE_REFUND_REWARD_POOL: Final = "refund_reward_pool"
@@ -3350,7 +3286,6 @@ SERVICE_FIELD_PENALTY_NAME: Final = "penalty_name"
 SERVICE_FIELD_BONUS_NAME: Final = "bonus_name"
 
 # Badge service fields
-SERVICE_FIELD_ACHIEVEMENT_NAME: Final = "achievement_name"
 SERVICE_FIELD_BADGE_NAME: Final = "badge_name"
 # Target streak count to restore. See the repair_badge_streak service.
 SERVICE_FIELD_BADGE_STREAK_COUNT: Final = "badge_streak_count"
@@ -3686,7 +3621,6 @@ ERROR_ACTION_APPLY_BONUSES: Final = "apply_bonuses"
 ERROR_ACTION_ADJUST_POINTS: Final = "adjust_points"
 ERROR_ACTION_REMOVE_BADGES: Final = "remove_badges"
 ERROR_ACTION_REPAIR_BADGE_STREAK: Final = "repair_badge_streak"
-ERROR_ACTION_RESET_FAMILY_GOAL: Final = "reset_family_goal"
 ERROR_ACTION_CONTRIBUTE_REWARD_POOL: Final = "contribute_to_reward_pools"
 ERROR_ACTION_MANAGE_REWARD_POOL: Final = "manage_reward_pools"
 
@@ -3920,10 +3854,6 @@ TRANS_KEY_CFOF_INVALID_BONUS_COUNT: Final = "invalid_bonus_count"
 TRANS_KEY_CFOF_INVALID_BONUS_NAME: Final = "invalid_bonus_name"
 TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_REWARD_POINTS: Final = (
     "invalid_achievement_reward_points"
-)
-TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_LEVELS: Final = "invalid_achievement_levels"
-TRANS_KEY_CFOF_INVALID_ACHIEVEMENT_TOP_MULTIPLIER: Final = (
-    "invalid_achievement_top_multiplier"
 )
 TRANS_KEY_CFOF_INVALID_CHALLENGE: Final = "invalid_challenge"
 TRANS_KEY_CFOF_INVALID_CHALLENGE_COUNT: Final = "invalid_challenge_count"
@@ -4580,38 +4510,9 @@ INCLUDE_RESET_SCHEDULE_BADGE_TYPES = [
 
 # Achievement Type Options
 ACHIEVEMENT_TYPE_OPTIONS = [
-    {
-        "value": ACHIEVEMENT_TYPE_FAMILY_POINTS,
-        "label": "Family Goal: Total Points Earned",
-    },
-    {
-        "value": ACHIEVEMENT_TYPE_FAMILY_CHORES,
-        "label": "Family Goal: Total Chores Completed",
-    },
-    {
-        "value": ACHIEVEMENT_TYPE_FAMILY_CAUGHT_UP,
-        "label": "Family Goal: Everyone Caught Up for X Days",
-    },
-    {
-        "value": ACHIEVEMENT_TYPE_FAMILY_EVERYONE,
-        "label": "Family Goal: Everyone Completes at Least X Chores",
-    },
-    {
-        "value": ACHIEVEMENT_TYPE_FAMILY_DAY,
-        "label": "Family Goal: X Chores Together in One Day",
-    },
-    {
-        "value": ACHIEVEMENT_TYPE_FAMILY_ACTIVE,
-        "label": "Family Goal: Everyone Completes a Chore for X Days",
-    },
-    # Single-person types are kept only so existing achievements and saved
-    # setups keep validating. New goals should be family goals.
-    {"value": ACHIEVEMENT_TYPE_STREAK, "label": "(Old) Chore Streak - one person"},
-    {"value": ACHIEVEMENT_TYPE_TOTAL, "label": "(Old) Chore Total - one person"},
-    {
-        "value": ACHIEVEMENT_TYPE_DAILY_MIN,
-        "label": "(Old) Daily Minimum Chores - one person",
-    },
+    {"value": ACHIEVEMENT_TYPE_STREAK, "label": "Chore Streak"},
+    {"value": ACHIEVEMENT_TYPE_TOTAL, "label": "Chore Total"},
+    {"value": ACHIEVEMENT_TYPE_DAILY_MIN, "label": "Daily Minimum Chores"},
 ]
 
 # Challenge Type Options
