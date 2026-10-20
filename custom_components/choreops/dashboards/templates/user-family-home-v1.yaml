@@ -429,7 +429,7 @@ views:
     - type: grid
       cards:
         - type: heading
-          heading: Family Achievements
+          heading: Family Pool Goals
           heading_style: title
           icon: mdi:trophy
         - type: custom:auto-entities
