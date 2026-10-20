@@ -59,7 +59,8 @@ class FamilyGoalManager(BaseManager):
     # ------------------------------------------------------------------
 
     async def async_setup(self) -> None:
-        """Subscribe to the events that can move a goal's total."""
+        """Move legacy family achievements over, then subscribe to events."""
+        self.migrate_legacy_achievements()
         for suffix in (
             base.SIGNAL_SUFFIX_STATS_UPDATED,
             base.SIGNAL_SUFFIX_CHORE_APPROVED,
@@ -79,6 +80,58 @@ class FamilyGoalManager(BaseManager):
         self.coordinator.config_entry.async_on_unload(
             async_at_started(self.hass, lambda _hass: self._mark_all_pending())
         )
+
+    def migrate_legacy_achievements(self) -> int:
+        """Convert family achievements from earlier versions into goals.
+
+        Earlier versions stored family goals as achievements. Each one is moved
+        into the goals bucket with its progress, levels, streaks and records
+        intact, and its old achievement entities are removed. Runs on every
+        start but only acts when legacy records exist.
+
+        Returns:
+            The number of achievements converted.
+        """
+        achievements = self.coordinator._data.get(base.DATA_ACHIEVEMENTS, {})
+        legacy = {
+            old_id: record
+            for old_id, record in achievements.items()
+            if isinstance(record, dict) and record.get(fg.DATA_TYPE) in fg.GOAL_TYPES
+        }
+        if not legacy:
+            return 0
+
+        taken = {
+            str(goal.get(fg.DATA_NAME, "")).strip().lower()
+            for goal in self.goals.values()
+        }
+        for old_id, record in legacy.items():
+            source = dict(record)
+            source[fg.DATA_LABELS] = source.pop(
+                base.DATA_ACHIEVEMENT_LABELS, source.get(fg.DATA_LABELS, [])
+            )
+            name = str(source.get(fg.DATA_NAME, "")).strip() or "Family Goal"
+            if name.lower() in taken:
+                name = f"{name} (family goal)"
+            source[fg.DATA_NAME] = name
+            taken.add(name.lower())
+
+            goal = dict(builders.build_goal(source))
+            for key in (*fg.RUNTIME_KEYS, fg.DATA_AWARDED):
+                if key in record:
+                    goal[key] = record[key]
+            self.coordinator._data.setdefault(base.DATA_CHALLENGES, {})[
+                str(goal[fg.DATA_ID])
+            ] = goal
+
+            del achievements[old_id]
+            remove_entities_by_item_id(
+                self.hass, self.coordinator.config_entry.entry_id, old_id
+            )
+            base.LOGGER.info("Migrated family achievement '%s' to a family goal", name)
+
+        self.coordinator._persist(immediate=True)
+        return len(legacy)
 
     def _cancel_timer(self) -> None:
         self._is_unloading = True

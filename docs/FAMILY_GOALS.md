@@ -51,6 +51,14 @@ exposes `family_total`; its `raw_progress` attribute is that person's own share.
 - Goals pay out through the same completion signal as challenges, so points and
   notifications work the same way. Existing achievements are unchanged.
 
+## Upgrading from earlier versions
+
+Family goals used to be stored as achievements. On the first start after upgrading,
+they are converted into family goals automatically, keeping their progress, levels,
+streaks and records. The old achievement entities are removed, and the goals appear
+under **Manage Family Goals** with new "Family Goal" sensors. Regenerate your
+dashboards afterwards.
+
 ## Restarting a goal
 
 Call the `choreops.reset_family_goal` service with the goal's name

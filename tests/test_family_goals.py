@@ -717,3 +717,44 @@ async def test_assignee_caught_up_streak_counts_breaks_and_tracks_best(
     # Neutral day (nothing due, nothing done) changes nothing.
     snap(0, 0)
     assert not gm._update_assignee_caught_up_streak(zoe)
+
+
+async def test_legacy_family_achievement_migrates_to_goal(
+    scenario_full: SetupResult,
+) -> None:
+    """A family achievement from an earlier version becomes a goal with its state."""
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    coordinator = scenario_full.coordinator
+    coordinator._data.setdefault(const.DATA_ACHIEVEMENTS, {})["old1"] = {
+        const.DATA_ACHIEVEMENT_INTERNAL_ID: "old1",
+        const.DATA_ACHIEVEMENT_NAME: "Pizza Night",
+        const.DATA_ACHIEVEMENT_LABELS: ["fun"],
+        const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS: [zoe, max_],
+        const.DATA_ACHIEVEMENT_TYPE: fg.GOAL_TYPE_POINTS,
+        const.DATA_ACHIEVEMENT_TARGET_VALUE: 50.0,
+        const.DATA_ACHIEVEMENT_REWARD_POINTS: 5.0,
+        fg.DATA_LEVELS: "50:5, 100:10",
+        fg.DATA_LEVEL: 1,
+        fg.DATA_BASELINE: {zoe: 3.0},
+        fg.DATA_PROGRESS: {zoe: {fg.DATA_AWARDED: True}},
+    }
+    coordinator._data[const.DATA_ACHIEVEMENTS]["keep"] = {
+        const.DATA_ACHIEVEMENT_NAME: "Personal",
+        const.DATA_ACHIEVEMENT_TYPE: "chore_total",
+    }
+
+    assert coordinator.family_goal_manager.migrate_legacy_achievements() == 1
+
+    assert "old1" not in coordinator.achievements_data
+    assert "keep" in coordinator.achievements_data
+    goal_id = coordinator.family_goal_manager.get_goal_id_by_name("Pizza Night")
+    goal = coordinator.challenges_data[goal_id]
+    assert goal[fg.DATA_TYPE] == fg.GOAL_TYPE_POINTS
+    assert goal[fg.DATA_LABELS] == ["fun"]
+    assert goal[fg.DATA_LEVEL] == 1
+    assert goal[fg.DATA_BASELINE] == {zoe: 3.0}
+    assert goal[fg.DATA_PROGRESS][zoe][fg.DATA_AWARDED] is True
+    assert set(goal[fg.DATA_ASSIGNED_USER_IDS]) == {zoe, max_}
+    # Running it again does nothing
+    assert coordinator.family_goal_manager.migrate_legacy_achievements() == 0
