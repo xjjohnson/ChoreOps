@@ -586,8 +586,23 @@ def _remove_schema45_challenge_linked_badges(data: dict[str, Any]) -> dict[str, 
 
 
 def _clear_schema45_challenges_container(data: dict[str, Any]) -> None:
-    """Clear active challenges container after schema45 conversion/removal."""
-    data[const.DATA_CHALLENGES] = {}
+    """Clear retired challenge records after schema45 conversion/removal.
+
+    Family Goals store their records in this same bucket, so they are kept.
+    This runs on every startup, so wiping the bucket would delete the goals.
+    """
+    from ..family_goals import const as family_goal_const
+
+    challenges = data.get(const.DATA_CHALLENGES)
+    if not isinstance(challenges, dict):
+        data[const.DATA_CHALLENGES] = {}
+        return
+    data[const.DATA_CHALLENGES] = {
+        goal_id: record
+        for goal_id, record in challenges.items()
+        if isinstance(record, dict)
+        and record.get(family_goal_const.DATA_TYPE) in family_goal_const.GOAL_TYPES
+    }
 
 
 def _remove_schema45_legacy_badge_progress_fields(
