@@ -1990,57 +1990,135 @@ views:
                       {'type': 'grid', 'columns': 1, 'square': false, 'cards': ep_rows.c}
                     }},
                   {%- else -%}
-                    {%- for pb in qa_pbuttons -%}
-                      {%- set pb_eid = pb.get('eid') if pb is mapping else pb -%}
-                      {%- set pb_raw = (pb.get('name') if pb is mapping else '') | string -%}
-                      {%- set pb_short = pb_raw[7:] if pb_raw[:7] == 'Points ' else pb_raw -%}
-                      {%- set pb_val = pb_short | float(0) -%}
-                      {%- set pb_abs = ((pb_val | abs | round(2)) | string | regex_replace('\.?0+$', '')) -%}
-                      {%- if pb_eid not in ['', none] -%}
-                        {%- set pb_col = 'var(--success-color)' if pb_val > 0 else 'var(--error-color)' -%}
-                        {%- set ep_rows.c = ep_rows.c + [{
-                          'type': 'custom:button-card',
-                          'entity': pb_eid,
-                          'icon': 'mdi:plus-circle-outline' if pb_val > 0 else 'mdi:minus-circle-outline',
-                          'name': ('+' ~ pb_abs) if pb_val > 0 else ('-' ~ pb_abs if pb_val < 0 else pb_short),
-                          'show_name': true,
-                          'show_icon': true,
-                          'show_label': false,
-                          'show_state': false,
-                          'tap_action': {'action': 'call-service', 'service': 'button.press', 'data': {'entity_id': pb_eid}},
-                          'hold_action': {'action': 'none'},
-                          'styles': {
-                            'card': [
-                              {'padding': '10px 4px'},
-                              {'border-radius': '14px'},
-                              {'box-shadow': 'none'},
-                              {'border': '1px solid color-mix(in srgb, ' ~ pb_col ~ ' 40%, var(--divider-color))'},
-                              {'background': 'color-mix(in srgb, ' ~ pb_col ~ ' 10%, var(--card-background-color))'}
-                            ],
-                            'icon': [{'width': '20px'}, {'color': pb_col}],
-                            'name': [{'font-size': '13px'}, {'font-weight': '700'}]
+                    {#-- Points tab: stepper + step size + reason + apply + recent manual changes --#}
+                    {%- set pt_amount = qa_open.get('pts-amount', 0) | int(default=0) -%}
+                    {%- set pt_step = qa_open.get('pts-step', 100) | int(default=100) -%}
+                    {%- if pt_step not in [10, 50, 100, 500] -%}
+                      {%- set pt_step = 100 -%}
+                    {%- endif -%}
+                    {%- set pt_reason = (qa_open.get('pts-reason', '') or '') | string -%}
+                    {%- set pt_base = {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update'} -%}
+                    {%- set pt_col = 'var(--success-color)' if pt_amount > 0 else ('var(--error-color)' if pt_amount < 0 else 'var(--secondary-text-color)') -%}
+                    {%- set pt_amount_txt = ('+' if pt_amount > 0 else '') ~ (pt_amount | string) -%}
+                    {%- set pt_after = (ep_raw + pt_amount) -%}
+                    {%- set pt_after_txt = (pt_after | round(0) | int) | string if pt_after == (pt_after | round(0)) else (pt_after | round(1)) | string -%}
+                    {%- set pt_circle = [{'width': '56px'}, {'height': '56px'}, {'border-radius': '50%'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'background': 'var(--secondary-background-color)'}, {'justify-self': 'center'}] -%}
+                    {{-
+                      {
+                        'type': 'grid', 'columns': 3, 'square': false,
+                        'cards': [
+                          {
+                            'type': 'custom:button-card', 'icon': 'mdi:minus', 'show_name': false, 'show_icon': true,
+                            'tap_action': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': dict(pt_base, key='admin-shared/quick-actions/pts-amount', value=(pt_amount - pt_step))},
+                            'hold_action': {'action': 'none'},
+                            'styles': {'card': pt_circle, 'icon': [{'width': '26px'}, {'color': 'var(--error-color)'}]}
+                          },
+                          {
+                            'type': 'custom:button-card', 'show_name': false, 'show_icon': false,
+                            'tap_action': {'action': 'none'}, 'hold_action': {'action': 'none'},
+                            'custom_fields': {'content': "<div style='text-align:center;'><div style='font-size:36px;font-weight:800;line-height:1;color:" ~ pt_col ~ ";'>" ~ pt_amount_txt ~ "</div><div style='font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;opacity:.6;margin-top:4px;'>" ~ ep_unit ~ "</div></div>"},
+                            'styles': {'card': [{'box-shadow': 'none'}, {'border': 'none'}, {'background': 'transparent'}, {'padding': '0'}], 'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}]}
+                          },
+                          {
+                            'type': 'custom:button-card', 'icon': 'mdi:plus', 'show_name': false, 'show_icon': true,
+                            'tap_action': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': dict(pt_base, key='admin-shared/quick-actions/pts-amount', value=(pt_amount + pt_step))},
+                            'hold_action': {'action': 'none'},
+                            'styles': {'card': pt_circle, 'icon': [{'width': '26px'}, {'color': 'var(--success-color)'}]}
                           }
-                        }] -%}
-                      {%- endif -%}
-                    {%- endfor -%}
-                    {%- if ep_rows.c | length == 0 -%}
-                      {%- set ep_rows.c = [{
-                        'type': 'custom:button-card',
-                        'show_name': true,
-                        'show_icon': false,
-                        'show_label': false,
-                        'show_state': false,
-                        'name': 'No point amounts set up in settings',
-                        'tap_action': {'action': 'none'},
+                        ]
+                      }
+                    }},
+                    {%- set pt_steps = namespace(c=[]) -%}
+                    {%- for sv in [10, 50, 100, 500] -%}
+                      {%- set sv_on = sv == pt_step -%}
+                      {%- set pt_steps.c = pt_steps.c + [{
+                        'type': 'custom:button-card', 'name': '±' ~ sv, 'show_name': true, 'show_icon': false,
+                        'tap_action': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': dict(pt_base, key='admin-shared/quick-actions/pts-step', value=sv)},
+                        'hold_action': {'action': 'none'},
                         'styles': {
-                          'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': '1px dashed var(--divider-color)'}, {'background': 'transparent'}],
-                          'name': [{'font-size': '12px'}, {'opacity': '0.65'}]
+                          'card': [{'padding': '9px 4px'}, {'border-radius': '999px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--primary-color)' if sv_on else '1px solid var(--divider-color)'}, {'background': 'var(--primary-color)' if sv_on else 'var(--secondary-background-color)'}],
+                          'name': [{'font-size': '13px'}, {'font-weight': '700'}, {'color': 'var(--text-primary-color)' if sv_on else 'var(--primary-text-color)'}]
                         }
                       }] -%}
-                    {%- endif -%}
+                    {%- endfor -%}
                     {{-
-                      {'type': 'grid', 'columns': 3 if ep_rows.c | length > 1 else 1, 'square': false, 'cards': ep_rows.c}
+                      {'type': 'grid', 'columns': 4, 'square': false, 'cards': pt_steps.c}
                     }},
+                    {%- set pt_reasons = namespace(c=[]) -%}
+                    {%- for rv in ['Helped out', 'Good behavior', 'Extra effort', 'Correction'] -%}
+                      {%- set rv_on = rv == pt_reason -%}
+                      {%- set pt_reasons.c = pt_reasons.c + [{
+                        'type': 'custom:button-card', 'name': rv, 'show_name': true, 'show_icon': false,
+                        'tap_action': ({'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'remove', 'key': 'admin-shared/quick-actions/pts-reason'}} if rv_on else {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': dict(pt_base, key='admin-shared/quick-actions/pts-reason', value=rv)}),
+                        'hold_action': {'action': 'none'},
+                        'styles': {
+                          'card': [{'padding': '9px 4px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--primary-color)' if rv_on else '1px solid var(--divider-color)'}, {'background': 'color-mix(in srgb, var(--primary-color) 18%, var(--card-background-color))' if rv_on else 'var(--secondary-background-color)'}],
+                          'name': [{'font-size': '12px'}, {'font-weight': '700'}, {'color': 'var(--primary-text-color)'}]
+                        }
+                      }] -%}
+                    {%- endfor -%}
+                    {{-
+                      {
+                        'type': 'custom:button-card', 'show_name': true, 'show_icon': false,
+                        'name': 'Reason · shows in Points history' ~ ('' if pt_reason else ' (none picked: saved as Adjustment)'),
+                        'tap_action': {'action': 'none'}, 'hold_action': {'action': 'none'},
+                        'styles': {
+                          'card': [{'padding': '2px 4px'}, {'box-shadow': 'none'}, {'border': 'none'}, {'background': 'transparent'}],
+                          'name': [{'justify-self': 'start'}, {'font-size': '11px'}, {'font-weight': '800'}, {'letter-spacing': '.6px'}, {'text-transform': 'uppercase'}, {'opacity': '0.65'}, {'white-space': 'normal'}]
+                        }
+                      }
+                    }},
+                    {{-
+                      {'type': 'grid', 'columns': 2, 'square': false, 'cards': pt_reasons.c}
+                    }},
+                    {%- set pt_ready = pt_amount != 0 -%}
+                    {%- set pt_verb = ('Add ' ~ pt_amount ~ ' to ' ~ selected_user_name) if pt_amount > 0 else ('Remove ' ~ (pt_amount | abs) ~ ' from ' ~ selected_user_name) -%}
+                    {{-
+                      {
+                        'type': 'custom:button-card',
+                        'name': ('Apply ' ~ pt_amount_txt) if pt_ready else 'Pick an amount above',
+                        'label': (selected_user_name ~ ': ' ~ ep_bal ~ ' → ' ~ pt_after_txt) if pt_ready else '',
+                        'show_name': true, 'show_icon': false, 'show_label': pt_ready,
+                        'tap_action': ({
+                          'action': 'call-service',
+                          'service': 'choreops.manual_adjust_points',
+                          'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'amount': pt_amount, 'reason': pt_reason if pt_reason else 'Adjustment'},
+                          'confirmation': {'text': pt_verb ~ '? (' ~ (pt_reason if pt_reason else 'Adjustment') ~ ')'}
+                        } if pt_ready else {'action': 'none'}),
+                        'hold_action': {'action': 'none'},
+                        'styles': {
+                          'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': 'none'}, {'background': ('var(--success-color)' if pt_amount > 0 else 'var(--error-color)') if pt_ready else 'var(--secondary-background-color)'}],
+                          'grid': [{'grid-template-areas': '"n" "l"'}, {'grid-template-columns': '1fr'}, {'row-gap': '2px'}, {'justify-items': 'center'}],
+                          'name': [{'font-size': '15px'}, {'font-weight': '800'}, {'color': '#fff' if pt_ready else 'var(--secondary-text-color)'}],
+                          'label': [{'font-size': '11px'}, {'opacity': '0.85'}, {'color': '#fff'}]
+                        }
+                      }
+                    }},
+                    {%- set pt_recent = (state_attr(selected_dashboard_helper, 'recent_manual_adjustments') or []) if qa_user_ok else [] -%}
+                    {%- if pt_recent | length > 0 -%}
+                      {%- set pt_rows = namespace(v='') -%}
+                      {%- for it in pt_recent -%}
+                        {%- set it_amt = it.get('amount', 0) | float(0) -%}
+                        {%- set it_when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
+                        {%- set it_days = (now().date() - it_when.date()).days if it_when else -1 -%}
+                        {%- set it_when_txt = '' if it_when is none else (('Today ' ~ it_when.strftime('%-I:%M %p')) if it_days == 0 else (('Yesterday ' ~ it_when.strftime('%-I:%M %p')) if it_days == 1 else (it_when.strftime('%a %-I:%M %p') if it_days < 7 else it_when.strftime('%b %-d')))) -%}
+                        {%- set it_col = 'var(--success-color)' if it_amt >= 0 else 'var(--error-color)' -%}
+                        {%- set it_name = ((it.get('item_name') or 'Adjustment') | string) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set pt_rows.v = pt_rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><ha-icon icon='" ~ ('mdi:plus-circle-outline' if it_amt >= 0 else 'mdi:minus-circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ it_col ~ ";flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ it_name ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ it_when_txt ~ "</div></div><div style='font-size:13px;font-weight:800;color:" ~ it_col ~ ";white-space:nowrap;'>" ~ (('+' if it_amt > 0 else '') ~ ('%g' | format(it_amt | round(2)))) ~ "</div></div>" -%}
+                      {%- endfor -%}
+                      {{-
+                        {
+                          'type': 'custom:button-card', 'show_name': false, 'show_icon': false,
+                          'tap_action': {'action': 'none'}, 'hold_action': {'action': 'none'},
+                          'custom_fields': {'content': "<div style='width:100%;text-align:left;'><div style='font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;opacity:.65;margin-bottom:2px;'>Recent manual changes · " ~ (selected_user_name | e) ~ "</div>" ~ pt_rows.v ~ "</div>"},
+                          'styles': {
+                            'card': [{'padding': '12px 14px'}, {'border-radius': '16px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'background-color': 'var(--card-background-color)'}],
+                            'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                            'custom_fields': {'content': [{'width': '100%'}]}
+                          }
+                        }
+                      }},
+                    {%- endif -%}
                   {%- endif -%}
                 {%- endif -%}
 

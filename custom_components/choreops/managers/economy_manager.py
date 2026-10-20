@@ -269,6 +269,7 @@ class EconomyManager(BaseManager):
                 achievement_points,
                 source=const.POINTS_SOURCE_ACHIEVEMENTS,
                 reference_id=achievement_id,
+                item_name=payload.get("achievement_name") or None,
             )
 
     async def _on_challenge_completed(self, payload: dict[str, Any]) -> None:
@@ -287,6 +288,7 @@ class EconomyManager(BaseManager):
                 challenge_points,
                 source=const.POINTS_SOURCE_CHALLENGES,
                 reference_id=challenge_id,
+                item_name=payload.get("challenge_name") or None,
             )
 
     async def _on_chore_approved(self, payload: dict[str, Any]) -> None:

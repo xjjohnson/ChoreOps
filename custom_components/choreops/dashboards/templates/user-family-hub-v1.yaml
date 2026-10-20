@@ -157,7 +157,7 @@ views:
                     {%- set cu_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
                     {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' (at risk)' if (cu_open and cu_n > 0) else '') -%}
                     {%- set streak_chip = ("<span style='display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ cu_col ~ "; background: color-mix(in srgb, " ~ cu_col ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'><ha-icon icon='mdi:fire' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ cu_col ~ "; display: block;'></ha-icon><span>" ~ cu_txt ~ "</span></span>") if (cu_n > 0 or cu_broken) else '' -%}
-                    {%- set streak_note = ("<div style='font-size: 11px; opacity: 0.65; margin-top: 8px;'>" ~ (('Streak ended. ') if cu_broken else '') ~ 'Best: ' ~ (cu_best | string) ~ (' days' if cu_best != 1 else ' day') ~ "</div>") if cu_best > 0 else '' -%}
+                    {%- set streak_note = ("<span style='font-size: 11px; opacity: 0.65; white-space: nowrap;'>" ~ (('Streak ended. ') if cu_broken else '') ~ 'Best: ' ~ (cu_best | string) ~ (' days' if cu_best != 1 else ' day') ~ "</span>") if cu_best > 0 else '' -%}
                     {%- set name_safe = name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                     {%- set hour_now = now().hour -%}
                     {%- if hour_now < 12 -%}
@@ -193,8 +193,7 @@ views:
                       ~ "</div>"
                       ~ right_col
                       ~ "</div>"
-                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ streak_chip ~ "</div>"
-                      ~ streak_note
+                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ streak_chip ~ streak_note ~ "</div>"
                       ~ "</div>"
                     -%}
 
@@ -961,7 +960,7 @@ views:
 
                   {%- set pref_show_reward_description = true -%}
 
-                  {%- set pref_default_header_collapsed = false -%}
+                  {%- set pref_default_header_collapsed = true -%}
 
                   {%- set pref_claim_accent = '#a957fa' -%}  {#-- Accent color for requested reward state and actions. --#}
 
@@ -1642,7 +1641,7 @@ views:
 
                   {%- set pref_show_next_higher_badge = true -%}
                   {%- set pref_show_next_lower_badge = true -%}
-                  {%- set pref_default_header_collapsed = false -%}
+                  {%- set pref_default_header_collapsed = true -%}
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Cumulative header background when fill is enabled. Allowed: 0-100. --#}
                   {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the main Cumulative header background fill and leave it transparent. Allowed: true, false. --#}
                   {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
@@ -2443,7 +2442,7 @@ views:
 
                   << template_snippets.user_override_helper >>
 
-                  {%- set pref_default_header_collapsed = false -%}
+                  {%- set pref_default_header_collapsed = true -%}
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Periodic header background when fill is enabled. Allowed: 0-100. --#}
                   {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the main Periodic header background fill and leave it transparent. Allowed: true, false. --#}
                   {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
@@ -2786,7 +2785,7 @@ views:
 
                   << template_snippets.user_override_helper >>
 
-                  {%- set pref_default_header_collapsed = false -%}
+                  {%- set pref_default_header_collapsed = true -%}
                   {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the main Achievements header background when fill is enabled. Allowed: 0-100. --#}
                   {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the main Achievements header background fill and leave it transparent. Allowed: true, false. --#}
                   {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
@@ -2842,7 +2841,7 @@ views:
                       {{
                         {
                           'type': 'custom:button-card',
-                          'name': ui.get('achievements', 'err-achievements'),
+                          'name': ui.get('family_goals_heading', 'Family Goals'),
                           'icon': 'mdi:trophy',
                           'show_name': true,
                           'show_icon': true,
@@ -3124,6 +3123,8 @@ views:
 
                   << template_snippets.user_override_helper >>
 
+                  {%- set pref_default_header_collapsed = true -%}  {#-- Allowed: true, false --#}
+                  {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- 0-100: percent of var(--primary-color) mixed into the header background. --#}
                   {%- set pref_activity_count = 5 -%}  {#-- How many recent events to show. Allowed: 1-5. --#}
 
                   {#-- 2. Dynamic Lookups & Validations --#}
@@ -3144,18 +3145,93 @@ views:
 
                     {#-- 4. Build Display --#}
                     {%- if items | length > 0 -%}
+                      {%- set key_root = 'gamification/points_history' -%}
+                      {%- set ui_control = state_attr(dashboard_helper, 'ui_control') | default({}, true) -%}
+                      {%- set ui_root = namespace(current=ui_control if ui_control is mapping else {}) -%}
+                      {%- for segment in key_root.split('/') -%}
+                        {%- set ui_root.current = ui_root.current.get(segment, {}) if ui_root.current is mapping else {} -%}
+                      {%- endfor -%}
+                      {%- set header_collapsed = (ui_root.current.get('header_collapse', pref_default_header_collapsed) if ui_root.current is mapping else pref_default_header_collapsed) in [true, 'true', 'True'] -%}
+                      {%- set integration_entry_id = state_attr(dashboard_helper, 'integration_entry_id') -%}
+                      {%- set dashboard_helper_user_id = state_attr(dashboard_helper, 'user_id') -%}
+                      {%- set can_save = integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] -%}
+                      {{
+                        {
+                          'type': 'custom:button-card',
+                          'name': ui.get('points_history', 'Points history'),
+                          'icon': 'mdi:history',
+                          'show_name': true,
+                          'show_icon': true,
+                          'tap_action': ({
+                            'action': 'call-service',
+                            'service': 'choreops.manage_ui_control',
+                            'data': {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'remove', 'key': key_root ~ '/header_collapse'}
+                          } if header_collapsed and can_save else {
+                            'action': 'call-service',
+                            'service': 'choreops.manage_ui_control',
+                            'data': {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'update', 'key': key_root ~ '/header_collapse', 'value': true}
+                          } if can_save else {'action': 'none'}),
+                          'hold_action': {'action': 'none'},
+                          'custom_fields': {
+                            'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if header_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                          },
+                          'styles': {
+                            'card': [
+                              {'background': ('color-mix(in srgb, var(--primary-color) ' ~ pref_primary_tint_mix_pct | string ~ '%, var(--card-background-color))') if header_collapsed else 'transparent'},
+                              {'box-shadow': 'none'},
+                              {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
+                              {'border-left': '3px solid var(--primary-color)'},
+                              {'border-bottom': '3px solid var(--primary-color)'},
+                              {'border-radius': '12px'},
+                              {'padding': '10px 12px'},
+                              {'min-height': 'unset'},
+                              {'margin-top': '5px'},
+                              {'margin-bottom': '0px'}
+                            ],
+                            'grid': [
+                              {'grid-template-areas': '"i n toggle"'},
+                              {'grid-template-columns': 'min-content 1fr min-content'},
+                              {'column-gap': '5px'},
+                              {'align-items': 'center'}
+                            ],
+                            'icon': [{'width': '18px'}, {'transform': 'translateY(-2px)'}, {'color': 'var(--primary-color)'}],
+                            'name': [
+                              {'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '700'},
+                              {'text-transform': 'uppercase'}, {'letter-spacing': '0.4px'}, {'color': 'var(--primary-text-color)'}
+                            ],
+                            'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                          }
+                        }
+                      }},
+                      {%- if not header_collapsed -%}
                       {%- set rows = namespace(v='') -%}
+                      {%- set tag_colors = {'chores': 'var(--success-color)', 'bonuses': 'var(--success-color)', 'penalties': 'var(--error-color)', 'rewards': 'var(--primary-color)', 'badges': 'var(--warning-color)', 'achievements': 'var(--warning-color)', 'challenges': 'var(--warning-color)', 'manual': 'var(--secondary-text-color)'} -%}
                       {%- for it in items -%}
                         {%- set amt = it.get('amount', 0) | float(0) -%}
                         {%- set when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
                         {%- set days = (now().date() - when.date()).days if when else -1 -%}
-                        {%- set when_txt = ('' if when is none else (('Today ' ~ when.strftime('%-I:%M %p')) if days == 0 else ('Yesterday' if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
-                        {%- set nm = ((it.get('item_name') or it.get('source_label') or 'Activity') | string) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                        {%- set lbl = (it.get('source_label') or '') | string -%}
+                        {%- set when_txt = ('' if when is none else (('Today ' ~ when.strftime('%-I:%M %p')) if days == 0 else (('Yesterday ' ~ when.strftime('%-I:%M %p')) if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
+                        {%- set raw_nm = ((it.get('item_name') or it.get('source_label') or 'Activity') | string) -%}
+                        {%- set level_txt = (raw_nm.split(' - Level ')[1].split(' ')[0]) if ' - Level ' in raw_nm else '' -%}
+                        {%- set nm = (raw_nm.split(' - Level ')[0]) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set lbl = ((it.get('source_label') or '') | string | upper) ~ (' · LEVEL ' ~ level_txt if level_txt else '') -%}
+                        {%- set src = it.get('source', '') -%}
+                        {%- set tcol = tag_colors.get(src, 'var(--secondary-text-color)') -%}
                         {%- set col = 'var(--success-color)' if amt >= 0 else 'var(--error-color)' -%}
-                        {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><ha-icon icon='" ~ icons.get(it.get('source', ''), 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:var(--secondary-text-color);flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ lbl ~ (' · ' if lbl and when_txt else '') ~ when_txt ~ "</div></div><div style='font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ "</div></div>" -%}
+                        {%- set bal_after = it.get('balance_after') -%}
+                        {%- set bal_txt = ("<div style='font-size:10px;font-weight:500;opacity:.55;'>→ " ~ ('{:,.0f}'.format(bal_after | float(0))) ~ "</div>") if bal_after is not none else '' -%}
+                        {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><div style='width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'><ha-icon icon='" ~ icons.get(src, 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;display:block;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.8;'><span style='font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-right:5px;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'>" ~ lbl ~ "</span><span style='opacity:.65;'>" ~ when_txt ~ "</span></div></div><div style='text-align:right;font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ bal_txt ~ "</div></div>" -%}
                       {%- endfor -%}
-                      {%- set html = "<div style='width:100%;text-align:left;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px;'>" ~ ui.get('points_history', 'Points history') ~ "</div>" ~ rows.v ~ "</div>" -%}
+                      {%- set ps = state_attr(dashboard_helper, 'points_summary') or {} -%}
+                      {%- set today_amt = ps.get('today', 0) | float(0) -%}
+                      {%- set week_amt = ps.get('week', 0) | float(0) -%}
+                      {%- set chip_css = "font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--secondary-background-color);white-space:nowrap;" -%}
+                      {%- set summary = "<div style='display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;'>"
+                        ~ "<span style='" ~ chip_css ~ "color:" ~ ('var(--success-color)' if today_amt > 0 else ('var(--error-color)' if today_amt < 0 else 'inherit')) ~ ";'>" ~ ui.get('today', 'Today') ~ " " ~ ('+' if today_amt > 0 else '') ~ '{:,.0f}'.format(today_amt) ~ "</span>"
+                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('this_week', 'This week') ~ " " ~ ('+' if week_amt > 0 else '') ~ '{:,.0f}'.format(week_amt) ~ "</span>"
+                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('balance', 'Balance') ~ " " ~ '{:,.0f}'.format(ps.get('balance', 0) | float(0)) ~ "</span>"
+                        ~ "</div>" -%}
+                      {%- set html = "<div style='width:100%;text-align:left;'>" ~ summary ~ rows.v ~ "</div>" -%}
                       {{
                         {
                           'type': 'custom:button-card',
@@ -3177,5 +3253,6 @@ views:
                           }
                         }
                       }},
+                      {%- endif -%}
                     {%- endif -%}
                   {%- endif -%}

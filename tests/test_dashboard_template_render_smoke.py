@@ -1581,6 +1581,10 @@ def _render_quick_actions(
         mock_states
     )
     env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 19, 12, 0)
+    env.globals["as_datetime"] = lambda v: __import__(
+        "datetime"
+    ).datetime.fromisoformat(str(v))
+    env.filters["as_local"] = lambda v: v
     env.filters["timestamp_custom"] = lambda v, f="", local=True: str(v)
     env.globals["as_timestamp"] = lambda v: 0
     output = env.from_string(template).render(
@@ -1720,35 +1724,97 @@ def test_admin_economy_tab_penalties_list() -> None:
     )
 
 
-def test_admin_economy_tab_points_uses_configured_point_buttons() -> None:
-    """The Points tab lists the amounts configured in the integration settings."""
+def test_admin_economy_tab_points_stepper_reason_and_apply() -> None:
+    """Points tab: stepper, step sizes, reason chips, Apply, recent changes."""
 
-    buttons = [
-        {"eid": "button.alice_minus_200", "name": "Points -200"},
-        {"eid": "button.alice_plus_50", "name": "Points +50"},
-    ]
     eco = _render_quick_actions(
-        "economy", {"econ-tab": "points"}, {"points_buttons": buttons}
+        "economy",
+        {
+            "econ-tab": "points",
+            "pts-amount": 100,
+            "pts-step": 50,
+            "pts-reason": "Helped out",
+        },
+        {
+            "recent_manual_adjustments": [
+                {
+                    "timestamp": "2026-10-19T12:10:00",
+                    "amount": -50.0,
+                    "item_name": "Left shoes out",
+                    "source": "manual",
+                }
+            ]
+        },
     )
-    amounts = eco[2]["cards"]
-    assert eco[2]["columns"] == 3
-    assert [c["name"] for c in amounts] == ["-200", "+50"]
-    assert amounts[0]["tap_action"] == {
-        "action": "call-service",
-        "service": "button.press",
-        "data": {"entity_id": "button.alice_minus_200"},
+    stepper = eco[2]["cards"]
+    assert "+100" in stepper[1]["custom_fields"]["content"]
+    minus, plus = stepper[0]["tap_action"], stepper[2]["tap_action"]
+    assert minus["data"]["key"] == "admin-shared/quick-actions/pts-amount"
+    assert minus["data"]["value"] == 50  # 100 - step 50
+    assert plus["data"]["value"] == 150
+    assert plus["data"]["ui_control_target"] == "shared_admin"
+
+    steps = eco[3]["cards"]
+    assert [c["name"] for c in steps] == ["±10", "±50", "±100", "±500"]
+    assert steps[1]["styles"]["card"][-1]["background"] == "var(--primary-color)"
+    assert steps[2]["tap_action"]["data"]["value"] == 100
+
+    reasons = eco[5]["cards"]
+    assert [c["name"] for c in reasons] == [
+        "Helped out",
+        "Good behavior",
+        "Extra effort",
+        "Correction",
+    ]
+    # The picked reason clears when tapped again; another one sets it.
+    assert reasons[0]["tap_action"]["data"]["ui_control_action"] == "remove"
+    assert reasons[1]["tap_action"]["data"]["value"] == "Good behavior"
+
+    apply_btn = eco[6]
+    assert apply_btn["name"] == "Apply +100"
+    assert apply_btn["tap_action"]["service"] == "choreops.manual_adjust_points"
+    assert apply_btn["tap_action"]["data"] == {
+        "config_entry_id": "entry-123",
+        "user_name": "Alice",
+        "amount": 100,
+        "reason": "Helped out",
     }
+    assert "Alice" in apply_btn["tap_action"]["confirmation"]["text"]
+
+    recent = eco[7]["custom_fields"]["content"]
+    assert "Left shoes out" in recent and "-50" in recent
+
+
+def test_admin_economy_tab_points_defaults_to_pick_an_amount() -> None:
+    """With nothing picked the Apply button does nothing and no reason is sent."""
+
+    eco = _render_quick_actions("economy", {"econ-tab": "points"}, {})
+    assert eco[2]["cards"][1]["custom_fields"]["content"].count("0") >= 1
+    apply_btn = eco[6]
+    assert apply_btn["name"] == "Pick an amount above"
+    assert apply_btn["tap_action"] == {"action": "none"}
+    # No manual changes yet, so no recent-changes card follows the button.
+    assert len(eco) == 7 or "Recent manual" not in str(eco[7])
+
+
+def test_admin_economy_tab_points_negative_amount_removes_points() -> None:
+    """A negative amount shows a Remove confirmation and no picked reason."""
+
+    eco = _render_quick_actions(
+        "economy", {"econ-tab": "points", "pts-amount": -50}, {}
+    )
+    apply_btn = eco[6]
+    assert apply_btn["name"] == "Apply -50"
+    data = apply_btn["tap_action"]["data"]
+    assert data["amount"] == -50 and data["reason"] == "Adjustment"
+    assert "Remove 50" in apply_btn["tap_action"]["confirmation"]["text"]
 
 
 def test_admin_economy_tab_empty_lists_show_a_hint() -> None:
-    """With nothing configured, each tab shows a short hint instead of a blank."""
+    """With nothing configured, the Bonuses tab shows a short hint."""
 
     eco = _render_quick_actions("economy", None, {})
     assert eco[2]["cards"][0]["name"] == "No bonuses set up yet"
-    eco = _render_quick_actions(
-        "economy", {"econ-tab": "points"}, {"points_buttons": []}
-    )
-    assert eco[2]["cards"][0]["name"] == "No point amounts set up in settings"
 
 
 def test_admin_quick_actions_system_tab_tools_and_links() -> None:
@@ -2054,7 +2120,19 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
                 "dashboard_lookup_key": "entry-123:user-lily",
                 "user_name": "Lily",
                 "dashboard_helpers": {},
+                "ui_control": {
+                    "gamification": {"points_history": {"header_collapse": False}}
+                },
+                "points_summary": {"today": 1510.0, "week": 1600.0, "balance": 8668.0},
                 "recent_activity": [
+                    {
+                        "timestamp": "2026-10-19T12:20:00",
+                        "amount": 1500.0,
+                        "balance_after": 8668.0,
+                        "source": "challenges",
+                        "source_label": "Challenge",
+                        "item_name": "Family points goal - Level 5",
+                    },
                     {
                         "timestamp": "2026-10-19T12:10:00",
                         "amount": 10.0,
@@ -2086,9 +2164,30 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
         state_attr=state_attr,
     )
     parsed = yaml.safe_load(f"[{output}]")
-    html = parsed[0]["custom_fields"]["content"]
+    assert parsed[0]["name"] == "Points history"
+    assert parsed[0]["custom_fields"]["toggle"].count("chevron-up") == 1
+    html = parsed[1]["custom_fields"]["content"]
     assert "Dishes" in html and "+10" in html and "Today" in html
     assert "Late" in html and "Yesterday" in html and "-2" in html
+    # Goal payouts show the goal name, a level tag and the balance after.
+    assert "Family points goal" in html and "LEVEL 5" in html
+    assert "- Level" not in html
+    assert "→ 8,668" in html
+    # Summary strip: today, this week, balance.
+    assert "Today +1,510" in html
+    assert "This week +1,600" in html
+    assert "Balance 8,668" in html
+
+    # With no saved state the card starts collapsed: header only, no rows.
+    mock_states["sensor.lily_helper"].attributes.pop("ui_control")
+    collapsed = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    parsed_collapsed = yaml.safe_load(f"[{collapsed}]")
+    assert len(parsed_collapsed) == 1
+    assert "chevron-down" in parsed_collapsed[0]["custom_fields"]["toggle"]
 
 
 def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> None:

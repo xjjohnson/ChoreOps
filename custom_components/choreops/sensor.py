@@ -4553,16 +4553,25 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
 
     @staticmethod
     def _build_recent_activity(
-        assignee_info: dict[str, Any], limit: int = 5
+        assignee_info: dict[str, Any],
+        limit: int = 5,
+        names: dict[str, dict[str, str]] | None = None,
+        only_source: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return the newest point-ledger entries for dashboard display.
 
         Args:
             assignee_info: The assignee's stored data (holds the point ledger).
             limit: How many entries to return, newest first.
+            names: Optional ``{source: {reference_id: name}}`` lookup used to
+                name older entries that were stored without an item name
+                (goal and achievement payouts).
+            only_source: When set, keep only entries from this point source
+                (for example manual adjustments).
 
         Returns:
-            Small list of dicts with timestamp, amount, source label and item name.
+            Small list of dicts with timestamp, amount, balance after, source
+            label and item name.
         """
         ledger = assignee_info.get(const.DATA_USER_LEDGER, [])
         if not isinstance(ledger, list):
@@ -4574,20 +4583,84 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             source = str(
                 raw_entry.get(const.DATA_LEDGER_SOURCE, const.POINTS_SOURCE_OTHER)
             )
+            if only_source is not None and source != only_source:
+                continue
+            item_name = raw_entry.get(const.DATA_LEDGER_ITEM_NAME, "")
+            if not item_name and names:
+                item_name = names.get(source, {}).get(
+                    str(raw_entry.get(const.DATA_LEDGER_REFERENCE_ID) or ""), ""
+                )
             recent.append(
                 {
                     "timestamp": raw_entry.get(const.DATA_LEDGER_TIMESTAMP, ""),
                     "amount": raw_entry.get(const.DATA_LEDGER_AMOUNT, 0.0),
+                    "balance_after": raw_entry.get(const.DATA_LEDGER_BALANCE_AFTER),
                     "source": source,
                     "source_label": const.LEDGER_SOURCE_LABELS.get(
                         source, const.LEDGER_SOURCE_LABELS[const.POINTS_SOURCE_OTHER]
                     ),
-                    "item_name": raw_entry.get(const.DATA_LEDGER_ITEM_NAME, ""),
+                    "item_name": item_name,
                 }
             )
             if len(recent) >= limit:
                 break
         return recent
+
+    def _ledger_name_lookup(self) -> dict[str, dict[str, str]]:
+        """Return goal and achievement names keyed by source and record id."""
+        lookup: dict[str, dict[str, str]] = {
+            const.POINTS_SOURCE_CHALLENGES: {},
+            const.POINTS_SOURCE_ACHIEVEMENTS: {},
+        }
+        for goal_id, goal in self.coordinator.challenges_data.items():
+            if isinstance(goal, dict) and goal.get(const.DATA_CHALLENGE_NAME):
+                lookup[const.POINTS_SOURCE_CHALLENGES][goal_id] = str(
+                    goal[const.DATA_CHALLENGE_NAME]
+                )
+        for item_id, item in self.coordinator.achievements_data.items():
+            if isinstance(item, dict) and item.get(const.DATA_ACHIEVEMENT_NAME):
+                lookup[const.POINTS_SOURCE_ACHIEVEMENTS][item_id] = str(
+                    item[const.DATA_ACHIEVEMENT_NAME]
+                )
+        return lookup
+
+    @staticmethod
+    def _build_points_summary(assignee_info: dict[str, Any]) -> dict[str, float]:
+        """Return points earned today and over the last 7 days, plus balance.
+
+        Args:
+            assignee_info: The assignee's stored data (ledger and balance).
+
+        Returns:
+            Dict with ``today``, ``week`` (net change) and ``balance``.
+        """
+        ledger = assignee_info.get(const.DATA_USER_LEDGER, [])
+        today = dt_today_local()
+        week_start = today - timedelta(days=6)
+        today_total = 0.0
+        week_total = 0.0
+        if isinstance(ledger, list):
+            for raw_entry in ledger:
+                if not isinstance(raw_entry, dict):
+                    continue
+                parsed = dt_util.parse_datetime(
+                    str(raw_entry.get(const.DATA_LEDGER_TIMESTAMP, ""))
+                )
+                if parsed is None:
+                    continue
+                day = dt_util.as_local(parsed).date()
+                amount = float(raw_entry.get(const.DATA_LEDGER_AMOUNT, 0.0) or 0.0)
+                if day == today:
+                    today_total += amount
+                if week_start <= day <= today:
+                    week_total += amount
+        return {
+            "today": round_points(today_total),
+            "week": round_points(week_total),
+            "balance": round_points(
+                float(assignee_info.get(const.DATA_USER_POINTS, 0.0) or 0.0)
+            ),
+        }
 
     def _build_core_sensors(self, entity_registry) -> dict[str, str | None]:
         """Build core sensor entity IDs for dashboard use.
@@ -5048,7 +5121,13 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             "challenges": challenges_attr,
             "points_buttons": points_buttons_attr,
             "pending_approvals": pending_approvals,
-            "recent_activity": self._build_recent_activity(assignee_info),
+            "recent_activity": self._build_recent_activity(
+                assignee_info, names=self._ledger_name_lookup()
+            ),
+            "points_summary": self._build_points_summary(assignee_info),
+            "recent_manual_adjustments": self._build_recent_activity(
+                assignee_info, only_source=const.POINTS_SOURCE_MANUAL
+            ),
             "caught_up_streak": self._build_caught_up_streak(assignee_info),
             "core_sensors": core_sensors,
             const.ATTR_DASHBOARD_CONFIG: dashboard_config,
