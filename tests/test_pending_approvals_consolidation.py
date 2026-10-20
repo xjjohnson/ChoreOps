@@ -10,6 +10,8 @@ structures without requiring full scenario setup. Complex integration tests
 are covered in test_workflow_* files.
 """
 
+from datetime import timedelta
+
 from homeassistant.core import HomeAssistant
 
 
@@ -86,6 +88,39 @@ def test_recent_activity_returns_newest_five_ledger_entries() -> None:
     assert recent[0]["amount"] == -2.0
     assert recent[1]["item_name"] == "Chore 7"
     assert AssigneeDashboardHelperSensor._build_recent_activity({}) == []
+
+
+def test_recent_activity_names_old_goal_entries_and_totals_points() -> None:
+    """Old goal payouts get their goal's name; summary totals today and the week."""
+    from custom_components.choreops import const
+    from custom_components.choreops.sensor import AssigneeDashboardHelperSensor
+    from custom_components.choreops.utils.dt_utils import dt_now_utc
+
+    now = dt_now_utc()
+    ledger = [
+        {
+            const.DATA_LEDGER_TIMESTAMP: (now - timedelta(days=30)).isoformat(),
+            const.DATA_LEDGER_AMOUNT: 999.0,
+            const.DATA_LEDGER_SOURCE: const.POINTS_SOURCE_CHORES,
+        },
+        {
+            const.DATA_LEDGER_TIMESTAMP: now.isoformat(),
+            const.DATA_LEDGER_AMOUNT: 40.0,
+            const.DATA_LEDGER_BALANCE_AFTER: 1040.0,
+            const.DATA_LEDGER_SOURCE: const.POINTS_SOURCE_CHALLENGES,
+            const.DATA_LEDGER_REFERENCE_ID: "goal-1",
+        },
+    ]
+    info = {const.DATA_USER_LEDGER: ledger, const.DATA_USER_POINTS: 1040.0}
+
+    recent = AssigneeDashboardHelperSensor._build_recent_activity(
+        info, names={const.POINTS_SOURCE_CHALLENGES: {"goal-1": "Family points goal"}}
+    )
+    assert recent[0]["item_name"] == "Family points goal"
+    assert recent[0]["balance_after"] == 1040.0
+
+    summary = AssigneeDashboardHelperSensor._build_points_summary(info)
+    assert summary == {"today": 40.0, "week": 40.0, "balance": 1040.0}
 
 
 def test_shared_admin_helper_lists_family_goals() -> None:

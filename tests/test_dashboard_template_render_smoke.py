@@ -2054,7 +2054,16 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
                 "dashboard_lookup_key": "entry-123:user-lily",
                 "user_name": "Lily",
                 "dashboard_helpers": {},
+                "points_summary": {"today": 1510.0, "week": 1600.0, "balance": 8668.0},
                 "recent_activity": [
+                    {
+                        "timestamp": "2026-10-19T12:20:00",
+                        "amount": 1500.0,
+                        "balance_after": 8668.0,
+                        "source": "challenges",
+                        "source_label": "Challenge",
+                        "item_name": "Family points goal - Level 5",
+                    },
                     {
                         "timestamp": "2026-10-19T12:10:00",
                         "amount": 10.0,
@@ -2089,6 +2098,14 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     html = parsed[0]["custom_fields"]["content"]
     assert "Dishes" in html and "+10" in html and "Today" in html
     assert "Late" in html and "Yesterday" in html and "-2" in html
+    # Goal payouts show the goal name, a level tag and the balance after.
+    assert "Family points goal" in html and "LEVEL 5" in html
+    assert "- Level" not in html
+    assert "→ 8,668" in html
+    # Summary strip: today, this week, balance.
+    assert "Today +1,510" in html
+    assert "This week +1,600" in html
+    assert "Balance 8,668" in html
 
 
 def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> None:

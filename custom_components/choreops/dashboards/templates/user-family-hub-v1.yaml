@@ -3144,17 +3144,33 @@ views:
                     {#-- 4. Build Display --#}
                     {%- if items | length > 0 -%}
                       {%- set rows = namespace(v='') -%}
+                      {%- set tag_colors = {'chores': 'var(--success-color)', 'bonuses': 'var(--success-color)', 'penalties': 'var(--error-color)', 'rewards': 'var(--primary-color)', 'badges': 'var(--warning-color)', 'achievements': 'var(--warning-color)', 'challenges': 'var(--warning-color)', 'manual': 'var(--secondary-text-color)'} -%}
                       {%- for it in items -%}
                         {%- set amt = it.get('amount', 0) | float(0) -%}
                         {%- set when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
                         {%- set days = (now().date() - when.date()).days if when else -1 -%}
-                        {%- set when_txt = ('' if when is none else (('Today ' ~ when.strftime('%-I:%M %p')) if days == 0 else ('Yesterday' if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
-                        {%- set nm = ((it.get('item_name') or it.get('source_label') or 'Activity') | string) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                        {%- set lbl = (it.get('source_label') or '') | string -%}
+                        {%- set when_txt = ('' if when is none else (('Today ' ~ when.strftime('%-I:%M %p')) if days == 0 else (('Yesterday ' ~ when.strftime('%-I:%M %p')) if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
+                        {%- set raw_nm = ((it.get('item_name') or it.get('source_label') or 'Activity') | string) -%}
+                        {%- set level_txt = (raw_nm.split(' - Level ')[1].split(' ')[0]) if ' - Level ' in raw_nm else '' -%}
+                        {%- set nm = (raw_nm.split(' - Level ')[0]) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set lbl = ((it.get('source_label') or '') | string | upper) ~ (' · LEVEL ' ~ level_txt if level_txt else '') -%}
+                        {%- set src = it.get('source', '') -%}
+                        {%- set tcol = tag_colors.get(src, 'var(--secondary-text-color)') -%}
                         {%- set col = 'var(--success-color)' if amt >= 0 else 'var(--error-color)' -%}
-                        {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><ha-icon icon='" ~ icons.get(it.get('source', ''), 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:var(--secondary-text-color);flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ lbl ~ (' · ' if lbl and when_txt else '') ~ when_txt ~ "</div></div><div style='font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ "</div></div>" -%}
+                        {%- set bal_after = it.get('balance_after') -%}
+                        {%- set bal_txt = ("<div style='font-size:10px;font-weight:500;opacity:.55;'>→ " ~ ('{:,.0f}'.format(bal_after | float(0))) ~ "</div>") if bal_after is not none else '' -%}
+                        {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><div style='width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'><ha-icon icon='" ~ icons.get(src, 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;display:block;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.8;'><span style='font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-right:5px;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'>" ~ lbl ~ "</span><span style='opacity:.65;'>" ~ when_txt ~ "</span></div></div><div style='text-align:right;font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ bal_txt ~ "</div></div>" -%}
                       {%- endfor -%}
-                      {%- set html = "<div style='width:100%;text-align:left;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px;'>" ~ ui.get('points_history', 'Points history') ~ "</div>" ~ rows.v ~ "</div>" -%}
+                      {%- set ps = state_attr(dashboard_helper, 'points_summary') or {} -%}
+                      {%- set today_amt = ps.get('today', 0) | float(0) -%}
+                      {%- set week_amt = ps.get('week', 0) | float(0) -%}
+                      {%- set chip_css = "font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--secondary-background-color);white-space:nowrap;" -%}
+                      {%- set summary = "<div style='display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;'>"
+                        ~ "<span style='" ~ chip_css ~ "color:" ~ ('var(--success-color)' if today_amt > 0 else ('var(--error-color)' if today_amt < 0 else 'inherit')) ~ ";'>" ~ ui.get('today', 'Today') ~ " " ~ ('+' if today_amt > 0 else '') ~ '{:,.0f}'.format(today_amt) ~ "</span>"
+                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('this_week', 'This week') ~ " " ~ ('+' if week_amt > 0 else '') ~ '{:,.0f}'.format(week_amt) ~ "</span>"
+                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('balance', 'Balance') ~ " " ~ '{:,.0f}'.format(ps.get('balance', 0) | float(0)) ~ "</span>"
+                        ~ "</div>" -%}
+                      {%- set html = "<div style='width:100%;text-align:left;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px;'>" ~ ui.get('points_history', 'Points history') ~ "</div>" ~ summary ~ rows.v ~ "</div>" -%}
                       {{
                         {
                           'type': 'custom:button-card',
