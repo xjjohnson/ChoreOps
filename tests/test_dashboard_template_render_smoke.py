@@ -2233,15 +2233,14 @@ def _achievement_state(eid: str, name: str, count: int, last: str, points: float
     )
 
 
-def test_family_hub_achievements_tab_shows_gold_badges_and_dims_unearned() -> None:
-    """Earned achievements get the gold frame and a x-count; unearned are dimmed."""
+def test_family_hub_goals_card_does_not_repeat_achievements() -> None:
+    """Achievements live in the badge area; the goals card no longer lists them."""
     tpl = _hub_card_template("gamification/achievements")
     output = _render_hub_card(
         tpl,
         {
             "achievements": [
                 {"eid": "sensor.lily_ach_a", "name": "Kitchen Hero"},
-                {"eid": "sensor.lily_ach_b", "name": "Honor Roll"},
                 {"eid": "sensor.lily_ach_c", "name": "Not Yet"},
             ]
         },
@@ -2249,29 +2248,13 @@ def test_family_hub_achievements_tab_shows_gold_badges_and_dims_unearned() -> No
             "sensor.lily_ach_a": _achievement_state(
                 "sensor.lily_ach_a", "Kitchen Hero", 3, "2026-10-18T10:00:00"
             ),
-            "sensor.lily_ach_b": _achievement_state(
-                "sensor.lily_ach_b", "Honor Roll", 1, "2026-10-19T09:00:00"
-            ),
             "sensor.lily_ach_c": _achievement_state(
                 "sensor.lily_ach_c", "Not Yet", 0, ""
             ),
         },
     )
-    parsed = yaml.safe_load(f"[{output}]")
-    achievement_cards = [
-        c for c in parsed if c.get("entity", "").startswith("sensor.lily_ach_")
-    ]
-    # Newest earned first, then earned, then unearned
-    assert [c["entity"] for c in achievement_cards] == [
-        "sensor.lily_ach_b",
-        "sensor.lily_ach_a",
-        "sensor.lily_ach_c",
-    ]
-    earned = achievement_cards[0]["styles"]["card"]
-    assert any("#d4a017" in str(rule.get("border", "")) for rule in earned)
-    assert "×3" in achievement_cards[1]["custom_fields"]["content"]
-    unearned = achievement_cards[2]["styles"]["card"]
-    assert any(rule.get("opacity") == "0.6" for rule in unearned)
+    assert "Kitchen Hero" not in output
+    assert "Not Yet" not in output
 
 
 def test_family_hub_showcase_lists_earned_achievements_as_gold_tiles() -> None:
