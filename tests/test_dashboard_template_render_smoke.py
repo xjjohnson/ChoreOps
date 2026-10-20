@@ -2178,8 +2178,10 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     assert "This week +1,600" in html
     assert "Balance 8,668" in html
 
-    # With no saved state the card starts collapsed: header only, no rows.
-    mock_states["sensor.lily_helper"].attributes.pop("ui_control")
+    # A saved "collapsed" choice hides the rows and leaves just the header.
+    mock_states["sensor.lily_helper"].attributes["ui_control"] = {
+        "gamification": {"points_history": {"header_collapse": True}}
+    }
     collapsed = env.from_string(tpl).render(
         integration_entities=integration_entities,
         states=states,
@@ -2188,6 +2190,15 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     parsed_collapsed = yaml.safe_load(f"[{collapsed}]")
     assert len(parsed_collapsed) == 1
     assert "chevron-down" in parsed_collapsed[0]["custom_fields"]["toggle"]
+
+    # With no saved choice the card starts open: header plus the rows.
+    mock_states["sensor.lily_helper"].attributes.pop("ui_control")
+    opened = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    assert len(yaml.safe_load(f"[{opened}]")) == 2
 
 
 def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> None:
