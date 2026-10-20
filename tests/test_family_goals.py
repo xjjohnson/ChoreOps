@@ -758,3 +758,32 @@ async def test_legacy_family_achievement_migrates_to_goal(
     assert set(goal[fg.DATA_ASSIGNED_USER_IDS]) == {zoe, max_}
     # Running it again does nothing
     assert coordinator.family_goal_manager.migrate_legacy_achievements() == 0
+
+
+async def test_goals_survive_a_restart(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Goals live in the challenges bucket; startup cleanup must not wipe them."""
+    zoe = scenario_full.assignee_ids["Zoë"]
+    entry = scenario_full.config_entry
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=100.0,
+        reward=5.0,
+        assigned=[zoe],
+    )
+    scenario_full.coordinator._persist(immediate=True)
+
+    for _ in range(2):
+        await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert goal_id in entry.runtime_data.challenges_data
+
+    sensors = [
+        state
+        for state in hass.states.async_all("sensor")
+        if "family_contributions" in state.attributes
+    ]
+    assert sensors
