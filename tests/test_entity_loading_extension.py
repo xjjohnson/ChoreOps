@@ -128,7 +128,6 @@ async def test_scenario_full_loads_all_entity_types(
     early_bird_achievement_id = result.achievement_ids["Early Bird"]
     achievement_data = coordinator.achievements_data[early_bird_achievement_id]
     assert achievement_data["name"] == "Early Bird"
-    assert achievement_data["type"] == "chore_total"  # Achievement type, not name
     assert achievement_data["reward_points"] == 25.0
 
 

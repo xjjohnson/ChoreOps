@@ -1279,23 +1279,7 @@ class ChoreOpsConfigFlow(config_entries.ConfigFlow, domain=const.DOMAIN):
 
             if not errors:
                 try:
-                    assignees_dict = {
-                        assignee_data[const.DATA_USER_NAME]: assignee_id
-                        for assignee_id, assignee_data in self._assignees_temp.items()
-                    }
-
-                    # Layer 3: Convert CFOF_* to DATA_* keys
                     data_input = db.map_cfof_to_achievement_data(user_input)
-
-                    data_input[const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS] = (
-                        fh.normalize_selected_user_ids(
-                            data_input.get(
-                                const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS,
-                                [],
-                            ),
-                            assignees_dict,
-                        )
-                    )
 
                     # Build complete achievement structure
                     achievement = db.build_achievement(data_input)
@@ -1320,14 +1304,7 @@ class ChoreOpsConfigFlow(config_entries.ConfigFlow, domain=const.DOMAIN):
                     return await self.async_step_challenge_count()
                 return await self.async_step_achievements()
 
-        assignees_dict = {
-            assignee_data[const.DATA_USER_NAME]: assignee_id
-            for assignee_id, assignee_data in self._assignees_temp.items()
-        }
-        all_chores = self._chores_temp
-        achievement_schema = fh.build_achievement_schema(
-            assignees_dict=assignees_dict, chores_dict=all_chores, default=None
-        )
+        achievement_schema = fh.build_achievement_schema()
         return self.async_show_form(
             step_id=const.CONFIG_FLOW_STEP_ACHIEVEMENTS,
             data_schema=achievement_schema,

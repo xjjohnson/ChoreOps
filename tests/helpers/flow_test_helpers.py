@@ -28,13 +28,10 @@ from tests.helpers import (
     BADGE_TYPE_PERIODIC,
     BADGE_TYPE_SPECIAL_OCCASION,
     # Config/Options flow field names - Achievements
-    CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS,
     CFOF_ACHIEVEMENTS_INPUT_DESCRIPTION,
     CFOF_ACHIEVEMENTS_INPUT_ICON,
     CFOF_ACHIEVEMENTS_INPUT_NAME,
     CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS,
-    CFOF_ACHIEVEMENTS_INPUT_TARGET_VALUE,
-    CFOF_ACHIEVEMENTS_INPUT_TYPE,
     CFOF_APPROVERS_INPUT_HA_USER,
     CFOF_APPROVERS_INPUT_MOBILE_NOTIFY_SERVICE,
     CFOF_APPROVERS_INPUT_NAME,
@@ -363,15 +360,8 @@ class FlowTestHelper:
             CFOF_ACHIEVEMENTS_INPUT_DESCRIPTION: yaml_achievement.get(
                 "description", ""
             ),
-            CFOF_ACHIEVEMENTS_INPUT_TYPE: yaml_achievement.get("type", "chore_count"),
-            CFOF_ACHIEVEMENTS_INPUT_TARGET_VALUE: yaml_achievement.get(
-                "target_value", 10
-            ),
             CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS: yaml_achievement.get(
                 "reward_points", 50
-            ),
-            CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS: yaml_achievement.get(
-                "assigned_to", []
             ),
         }
 

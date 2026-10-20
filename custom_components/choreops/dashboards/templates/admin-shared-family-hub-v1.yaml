@@ -1693,6 +1693,7 @@ views:
                 {%- set qa_paused_until = state_attr(selected_dashboard_helper, 'chores_paused_until') -%}
                 {%- set qa_gam = state_attr(selected_dashboard_helper, 'gamification_enabled') | default(false, true) -%}
                 {%- set qa_pbuttons = (state_attr(selected_dashboard_helper, 'points_buttons') | default([], true)) if qa_user_ok else [] -%}
+                {%- set qa_achievements = (state_attr(selected_dashboard_helper, 'achievements') | default([], true)) if qa_user_ok else [] -%}
                 {%- set qa_bonuses = (state_attr(selected_dashboard_helper, 'bonuses') | default([], true)) if qa_user_ok else [] -%}
                 {%- set qa_penalties = (state_attr(selected_dashboard_helper, 'penalties') | default([], true)) if qa_user_ok else [] -%}
                 {%- set qa_badges = (state_attr(selected_dashboard_helper, 'badges') | default([], true)) if qa_user_ok else [] -%}
@@ -1777,7 +1778,7 @@ views:
                 {#-- Economy panel: balance, Bonuses / Penalties / Points tabs --#}
                 {%- if qa_tab == 'economy' and qa_gam and qa_user_ok -%}
                   {%- set ep_tab = (qa_open.get('econ-tab', 'bonuses')) | string -%}
-                  {%- if ep_tab not in ['bonuses', 'penalties', 'points'] -%}
+                  {%- if ep_tab not in ['bonuses', 'penalties', 'points', 'achievements'] -%}
                     {%- set ep_tab = 'bonuses' -%}
                   {%- endif -%}
                   {%- set ep_core = state_attr(selected_dashboard_helper, 'core_sensors') or {} -%}
@@ -1824,7 +1825,7 @@ views:
                     }
                   }},
                   {%- set ep_seg = namespace(c=[]) -%}
-                  {%- for ek, el, ei in [('bonuses', 'Bonuses', 'mdi:gift-outline'), ('penalties', 'Penalties', 'mdi:alert-octagon-outline'), ('points', 'Points', 'mdi:plus-minus-variant')] -%}
+                  {%- for ek, el, ei in [('bonuses', 'Bonuses', 'mdi:gift-outline'), ('penalties', 'Penalties', 'mdi:alert-octagon-outline'), ('points', 'Points', 'mdi:plus-minus-variant'), ('achievements', 'Achievements', 'mdi:trophy-award')] -%}
                     {%- set ep_on = ek == ep_tab -%}
                     {%- set ep_seg.c = ep_seg.c + [{
                       'type': 'custom:button-card',
@@ -1858,7 +1859,7 @@ views:
                     }] -%}
                   {%- endfor -%}
                   {{-
-                    {'type': 'grid', 'columns': 3, 'square': false, 'cards': ep_seg.c}
+                    {'type': 'grid', 'columns': 4, 'square': false, 'cards': ep_seg.c}
                   }},
                   {%- set ep_rows = namespace(c=[]) -%}
                   {%- if ep_tab in ['bonuses', 'penalties'] -%}
@@ -1914,6 +1915,65 @@ views:
                         'styles': {
                           'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': '1px dashed var(--divider-color)'}, {'background': 'transparent'}],
                           'name': [{'font-size': '12px'}, {'opacity': '0.65'}]
+                        }
+                      }] -%}
+                    {%- endif -%}
+                    {{-
+                      {'type': 'grid', 'columns': 1, 'square': false, 'cards': ep_rows.c}
+                    }},
+                  {%- elif ep_tab == 'achievements' -%}
+                    {#-- Achievements are given by hand: tap a gold tile to give it to the selected person --#}
+                    {%- for it in qa_achievements if it is mapping and it.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] -%}
+                      {%- set ach_attrs = states[it.get('eid')].attributes | default({}, true) -%}
+                      {%- set ach_name = ((ach_attrs.get('achievement_name') or it.get('name') or '') | string) -%}
+                      {%- set ach_pts = ach_attrs.get('reward_points', 0) | float(default=0) -%}
+                      {%- set ach_n = ach_attrs.get('award_count', 0) | int(default=0) -%}
+                      {%- set ach_icon = (ach_attrs.get('icon') or 'mdi:trophy') | string -%}
+                      {%- set ep_rows.c = ep_rows.c + [{
+                        'type': 'custom:button-card',
+                        'entity': it.get('eid'),
+                        'icon': ach_icon,
+                        'name': ach_name,
+                        'label': (('+' ~ ('%g' | format(ach_pts)) ~ ' pts') if ach_pts > 0 else 'no points') ~ ' · given ' ~ ach_n ~ '×',
+                        'show_name': true,
+                        'show_icon': true,
+                        'show_label': true,
+                        'show_state': false,
+                        'tap_action': {'action': 'call-service', 'service': 'choreops.award_achievement', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'achievement_name': ach_name}, 'confirmation': {'text': 'Give ' ~ ach_name ~ ' to ' ~ selected_user_name ~ '?'}},
+                        'hold_action': {'action': 'none'},
+                        'styles': {
+                          'card': [
+                            {'padding': '8px 12px'},
+                            {'border-radius': '14px'},
+                            {'box-shadow': '0 0 0 3px color-mix(in srgb, #f6d365 35%, transparent)'},
+                            {'border': '2px solid #d4a017'},
+                            {'background': 'linear-gradient(135deg, color-mix(in srgb, #f6d365 22%, var(--card-background-color)), var(--card-background-color))'}
+                          ],
+                          'grid': [
+                            {'grid-template-areas': '"i n" "i l"'},
+                            {'grid-template-columns': '40px minmax(0, 1fr)'},
+                            {'column-gap': '10px'},
+                            {'row-gap': '1px'},
+                            {'align-items': 'center'}
+                          ],
+                          'icon': [{'width': '24px'}, {'color': '#5b4300'}, {'background': 'linear-gradient(145deg, #f6d365, #d4a017)'}, {'border-radius': '50%'}, {'padding': '7px'}],
+                          'name': [{'justify-self': 'start'}, {'font-size': '13px'}, {'font-weight': '700'}, {'text-align': 'left'}],
+                          'label': [{'justify-self': 'start'}, {'font-size': '11px'}, {'opacity': '0.75'}]
+                        }
+                      }] -%}
+                    {%- endfor -%}
+                    {%- if ep_rows.c | length == 0 -%}
+                      {%- set ep_rows.c = [{
+                        'type': 'custom:button-card',
+                        'show_name': true,
+                        'show_icon': false,
+                        'show_label': false,
+                        'show_state': false,
+                        'name': 'No achievements set up yet (Settings → ChoreOps → Configure → Manage Achievement)',
+                        'tap_action': {'action': 'none'},
+                        'styles': {
+                          'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': '1px dashed var(--divider-color)'}, {'background': 'transparent'}],
+                          'name': [{'font-size': '12px'}, {'opacity': '0.65'}, {'white-space': 'normal'}]
                         }
                       }] -%}
                     {%- endif -%}

@@ -3678,42 +3678,19 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
         coordinator = self._get_coordinator()
         errors: dict[str, str] = {}
         achievements_dict = coordinator.achievements_data
-        chores_dict = coordinator.chores_data
-        assignees_dict = {
-            assignee_data[const.DATA_USER_NAME]: assignee_id
-            for assignee_id, assignee_data in coordinator.assignees_data.items()
-        }
 
         if user_input is not None:
-            # Layer 2: UI validation (uniqueness + type-specific checks)
             errors = fh.validate_achievements_inputs(user_input, achievements_dict)
 
             if not errors:
                 try:
-                    # Layer 3: Convert CFOF_* to DATA_* keys
                     data_input = db.map_cfof_to_achievement_data(user_input)
-
-                    data_input[const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS] = (
-                        fh.normalize_selected_user_ids(
-                            data_input.get(
-                                const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS,
-                                [],
-                            ),
-                            assignees_dict,
-                        )
-                    )
-
-                    # Use GamificationManager for achievement creation
                     internal_id = coordinator.gamification_manager.create_achievement(
                         data_input, immediate_persist=True
                     )
-                    achievement_name = data_input.get(
-                        const.DATA_ACHIEVEMENT_NAME, internal_id
-                    )
-
                     const.LOGGER.debug(
                         "Added Achievement '%s' with ID: %s",
-                        achievement_name,
+                        data_input.get(const.DATA_ACHIEVEMENT_NAME, internal_id),
                         internal_id,
                     )
                     self._mark_reload_needed()
@@ -3722,24 +3699,9 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
                 except EntityValidationError as err:
                     errors[err.field] = err.translation_key
 
-        # Build schema without defaults
-        schema = fh.build_achievement_schema(
-            assignees_dict=assignees_dict, chores_dict=chores_dict
-        )
-
-        # On validation error, preserve user's attempted input
+        schema = fh.build_achievement_schema()
         if user_input:
-            suggested_values = dict(user_input)
-            suggested_values[const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS] = (
-                fh.normalize_selected_user_ids(
-                    suggested_values.get(
-                        const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS,
-                        [],
-                    ),
-                    assignees_dict,
-                )
-            )
-            schema = self.add_suggested_values_to_schema(schema, suggested_values)
+            schema = self.add_suggested_values_to_schema(schema, dict(user_input))
 
         return self.async_show_form(
             step_id=const.OPTIONS_FLOW_STEP_ADD_ACHIEVEMENT,
@@ -3772,8 +3734,6 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
                 for eid, data in achievements_dict.items()
                 if eid != internal_id
             }
-
-            # Layer 2: UI validation (uniqueness + type-specific checks)
             errors = fh.validate_achievements_inputs(
                 user_input,
                 achievements_except_current,
@@ -3782,24 +3742,7 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
 
             if not errors:
                 try:
-                    # Layer 3: Convert CFOF_* to DATA_* keys
                     data_input = db.map_cfof_to_achievement_data(user_input)
-
-                    assignees_dict = {
-                        assignee_data[const.DATA_USER_NAME]: assignee_id
-                        for assignee_id, assignee_data in coordinator.assignees_data.items()
-                    }
-                    data_input[const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS] = (
-                        fh.normalize_selected_user_ids(
-                            data_input.get(
-                                const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS,
-                                [],
-                            ),
-                            assignees_dict,
-                        )
-                    )
-
-                    # Use GamificationManager for achievement update
                     coordinator.gamification_manager.update_achievement(
                         str(internal_id), data_input, immediate_persist=True
                     )
@@ -3816,21 +3759,6 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
                 except EntityValidationError as err:
                     errors[err.field] = err.translation_key
 
-        assignees_dict = {
-            assignee_data[const.DATA_USER_NAME]: assignee_id
-            for assignee_id, assignee_data in coordinator.assignees_data.items()
-        }
-        chores_dict = coordinator.chores_data
-
-        # Normalize stored assignee values to selector IDs for display.
-        assigned_user_ids = fh.normalize_selected_user_ids(
-            achievement_data.get(const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []),
-            assignees_dict,
-        )
-        valid_assignee_ids = set(assignees_dict.values())
-        valid_chore_ids = set(chores_dict.keys())
-
-        # Build suggested values for form (CFOF keys → existing DATA values)
         suggested_values = {
             const.CFOF_ACHIEVEMENTS_INPUT_NAME: achievement_data.get(
                 const.DATA_ACHIEVEMENT_NAME
@@ -3844,19 +3772,6 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
             const.CFOF_ACHIEVEMENTS_INPUT_ICON: achievement_data.get(
                 const.DATA_ACHIEVEMENT_ICON
             ),
-            const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS: assigned_user_ids,
-            const.CFOF_ACHIEVEMENTS_INPUT_TYPE: achievement_data.get(
-                const.DATA_ACHIEVEMENT_TYPE, const.ACHIEVEMENT_TYPE_STREAK
-            ),
-            const.CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID: achievement_data.get(
-                const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID, const.SENTINEL_EMPTY
-            ),
-            const.CFOF_ACHIEVEMENTS_INPUT_CRITERIA: achievement_data.get(
-                const.DATA_ACHIEVEMENT_CRITERIA, const.SENTINEL_EMPTY
-            ),
-            const.CFOF_ACHIEVEMENTS_INPUT_TARGET_VALUE: achievement_data.get(
-                const.DATA_ACHIEVEMENT_TARGET_VALUE, const.DEFAULT_ACHIEVEMENT_TARGET
-            ),
             const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS: achievement_data.get(
                 const.DATA_ACHIEVEMENT_REWARD_POINTS,
                 const.DEFAULT_ACHIEVEMENT_REWARD_POINTS,
@@ -3867,39 +3782,9 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
         if user_input:
             suggested_values.update(user_input)
 
-        suggested_values[const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS] = (
-            fh.normalize_selected_user_ids(
-                suggested_values.get(const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS),
-                assignees_dict,
-            )
+        schema = self.add_suggested_values_to_schema(
+            fh.build_achievement_schema(), suggested_values
         )
-
-        suggested_values[const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS] = (
-            _sanitize_select_values(
-                suggested_values.get(const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS),
-                valid_assignee_ids,
-            )
-        )
-
-        selected_chore_id = suggested_values.get(
-            const.CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID,
-            const.SENTINEL_EMPTY,
-        )
-        if (
-            selected_chore_id != const.SENTINEL_EMPTY
-            and selected_chore_id not in valid_chore_ids
-        ):
-            suggested_values[const.CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID] = (
-                const.SENTINEL_EMPTY
-            )
-
-        # Build schema without defaults (suggestions provide the values)
-        schema = fh.build_achievement_schema(
-            assignees_dict=assignees_dict,
-            chores_dict=chores_dict,
-        )
-        # Apply suggested values to schema
-        schema = self.add_suggested_values_to_schema(schema, suggested_values)
 
         return self.async_show_form(
             step_id=const.OPTIONS_FLOW_STEP_EDIT_ACHIEVEMENT,
