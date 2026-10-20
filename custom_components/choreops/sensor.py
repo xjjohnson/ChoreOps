@@ -2401,6 +2401,11 @@ class AssigneeBadgeProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             const.DATA_USER_BADGE_PROGRESS_DAYS_DONE: badge_progress.get(
                 const.DATA_USER_BADGE_PROGRESS_DAYS_DONE, []
             ),
+            # First local day this cycle's progress was recorded; earlier days
+            # were not watched and must not read as missed.
+            const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE: badge_progress.get(
+                const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE, ""
+            ),
             # Group 3: Target definition
             const.DATA_BADGE_TARGET_TYPE: target.get(const.DATA_BADGE_TARGET_TYPE),
             const.DATA_BADGE_TARGET_THRESHOLD_VALUE: target.get(

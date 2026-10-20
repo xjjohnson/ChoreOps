@@ -2526,6 +2526,7 @@ views:
                           'days_done': (ba.get('days_done') if ba.get('days_done') is iterable and ba.get('days_done') is not string else []),
                           'day_based': b_tt.startswith(('days_', 'streak_')),
                           'streak': b_tt.startswith('streak_'),
+                          'tracked_since': ((ba.get('days_tracked_since') or '') | string),
                           'threshold': b_thr,
                           'current': ((progress / 100 * b_thr) | round(0) | int),
                           'unit': 'pts' if b_tt.startswith('points') else ('chores' if b_tt.startswith('chore') else 'days'),
@@ -2742,7 +2743,7 @@ views:
                               {%- if b.start | length > 0 and b.end | length > 0 and not b.starts_future -%}
                                 {%- set start_ts = as_timestamp(b.start ~ 'T12:00:00') -%}
                                 {%- set n_days = (((as_timestamp(b.end ~ 'T12:00:00') - start_ts) / 86400) | round(0) | int) + 1 -%}
-                                {%- if n_days >= 2 and n_days <= 42 -%}
+                                {%- if n_days >= 2 and n_days <= 7 -%}
                                   {%- set dcount = namespace(done=0, cells='') -%}
                                   {%- for i in range(n_days) -%}
                                     {%- set d_ts = start_ts + (i * 86400) -%}
@@ -2761,7 +2762,7 @@ views:
                                       {%- set c_bd = '2px dashed var(--primary-color)' -%}
                                       {%- set c_fg = 'var(--primary-color)' -%}
                                       {%- set c_mark = '•' -%}
-                                    {%- elif d_past and b.day_based -%}
+                                    {%- elif d_past and b.day_based and b.tracked_since | length > 0 and d_iso >= b.tracked_since -%}
                                       {%- set c_bg = 'color-mix(in srgb, var(--error-color) 18%, var(--card-background-color))' -%}
                                       {%- set c_bd = '1px solid color-mix(in srgb, var(--error-color) 45%, transparent)' -%}
                                       {%- set c_fg = 'var(--error-color)' -%}
@@ -2772,18 +2773,90 @@ views:
                                       {%- set c_fg = 'var(--secondary-text-color)' -%}
                                       {%- set c_mark = '' -%}
                                     {%- endif -%}
-                                    {%- if n_days <= 7 -%}
                                       {%- set dcount.cells = dcount.cells ~ "<div style='text-align:center;'><div style='font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;margin-bottom:3px;'>" ~ (d_ts | timestamp_custom('%a')) ~ "</div><div style='height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";color:" ~ c_fg ~ ";'>" ~ c_mark ~ "</div></div>" -%}
-                                    {%- else -%}
-                                      {%- set dcount.cells = dcount.cells ~ "<div title='" ~ d_iso ~ "' style='width:18px;height:18px;border-radius:5px;box-sizing:border-box;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";'></div>" -%}
-                                    {%- endif -%}
                                   {%- endfor -%}
                                   {%- set strip_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'>" ~ (count_txt ~ ' · ' if (not b.day_based and count_txt | length > 0) else '') ~ "<b style='color:var(--primary-text-color);'>" ~ dcount.done ~ (' of ' ~ n_days if b.day_based else '') ~ "</b> " ~ ('days done' if b.day_based else ('day active' if dcount.done == 1 else 'days active')) ~ "</div>" -%}
-                                  {%- if n_days <= 7 -%}
                                     {%- set day_strip = "<div style='margin-top:10px;display:grid;grid-template-columns:repeat(" ~ n_days ~ ",1fr);gap:6px;'>" ~ dcount.cells ~ "</div>" ~ strip_note -%}
-                                  {%- else -%}
-                                    {%- set day_strip = "<div style='margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;'>" ~ dcount.cells ~ "</div>" ~ strip_note -%}
+                                {%- endif -%}
+                                {%- if n_days > 7 -%}
+                                  {#-- long goal: calendar weeks (last 4 weeks when the cycle is long), plus a pace line --#}
+                                  {%- set today_ts = as_timestamp(current_date ~ 'T12:00:00') -%}
+                                  {%- set lead = (start_ts | timestamp_custom('%u') | int(default=1)) - 1 -%}
+                                  {%- set total_rows = (lead + n_days + 6) // 7 -%}
+                                  {%- set since_start = (((today_ts - start_ts) / 86400) | round(0) | int) -%}
+                                  {%- set today_row = [[(lead + since_start) // 7, 0] | max, total_rows - 1] | min -%}
+                                  {%- set windowed = total_rows > 6 -%}
+                                  {%- set first_row = ([today_row - 3, 0] | max) if windowed else 0 -%}
+                                  {%- set last_row = ([first_row + 3, total_rows - 1] | min) if windowed else total_rows - 1 -%}
+                                  {%- set cal = namespace(cells='') -%}
+                                  {%- for ci in range(first_row * 7, (last_row + 1) * 7) -%}
+                                    {%- set di = ci - lead -%}
+                                    {%- if di < 0 or di >= n_days -%}
+                                      {%- set cal.cells = cal.cells ~ "<div></div>" -%}
+                                    {%- else -%}
+                                      {%- set d_iso = (start_ts + (di * 86400)) | timestamp_custom('%Y-%m-%d') -%}
+                                      {%- if d_iso in b.days_done -%}
+                                        {%- set c_bg = 'color-mix(in srgb, var(--success-color) 22%, var(--card-background-color))' -%}
+                                        {%- set c_bd = '1px solid color-mix(in srgb, var(--success-color) 55%, transparent)' -%}
+                                        {%- set c_fg = 'var(--success-color)' -%}
+                                        {%- set c_mark = '✓' -%}
+                                      {%- elif d_iso == current_date -%}
+                                        {%- set c_bg = 'transparent' -%}
+                                        {%- set c_bd = '2px dashed var(--primary-color)' -%}
+                                        {%- set c_fg = 'var(--primary-color)' -%}
+                                        {%- set c_mark = '•' -%}
+                                      {%- elif d_iso < current_date and b.day_based and b.tracked_since | length > 0 and d_iso >= b.tracked_since -%}
+                                        {%- set c_bg = 'color-mix(in srgb, var(--error-color) 18%, var(--card-background-color))' -%}
+                                        {%- set c_bd = '1px solid color-mix(in srgb, var(--error-color) 45%, transparent)' -%}
+                                        {%- set c_fg = 'var(--error-color)' -%}
+                                        {%- set c_mark = '✗' -%}
+                                      {%- else -%}
+                                        {%- set c_bg = 'var(--secondary-background-color)' -%}
+                                        {%- set c_bd = '1px solid transparent' -%}
+                                        {%- set c_fg = 'var(--secondary-text-color)' -%}
+                                        {%- set c_mark = '' -%}
+                                      {%- endif -%}
+                                      {%- set cal.cells = cal.cells ~ "<div title='" ~ d_iso ~ "' style='height:22px;box-sizing:border-box;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";color:" ~ c_fg ~ ";'>" ~ c_mark ~ "</div>" -%}
+                                    {%- endif -%}
+                                  {%- endfor -%}
+                                  {%- set wkl = namespace(h='') -%}
+                                  {%- for letter in ['M', 'T', 'W', 'T', 'F', 'S', 'S'] -%}
+                                    {%- set wkl.h = wkl.h ~ "<div style='text-align:center;font-size:9px;font-weight:700;opacity:.55;'>" ~ letter ~ "</div>" -%}
+                                  {%- endfor -%}
+                                  {%- set wk_head = "<div style='margin-top:10px;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;'>" ~ wkl.h ~ "</div>" -%}
+                                  {%- set win_note = ("<div style='display:flex;justify-content:space-between;margin-top:8px;font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;letter-spacing:.4px;'><span>Last 4 weeks</span><span>cycle is " ~ n_days ~ " days</span></div>") if windowed else '' -%}
+                                  {%- set watched_days = (([((today_ts - as_timestamp(b.tracked_since ~ 'T12:00:00')) / 86400) | round(0) | int, 0] | max) if b.tracked_since | length > 0 else 0) -%}
+                                  {%- set past_done = b.days_done | select('lt', current_date) | select('ge', b.tracked_since) | list | length -%}
+                                  {%- set missed_n = [watched_days - past_done, 0] | max -%}
+                                  {%- set cal_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'>" ~ (count_txt ~ ' · ' if count_txt | length > 0 else '') ~ (("<b style='color:var(--primary-text-color);'>" ~ missed_n ~ "</b> missed") if (b.day_based and missed_n > 0) else ("<b style='color:var(--primary-text-color);'>" ~ (b.days_done | length) ~ "</b> " ~ ('day active' if (b.days_done | length) == 1 else 'days active'))) ~ "</div>" -%}
+                                  {#-- pace: where the count should be by today if the work were spread evenly --#}
+                                  {%- set pace_html = '' -%}
+                                  {%- if b.threshold > 0 and b.current < b.threshold -%}
+                                    {%- set elapsed = [[since_start + 1, 1] | max, n_days] | min -%}
+                                    {%- set expected = b.threshold * elapsed / n_days -%}
+                                    {%- set tol = [1, b.threshold * 0.1] | max -%}
+                                    {%- set delta = b.current - expected -%}
+                                    {%- set remaining = b.threshold - b.current -%}
+                                    {%- set avail = [b.days_left, 1] | max -%}
+                                    {%- if delta >= tol -%}
+                                      {%- set pace_label = ui.get('ahead_of_pace', 'Ahead of pace') -%}
+                                      {%- set pace_col = 'var(--success-color)' -%}
+                                    {%- elif delta > -tol -%}
+                                      {%- set pace_label = ui.get('on_track', 'On track') -%}
+                                      {%- set pace_col = 'var(--primary-color)' -%}
+                                    {%- else -%}
+                                      {%- set pace_label = ui.get('behind_pace', 'Behind pace') -%}
+                                      {%- set pace_col = 'var(--warning-color)' -%}
+                                    {%- endif -%}
+                                    {%- set rem_txt = '%g' | format(remaining | round(2)) -%}
+                                    {%- if b.unit == 'chores' and avail <= 14 -%}
+                                      {%- set need_txt = 'needs ' ~ rem_txt ~ ' · ' ~ ('%g' | format((remaining / avail) | round(1))) ~ ' per day' -%}
+                                    {%- else -%}
+                                      {%- set need_txt = 'needs ' ~ rem_txt ~ ' in ' ~ avail ~ (' day' if avail == 1 else ' days') -%}
+                                    {%- endif -%}
+                                    {%- set pace_html = "<div style='margin-top:8px;padding:6px 10px;border-radius:10px;background:var(--secondary-background-color);display:flex;justify-content:space-between;gap:8px;font-size:12px;'><span style='font-weight:800;color:" ~ pace_col ~ ";'>" ~ pace_label ~ "</span><span style='color:var(--secondary-text-color);'>" ~ need_txt ~ "</span></div>" -%}
                                   {%- endif -%}
+                                  {%- set day_strip = win_note ~ wk_head ~ "<div style='margin-top:4px;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;'>" ~ cal.cells ~ "</div>" ~ cal_note ~ pace_html -%}
                                 {%- endif -%}
                               {%- endif -%}
                               {%- if day_strip | length == 0 and b.rank != 2 -%}

@@ -2441,6 +2441,7 @@ def test_family_hub_goal_shows_done_missed_today_and_ahead_days() -> None:
             "start_date": "2026-10-17",
             "end_date": "2026-10-23",
             "days_done": ["2026-10-17", "2026-10-19"],
+            "days_tracked_since": "2026-10-17",
         }
     )
     output = _render_hub_card(tpl, helper, extra, real_dates=True)
@@ -2619,3 +2620,99 @@ def test_family_hub_open_ended_streak_shows_last_seven_days() -> None:
     # The harness clock is 2026-10-19, so the last five days up to today are done.
     assert output.count("✓") == 5
     assert "✗" not in output
+
+
+def _long_goal(progress: int, **attrs: object):
+    return _goal_badge_states(
+        {
+            "target_type": "chore_count",
+            "threshold_value": 10,
+            "recurring_frequency": "biweekly",
+            "start_date": "2026-10-12",
+            "end_date": "2026-10-25",
+            **attrs,
+        },
+        progress=progress,
+    )
+
+
+def test_family_hub_long_goal_shows_calendar_weeks_and_pace() -> None:
+    """A two-week goal shows its days as calendar weeks with a pace line."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _long_goal(10, days_done=["2026-10-13"])
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert output.count("title='2026-") == 14  # one cell per day of the cycle
+    assert "Behind pace" in output
+    assert "needs 9 · 1.5 per day" in output
+    assert "1 of 10</b> chores" in output
+    assert "✗" not in output  # a count goal never marks missed days
+    assert "Last 4 weeks" not in output
+
+
+def test_family_hub_long_goal_pace_is_on_track_within_a_unit() -> None:
+    """Within a unit of the even pace reads on track, not behind."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _long_goal(50)
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "On track" in output
+    assert "Behind pace" not in output
+
+
+def test_family_hub_long_goal_pace_ahead() -> None:
+    """A count well past the even pace reads ahead."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _long_goal(80)
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "Ahead of pace" in output
+    assert "needs 2 · 0.3 per day" in output
+
+
+def test_family_hub_very_long_goal_shows_only_the_last_four_weeks() -> None:
+    """A months-long cycle shows four week rows and notes the cycle length."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _long_goal(
+        20,
+        target_type="days_all_chores",
+        threshold_value=21,
+        start_date="2026-09-01",
+        end_date="2026-12-31",
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "Last 4 weeks" in output
+    assert "cycle is 122 days" in output
+    assert output.count("title='2026-") == 28
+
+
+def test_family_hub_days_before_tracking_are_never_marked_missed() -> None:
+    """With no tracking start recorded, past days stay blank instead of red."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "target_type": "days_all_chores",
+            "start_date": "2026-10-12",
+            "end_date": "2026-10-25",
+            "days_done": ["2026-10-13"],
+        }
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    assert "✗" not in output
+    assert "missed" not in output
+
+
+def test_family_hub_missed_days_start_at_the_tracking_day() -> None:
+    """Only days since tracking began count as missed."""
+    tpl = _hub_card_template("pref_urgent_days")
+    helper, extra = _goal_badge_states(
+        {
+            "target_type": "days_all_chores",
+            "threshold_value": 10,
+            "start_date": "2026-10-12",
+            "end_date": "2026-10-25",
+            "days_done": ["2026-10-17"],
+            "days_tracked_since": "2026-10-16",
+        }
+    )
+    output = _render_hub_card(tpl, helper, extra, real_dates=True)
+    # Oct 16 and Oct 18 passed with nothing recorded; Oct 17 was done.
+    assert output.count("✗") == 2
+    assert "2</b> missed" in output

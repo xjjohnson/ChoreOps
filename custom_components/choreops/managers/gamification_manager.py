@@ -1111,6 +1111,16 @@ class GamificationManager(BaseManager):
         ):
             return
 
+        # Remember the first day this cycle's progress was watched, so a dashboard
+        # never calls an earlier day "missed" when nothing was being recorded.
+        tracked_progress = self._get_badge_progress(assignee_id, badge_id)
+        if tracked_progress is not None and not tracked_progress.get(
+            const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE
+        ):
+            tracked_progress[const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE] = context[
+                "today_iso"
+            ]
+
         badges_earned = assignee_data.get(const.DATA_USER_BADGES_EARNED, {})
         already_earned = badge_id in badges_earned
 
@@ -1357,6 +1367,7 @@ class GamificationManager(BaseManager):
         progress[const.DATA_USER_BADGE_PROGRESS_STATUS] = const.BADGE_STATE_ACTIVE_CYCLE
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] = 0
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE] = []
+        progress[const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE] = ""
         progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] = 0.0
         progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] = False
         progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = held_day
@@ -1622,6 +1633,7 @@ class GamificationManager(BaseManager):
         progress[const.DATA_USER_BADGE_PROGRESS_CHORES_CYCLE_COUNT] = 0
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] = 0
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE] = []
+        progress[const.DATA_USER_BADGE_PROGRESS_TRACKED_SINCE] = ""
         progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] = 0.0
         progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] = False
         progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = ""
