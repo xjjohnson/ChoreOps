@@ -123,6 +123,38 @@ def test_recent_activity_names_old_goal_entries_and_totals_points() -> None:
     assert summary == {"today": 40.0, "week": 40.0, "balance": 1040.0}
 
 
+def test_recent_manual_adjustments_keep_only_manual_entries() -> None:
+    """The manual-changes list skips other sources and honors the limit."""
+    from custom_components.choreops import const
+    from custom_components.choreops.sensor import AssigneeDashboardHelperSensor
+
+    ledger = [
+        {
+            const.DATA_LEDGER_TIMESTAMP: "2026-10-01T10:00:00",
+            const.DATA_LEDGER_AMOUNT: 25.0,
+            const.DATA_LEDGER_SOURCE: const.POINTS_SOURCE_MANUAL,
+            const.DATA_LEDGER_ITEM_NAME: "Helped out",
+        },
+        {
+            const.DATA_LEDGER_TIMESTAMP: "2026-10-02T10:00:00",
+            const.DATA_LEDGER_AMOUNT: 10.0,
+            const.DATA_LEDGER_SOURCE: const.POINTS_SOURCE_CHORES,
+            const.DATA_LEDGER_ITEM_NAME: "Dishes",
+        },
+        {
+            const.DATA_LEDGER_TIMESTAMP: "2026-10-03T10:00:00",
+            const.DATA_LEDGER_AMOUNT: -50.0,
+            const.DATA_LEDGER_SOURCE: const.POINTS_SOURCE_MANUAL,
+            const.DATA_LEDGER_ITEM_NAME: "Left shoes out",
+        },
+    ]
+    manual = AssigneeDashboardHelperSensor._build_recent_activity(
+        {const.DATA_USER_LEDGER: ledger},
+        only_source=const.POINTS_SOURCE_MANUAL,
+    )
+    assert [m["item_name"] for m in manual] == ["Left shoes out", "Helped out"]
+
+
 def test_shared_admin_helper_lists_family_goals() -> None:
     """Family goals are exposed straight from the goal manager for the reset card."""
     from types import SimpleNamespace

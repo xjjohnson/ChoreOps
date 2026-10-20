@@ -4556,6 +4556,7 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         assignee_info: dict[str, Any],
         limit: int = 5,
         names: dict[str, dict[str, str]] | None = None,
+        only_source: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return the newest point-ledger entries for dashboard display.
 
@@ -4565,6 +4566,8 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             names: Optional ``{source: {reference_id: name}}`` lookup used to
                 name older entries that were stored without an item name
                 (goal and achievement payouts).
+            only_source: When set, keep only entries from this point source
+                (for example manual adjustments).
 
         Returns:
             Small list of dicts with timestamp, amount, balance after, source
@@ -4580,6 +4583,8 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             source = str(
                 raw_entry.get(const.DATA_LEDGER_SOURCE, const.POINTS_SOURCE_OTHER)
             )
+            if only_source is not None and source != only_source:
+                continue
             item_name = raw_entry.get(const.DATA_LEDGER_ITEM_NAME, "")
             if not item_name and names:
                 item_name = names.get(source, {}).get(
@@ -5120,6 +5125,9 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                 assignee_info, names=self._ledger_name_lookup()
             ),
             "points_summary": self._build_points_summary(assignee_info),
+            "recent_manual_adjustments": self._build_recent_activity(
+                assignee_info, only_source=const.POINTS_SOURCE_MANUAL
+            ),
             "caught_up_streak": self._build_caught_up_streak(assignee_info),
             "core_sensors": core_sensors,
             const.ATTR_DASHBOARD_CONFIG: dashboard_config,
