@@ -1102,6 +1102,15 @@ class GamificationManager(BaseManager):
         ):
             return
 
+        # A repeating streak that was earned today keeps showing as achieved
+        # until the day changes, then restarts from zero.
+        if self._is_repeating_streak_badge(
+            badge_data
+        ) and self._streak_hold_blocks_evaluation(
+            assignee_id, badge_id, context["today_iso"]
+        ):
+            return
+
         badges_earned = assignee_data.get(const.DATA_USER_BADGES_EARNED, {})
         already_earned = badge_id in badges_earned
 
@@ -1153,6 +1162,7 @@ class GamificationManager(BaseManager):
                 result,
                 already_earned=already_earned,
                 canonical_target=canonical_target,
+                today_iso=context["today_iso"],
             )
         # If criteria not met: do nothing (badge stays earned, no re-award)
 
@@ -1231,6 +1241,7 @@ class GamificationManager(BaseManager):
         *,
         already_earned: bool,
         canonical_target: CanonicalTargetDefinition,
+        today_iso: str | None = None,
     ) -> None:
         """Apply non-cumulative badge award effects through a shared adapter."""
         const.LOGGER.debug(
@@ -1247,7 +1258,7 @@ class GamificationManager(BaseManager):
                 assignee_id, badge_id, badge_data, result
             )
             if repeating:
-                self._restart_streak_after_award(assignee_id, badge_id)
+                self._restart_streak_after_award(assignee_id, badge_id, today_iso)
             return
 
         if not repeating and self._is_periodic_award_recorded_for_current_cycle(
@@ -1263,7 +1274,7 @@ class GamificationManager(BaseManager):
 
         await self._apply_periodic_reaward(assignee_id, badge_id, badge_data)
         if repeating:
-            self._restart_streak_after_award(assignee_id, badge_id)
+            self._restart_streak_after_award(assignee_id, badge_id, today_iso)
 
     def _is_repeating_streak_badge(self, badge_data: BadgeData) -> bool:
         """Return True for streak badges with no reset schedule.
@@ -1291,12 +1302,10 @@ class GamificationManager(BaseManager):
             == const.FREQUENCY_NONE
         )
 
-    def _restart_streak_after_award(self, assignee_id: str, badge_id: str) -> None:
-        """Zero a streak badge's counter right after it is awarded.
-
-        Today stays marked as already counted so the same day is not credited
-        again; tomorrow becomes day one of the next streak.
-        """
+    def _get_badge_progress(
+        self, assignee_id: str, badge_id: str
+    ) -> dict[str, Any] | None:
+        """Return the stored progress dict for an assignee's badge, if any."""
         assignee_info: UserData | dict[str, Any] = self.coordinator.assignees_data.get(
             assignee_id, {}
         )
@@ -1304,15 +1313,56 @@ class GamificationManager(BaseManager):
             "dict[str, Any]", assignee_info.get(const.DATA_USER_BADGE_PROGRESS, {})
         )
         progress = cast("dict[str, Any]", badge_progress.get(badge_id, {}))
-        if not progress:
+        return progress or None
+
+    def _restart_streak_after_award(
+        self, assignee_id: str, badge_id: str, today_iso: str | None = None
+    ) -> None:
+        """Hold a repeating streak badge's achieved state for the rest of the day.
+
+        The counter and the achieved state stay as they are so the dashboard can
+        show the badge as reached today. Today is marked as held so it is neither
+        credited nor awarded again; the first evaluation on a later day (the
+        midnight rollover runs one) zeroes the streak so tomorrow becomes day
+        one of the next streak.
+        """
+        progress = self._get_badge_progress(assignee_id, badge_id)
+        if progress is None:
             return
+        today_iso = today_iso or dt_today_iso()
+        progress[const.DATA_USER_BADGE_PROGRESS_STREAK_HELD_DAY] = today_iso
+        progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = today_iso
+        self.coordinator._persist_and_update()
+
+    def _streak_hold_blocks_evaluation(
+        self, assignee_id: str, badge_id: str, today_iso: str
+    ) -> bool:
+        """Apply a held streak: keep it today, restart it on a later day.
+
+        Returns:
+            True when the badge was earned today and must not be evaluated again
+            until the day changes.
+        """
+        progress = self._get_badge_progress(assignee_id, badge_id)
+        if progress is None:
+            return False
+        held_day = str(
+            progress.get(const.DATA_USER_BADGE_PROGRESS_STREAK_HELD_DAY) or ""
+        )
+        if not held_day:
+            return False
+        if held_day >= today_iso:
+            return True
+
         progress[const.DATA_USER_BADGE_PROGRESS_STATUS] = const.BADGE_STATE_ACTIVE_CYCLE
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_CYCLE_COUNT] = 0
         progress[const.DATA_USER_BADGE_PROGRESS_DAYS_DONE] = []
         progress[const.DATA_USER_BADGE_PROGRESS_OVERALL_PROGRESS] = 0.0
         progress[const.DATA_USER_BADGE_PROGRESS_CRITERIA_MET] = False
-        progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = dt_today_iso()
+        progress[const.DATA_USER_BADGE_PROGRESS_LAST_UPDATE_DAY] = held_day
+        progress[const.DATA_USER_BADGE_PROGRESS_STREAK_HELD_DAY] = ""
         self.coordinator._persist_and_update()
+        return False
 
     @staticmethod
     def _record_day_done(progress: dict[str, Any], day_iso: str) -> None:
