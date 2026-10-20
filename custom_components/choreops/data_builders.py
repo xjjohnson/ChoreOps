@@ -2653,11 +2653,6 @@ _CFOF_TO_ACHIEVEMENT_DATA_MAPPING: dict[str, str] = {
     const.CFOF_ACHIEVEMENTS_INPUT_DESCRIPTION: const.DATA_ACHIEVEMENT_DESCRIPTION,
     const.CFOF_ACHIEVEMENTS_INPUT_LABELS: const.DATA_ACHIEVEMENT_LABELS,
     const.CFOF_ACHIEVEMENTS_INPUT_ICON: const.DATA_ACHIEVEMENT_ICON,
-    const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS: const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS,
-    const.CFOF_ACHIEVEMENTS_INPUT_TYPE: const.DATA_ACHIEVEMENT_TYPE,
-    const.CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID: const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID,
-    const.CFOF_ACHIEVEMENTS_INPUT_CRITERIA: const.DATA_ACHIEVEMENT_CRITERIA,
-    const.CFOF_ACHIEVEMENTS_INPUT_TARGET_VALUE: const.DATA_ACHIEVEMENT_TARGET_VALUE,
     const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS: const.DATA_ACHIEVEMENT_REWARD_POINTS,
 }
 
@@ -2709,7 +2704,7 @@ def validate_achievement_data(
     Validation Rules:
         1. Name not empty
         2. Name not duplicate
-        3. Streak type requires chore selection
+        3. Reward points, when given, are a valid non-negative number
     """
     errors: dict[str, str] = {}
 
@@ -2734,28 +2729,6 @@ def validate_achievement_data(
                     const.TRANS_KEY_CFOF_DUPLICATE_ACHIEVEMENT
                 )
                 return errors
-
-    # === 3. At least one assignee must be assigned ===
-    assigned_assignees = data.get(const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, [])
-    if not assigned_assignees:
-        errors[const.CFOP_ERROR_ASSIGNED_USER_IDS] = (
-            const.TRANS_KEY_CFOF_ACHIEVEMENT_NO_ASSIGNEES_ASSIGNED
-        )
-        return errors
-
-    # === 4. Streak type requires chore selection ===
-    achievement_type = data.get(const.DATA_ACHIEVEMENT_TYPE)
-    if achievement_type == const.ACHIEVEMENT_TYPE_STREAK:
-        chore_id = data.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID)
-        if not chore_id or chore_id in (
-            const.SENTINEL_EMPTY,
-            const.SENTINEL_NONE_TEXT,
-            const.SENTINEL_NO_SELECTION,
-        ):
-            errors[const.CFOP_ERROR_SELECT_CHORE_ID] = (
-                const.TRANS_KEY_CFOF_CHORE_MUST_BE_SELECTED
-            )
-            return errors
 
     if const.DATA_ACHIEVEMENT_REWARD_POINTS in data:
         try:
@@ -2844,23 +2817,6 @@ def build_achievement(
         ),
         const.DATA_ACHIEVEMENT_ICON: str(
             get_field(const.DATA_ACHIEVEMENT_ICON, const.SENTINEL_EMPTY)
-        ),
-        const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS: _normalize_list_field(
-            get_field(const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, [])
-        ),
-        const.DATA_ACHIEVEMENT_TYPE: str(
-            get_field(const.DATA_ACHIEVEMENT_TYPE, const.ACHIEVEMENT_TYPE_STREAK)
-        ),
-        const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID: str(
-            get_field(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID, const.SENTINEL_EMPTY)
-        ),
-        const.DATA_ACHIEVEMENT_CRITERIA: str(
-            get_field(const.DATA_ACHIEVEMENT_CRITERIA, const.SENTINEL_EMPTY)
-        ).strip(),
-        const.DATA_ACHIEVEMENT_TARGET_VALUE: float(
-            get_field(
-                const.DATA_ACHIEVEMENT_TARGET_VALUE, const.DEFAULT_ACHIEVEMENT_TARGET
-            )
         ),
         const.DATA_ACHIEVEMENT_REWARD_POINTS: parse_points_value(
             get_field(

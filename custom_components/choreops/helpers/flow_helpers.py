@@ -3185,23 +3185,16 @@ def process_penalty_form_input(user_input: dict) -> dict:
 # ----------------------------------------------------------------------------------
 
 
-def build_achievement_schema(assignees_dict, chores_dict, default=None):
-    """Build a schema for achievements, keyed by internal_id.
+def build_achievement_schema(default=None):
+    """Build the form schema for an achievement.
+
+    An achievement is a manually given recognition: a name, an icon, a
+    description, labels and optional reward points. Nothing triggers it.
 
     Note: default parameter is kept for backwards compatibility but should NOT
-    be used. Instead, use add_suggested_values_to_schema() after schema creation.
-    This allows users to clear optional fields (suggested values vs defaults).
+    be used. Use add_suggested_values_to_schema() after schema creation so users
+    can clear optional fields.
     """
-    assignee_options = [
-        {"value": assignee_id, "label": assignee_name}
-        for assignee_name, assignee_id in assignees_dict.items()
-    ]
-
-    chore_options = [{"value": const.SENTINEL_EMPTY, "label": const.LABEL_NONE}]
-    for chore_id, chore_data in chores_dict.items():
-        chore_name = chore_data.get(const.DATA_CHORE_NAME, f"Chore {chore_id[:6]}")
-        chore_options.append({"value": chore_id, "label": chore_name})
-
     return vol.Schema(
         {
             vol.Required(const.CFOF_ACHIEVEMENTS_INPUT_NAME): str,
@@ -3214,54 +3207,6 @@ def build_achievement_schema(assignees_dict, chores_dict, default=None):
                 default=[],
             ): selector.LabelSelector(selector.LabelSelectorConfig(multiple=True)),
             vol.Optional(const.CFOF_ACHIEVEMENTS_INPUT_ICON): selector.IconSelector(),
-            vol.Required(
-                const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS,
-                default=[],
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=cast("list[selector.SelectOptionDict]", assignee_options),
-                    translation_key=const.TRANS_KEY_FLOW_HELPERS_ASSIGNED_USER_IDS,
-                    multiple=True,
-                )
-            ),
-            vol.Required(
-                const.CFOF_ACHIEVEMENTS_INPUT_TYPE,
-                default=const.ACHIEVEMENT_TYPE_STREAK,
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=cast(
-                        "list[selector.SelectOptionDict]",
-                        const.ACHIEVEMENT_TYPE_OPTIONS,
-                    ),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                )
-            ),
-            # If type == "chore_streak", let the user choose the chore to track:
-            vol.Optional(
-                const.CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID,
-                default=const.SENTINEL_EMPTY,
-            ): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=cast("list[selector.SelectOptionDict]", chore_options),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    multiple=False,
-                )
-            ),
-            # For non-streak achievements the user can type criteria freely:
-            vol.Optional(
-                const.CFOF_ACHIEVEMENTS_INPUT_CRITERIA,
-                default="",
-            ): str,
-            vol.Required(
-                const.CFOF_ACHIEVEMENTS_INPUT_TARGET_VALUE,
-                default=const.DEFAULT_ACHIEVEMENT_TARGET,
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    mode=selector.NumberSelectorMode.BOX,
-                    min=0,
-                    step=0.1,
-                )
-            ),
             vol.Required(
                 const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS,
                 default=const.DEFAULT_ACHIEVEMENT_REWARD_POINTS,
@@ -3345,23 +3290,10 @@ def validate_achievements_inputs(
     from .. import data_builders as db
 
     # Transform CFOF_* keys to DATA_* keys
-    assigned_assignees = user_input.get(
-        const.CFOF_ACHIEVEMENTS_INPUT_ASSIGNED_USER_IDS, []
-    )
-    if not isinstance(assigned_assignees, list):
-        assigned_assignees = [assigned_assignees] if assigned_assignees else []
-
     data = {
         const.DATA_ACHIEVEMENT_NAME: user_input.get(
             const.CFOF_ACHIEVEMENTS_INPUT_NAME, ""
         ),
-        const.DATA_ACHIEVEMENT_TYPE: user_input.get(
-            const.CFOF_ACHIEVEMENTS_INPUT_TYPE, const.ACHIEVEMENT_TYPE_STREAK
-        ),
-        const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID: user_input.get(
-            const.CFOF_ACHIEVEMENTS_INPUT_SELECTED_CHORE_ID, const.SENTINEL_EMPTY
-        ),
-        const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS: assigned_assignees,
         const.DATA_ACHIEVEMENT_REWARD_POINTS: user_input.get(
             const.CFOF_ACHIEVEMENTS_INPUT_REWARD_POINTS,
             const.DEFAULT_ACHIEVEMENT_REWARD_POINTS,

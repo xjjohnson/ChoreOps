@@ -884,21 +884,15 @@ async def test_add_achievement_via_options_flow(
     hass: HomeAssistant,
     init_integration_with_coordinator: SetupResult,
 ) -> None:
-    """Test adding an achievement via options flow."""
+    """Achievements are manual: the form asks only for name, icon, labels, points."""
     config_entry = init_integration_with_coordinator.config_entry
     coordinator = init_integration_with_coordinator.coordinator
 
-    # Get existing assignee ID for assignment
-    assignee_id = next(iter(coordinator.assignees_data.keys()))
-
     yaml_achievement = {
-        "name": "First Ten Chores",
+        "name": "Kitchen Hero",
         "icon": "mdi:trophy",
-        "description": "Complete 10 chores",
-        "type": "chore_total",  # Valid types: chore_total, chore_streak, daily_minimum
-        "target_value": 10,
-        "reward_points": 50,
-        "assigned_to": [assignee_id],
+        "description": "Cleaned the whole kitchen",
+        "reward_points": 20,
     }
 
     form_data = FlowTestHelper.build_achievement_form_data(yaml_achievement)
@@ -915,32 +909,27 @@ async def test_add_achievement_via_options_flow(
     assert result.get("type") == FlowResultType.FORM
     assert result.get("step_id") == OPTIONS_FLOW_STEP_INIT
 
-    # Verify achievement was created via coordinator
     stored_achievement = next(
         achievement
         for achievement in coordinator.achievements_data.values()
-        if achievement["name"] == "First Ten Chores"
+        if achievement["name"] == "Kitchen Hero"
     )
-    assert stored_achievement["assigned_user_ids"] == [assignee_id]
+    assert stored_achievement["reward_points"] == 20
+    # No triggers are stored any more
+    for removed in ("type", "target_value", "assigned_user_ids", "selected_chore_id"):
+        assert removed not in stored_achievement
 
 
-async def test_edit_achievement_uses_assignee_ids_for_suggested_values(
+async def test_edit_achievement_form_has_no_trigger_fields(
     hass: HomeAssistant,
     init_integration_with_coordinator: SetupResult,
 ) -> None:
-    """Achievement edit form should suggest assignee UUIDs, not display names."""
+    """The edit form suggests the saved values and offers no trigger fields."""
     config_entry = init_integration_with_coordinator.config_entry
     coordinator = init_integration_with_coordinator.coordinator
 
-    assignee_id, assignee_data = next(iter(coordinator.assignees_data.items()))
     achievement_id = coordinator.gamification_manager.create_achievement(
-        {
-            "name": "Weekend Winner",
-            "assigned_user_ids": [assignee_id],
-            "type": "chore_total",
-            "target_value": 3,
-            "reward_points": 15,
-        },
+        {"name": "Weekend Winner", "reward_points": 15},
         immediate_persist=True,
     )
     achievement_name = coordinator.achievements_data[achievement_id]["name"]
@@ -960,55 +949,15 @@ async def test_edit_achievement_uses_assignee_ids_for_suggested_values(
     )
 
     assert result.get("type") == FlowResultType.FORM
-    suggested_value = _get_schema_suggested_value(
-        result["data_schema"],
-        "assigned_user_ids",
-    )
-    assert suggested_value == [assignee_id], assignee_data
-
-
-async def test_edit_achievement_normalizes_legacy_assignee_names(
-    hass: HomeAssistant,
-    init_integration_with_coordinator: SetupResult,
-) -> None:
-    """Legacy name-based achievement assignees should reopen as UUIDs."""
-    config_entry = init_integration_with_coordinator.config_entry
-    coordinator = init_integration_with_coordinator.coordinator
-
-    assignee_id, assignee_data = next(iter(coordinator.assignees_data.items()))
-    assignee_name = assignee_data["name"]
-    achievement_id = coordinator.gamification_manager.create_achievement(
-        {
-            "name": "Legacy Achievement",
-            "assigned_user_ids": [assignee_name],
-            "type": "chore_total",
-            "target_value": 5,
-            "reward_points": 20,
-        },
-        immediate_persist=True,
-    )
-    achievement_name = coordinator.achievements_data[achievement_id]["name"]
-
-    result = await hass.config_entries.options.async_init(config_entry.entry_id)
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input={OPTIONS_FLOW_INPUT_MENU_SELECTION: OPTIONS_FLOW_ACHIEVEMENTS},
-    )
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input={OPTIONS_FLOW_INPUT_MANAGE_ACTION: "edit"},
-    )
-    result = await hass.config_entries.options.async_configure(
-        result["flow_id"],
-        user_input={"entity_name": achievement_name},
-    )
-
-    assert result.get("type") == FlowResultType.FORM
-    suggested_value = _get_schema_suggested_value(
-        result["data_schema"],
-        "assigned_user_ids",
-    )
-    assert suggested_value == [assignee_id]
+    fields = {str(key) for key in result["data_schema"].schema}
+    assert fields == {
+        "name",
+        "description",
+        "achievement_labels",
+        "icon",
+        "reward_points",
+    }
+    assert _get_schema_suggested_value(result["data_schema"], "reward_points") == 15
 
 
 # =========================================================================

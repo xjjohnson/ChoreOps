@@ -54,7 +54,6 @@ if TYPE_CHECKING:
 
     from ..coordinator import ChoreOpsDataCoordinator
     from ..type_defs import (
-        AchievementData,
         AchievementProgress,
         AssigneeBadgeProgress,
         AssigneeCumulativeBadgeProgress,
@@ -411,84 +410,64 @@ class GamificationManager(BaseManager):
         for assignee_id in self.coordinator.assignees_data:
             self._mark_pending(assignee_id)
 
-    async def award_achievement(self, assignee_id: str, achievement_id: str) -> None:
-        """Award the achievement to the assignee.
+    async def award_achievement(self, assignee_id: str, achievement_id: str) -> int:
+        """Give an achievement to a person (an approver's decision, never automatic).
 
-        Update the achievement progress to indicate it is earned,
-        and send notifications to both the assignee and their approvers.
+        The same achievement can be given again; each award bumps the person's
+        count, pays the achievement's reward points and sends the notifications.
 
         Args:
             assignee_id: The internal UUID of the assignee
             achievement_id: The internal UUID of the achievement
+
+        Returns:
+            How many times the person now holds the achievement.
+
+        Raises:
+            HomeAssistantError: The achievement or the person does not exist.
         """
         achievement_info = self.coordinator.achievements_data.get(achievement_id)
         if not achievement_info:
-            const.LOGGER.error(
-                "ERROR: Achievement Award - Achievement ID '%s' not found.",
-                achievement_id,
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=const.TRANS_KEY_ERROR_NOT_FOUND,
+                translation_placeholders={
+                    "entity_type": const.LABEL_ACHIEVEMENT,
+                    "name": achievement_id,
+                },
             )
-            return
+        if assignee_id not in self.coordinator.assignees_data:
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=const.TRANS_KEY_ERROR_NOT_FOUND,
+                translation_placeholders={
+                    "entity_type": const.LABEL_ASSIGNEE,
+                    "name": assignee_id,
+                },
+            )
 
-        # Get or create the existing progress dictionary for this assignee
-        progress_for_assignee = achievement_info.setdefault(
-            const.DATA_ACHIEVEMENT_PROGRESS, {}
-        ).get(assignee_id)
-        if progress_for_assignee is None:
-            # If it doesn't exist, initialize it with baseline from the assignee's current total.
-            assignee_info: UserData | dict[str, Any] = (
-                self.coordinator.assignees_data.get(assignee_id, {})
-            )
-            # Read approved_all_time from chore_periods.all_time bucket (v43+)
-            # Cast to dict[str, Any] since chore_periods is a runtime-added bucket
-            chore_periods: dict[str, Any] = cast(
-                "dict[str, Any]",
-                assignee_info.get(const.DATA_USER_CHORE_PERIODS, {}),
-            )
-            all_time_container: dict[str, Any] = cast(
-                "dict[str, Any]",
-                chore_periods.get(const.DATA_USER_CHORE_DATA_PERIODS_ALL_TIME, {}),
-            )
-            # All-time uses nested structure: periods["all_time"]["all_time"] = {data}
-            all_time_data: dict[str, Any] = cast(
-                "dict[str, Any]", all_time_container.get(const.PERIOD_ALL_TIME, {})
-            )
-            progress_dict = {
-                const.DATA_ACHIEVEMENT_BASELINE: all_time_data.get(
-                    const.DATA_USER_CHORE_DATA_PERIOD_APPROVED, const.DEFAULT_ZERO
-                ),
-                const.DATA_ACHIEVEMENT_CURRENT_VALUE: const.DEFAULT_ZERO,
-                const.DATA_ACHIEVEMENT_AWARDED: False,
-            }
-            achievement_info[const.DATA_ACHIEVEMENT_PROGRESS][assignee_id] = cast(
-                "AchievementProgress", progress_dict
-            )
-            progress_for_assignee = cast("AchievementProgress", progress_dict)
-
-        # Type narrow: progress_for_assignee is now guaranteed to be AchievementProgress
-        progress_for_assignee_checked: AchievementProgress = progress_for_assignee
-
-        # Mark achievement as earned for the assignee
-        progress_for_assignee_checked[const.DATA_ACHIEVEMENT_AWARDED] = True
-        progress_for_assignee_checked[const.DATA_ACHIEVEMENT_CURRENT_VALUE] = (  # type: ignore[typeddict-unknown-key]
-            achievement_info.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 1)
+        entry = cast(
+            "dict[str, Any]",
+            achievement_info.setdefault(const.DATA_ACHIEVEMENT_PROGRESS, {}).setdefault(
+                assignee_id, {}
+            ),
         )
+        count = int(entry.get(const.DATA_ACHIEVEMENT_AWARD_COUNT, 0) or 0)
+        if not count and entry.get(const.DATA_ACHIEVEMENT_AWARDED):
+            count = 1  # earned before awards were counted
+        count += 1
+        entry[const.DATA_ACHIEVEMENT_AWARDED] = True
+        entry[const.DATA_ACHIEVEMENT_AWARD_COUNT] = count
+        entry[const.DATA_ACHIEVEMENT_LAST_AWARDED] = dt_now_utc_iso()
 
-        # Award the extra reward points defined in the achievement
         extra_points = achievement_info.get(
             const.DATA_ACHIEVEMENT_REWARD_POINTS, const.DEFAULT_ZERO
-        )
-
-        const.LOGGER.debug(
-            "DEBUG: Achievement Award - Achievement ID '%s' to Assignee ID '%s'",
-            achievement_info.get(const.DATA_ACHIEVEMENT_NAME),
-            assignee_id,
         )
 
         # Persist → Emit (per DEVELOPMENT_STANDARDS.md § 5.3)
         self.coordinator._persist_and_update()
 
-        # Emit event for NotificationManager to send notifications
-        # EconomyManager listens to this and handles point deposit
+        # NotificationManager notifies; EconomyManager deposits the points
         self.emit(
             const.SIGNAL_SUFFIX_ACHIEVEMENT_EARNED,
             user_id=assignee_id,
@@ -497,6 +476,7 @@ class GamificationManager(BaseManager):
             achievement_name=achievement_info.get(const.DATA_ACHIEVEMENT_NAME, ""),
             achievement_points=extra_points,
         )
+        return count
 
     async def award_challenge(self, assignee_id: str, challenge_id: str) -> None:
         """Award the challenge to the assignee.
@@ -858,15 +838,6 @@ class GamificationManager(BaseManager):
         # Evaluate each badge
         for badge_id, badge_data in badges_data.items():
             await self._evaluate_badge_for_assignee(context, badge_id, badge_data)
-
-        # Get achievement data from coordinator
-        achievements_data = self.coordinator.achievements_data
-
-        # Evaluate each achievement
-        for achievement_id, achievement_data in achievements_data.items():
-            await self._evaluate_achievement_for_assignee(
-                context, achievement_id, achievement_data
-            )
 
         challenge_count = len(self.coordinator.challenges_data)
         if challenge_count:
@@ -2776,143 +2747,6 @@ class GamificationManager(BaseManager):
         )
 
     # =========================================================================
-    # ACHIEVEMENT EVALUATION
-    # =========================================================================
-
-    async def _evaluate_achievement_for_assignee(
-        self,
-        context: EvaluationContext,
-        achievement_id: str,
-        achievement_data: AchievementData,
-    ) -> None:
-        """Evaluate a single achievement for a assignee.
-
-        Args:
-            context: The evaluation context for the assignee
-            achievement_id: Achievement internal ID
-            achievement_data: Achievement definition
-        """
-        assignee_id = context["assignee_id"]
-
-        # Check if assignee already has this achievement (awarded flag in progress)
-        achievement_progress = achievement_data.get(const.DATA_ACHIEVEMENT_PROGRESS, {})
-        assignee_progress = achievement_progress.get(assignee_id, {})
-        already_awarded = assignee_progress.get(const.DATA_ACHIEVEMENT_AWARDED, False)
-
-        if already_awarded:
-            # Achievements are permanent - no re-evaluation needed
-            return
-
-        canonical_target = self._map_achievement_to_canonical_target(
-            assignee_id,
-            achievement_id,
-            achievement_data,
-            assignee_progress,
-        )
-        runtime_context = self._build_source_runtime_context(
-            context,
-            assignee_id=assignee_id,
-            canonical_target=canonical_target,
-            current_achievement_progress=assignee_progress,
-        )
-        result = GamificationEngine.evaluate_canonical_target(
-            runtime_context,
-            entity_id=achievement_id,
-            entity_name=str(
-                achievement_data.get(const.DATA_ACHIEVEMENT_NAME, "Unknown Achievement")
-            ),
-            entity_type="achievement",
-            canonical_target=canonical_target,
-        )
-
-        # Apply result
-        await self._apply_achievement_result(
-            assignee_id, achievement_id, achievement_data, result
-        )
-
-    async def _apply_achievement_result(
-        self,
-        assignee_id: str,
-        achievement_id: str,
-        achievement_data: AchievementData,
-        result: EvaluationResult,
-    ) -> None:
-        """Apply achievement evaluation result.
-
-        Args:
-            assignee_id: Assignee's internal ID
-            achievement_id: Achievement internal ID
-            achievement_data: Achievement definition
-            result: Evaluation result from engine
-        """
-        criteria_met = result.get("criteria_met", False)
-
-        progress_changed = False
-        criterion_results = result.get("criterion_results", [])
-        current_value_raw: Any = None
-        if criterion_results and isinstance(criterion_results, list):
-            first_criterion = criterion_results[0]
-            if isinstance(first_criterion, dict):
-                current_value_raw = first_criterion.get("current_value")
-
-        if isinstance(current_value_raw, (int, float)):
-            achievement_progress = achievement_data.setdefault(
-                const.DATA_ACHIEVEMENT_PROGRESS, {}
-            )
-            assignee_progress = achievement_progress.setdefault(assignee_id, {})
-            assignee_progress_dict = cast("dict[str, Any]", assignee_progress)
-
-            if const.DATA_ACHIEVEMENT_AWARDED not in assignee_progress_dict:
-                assignee_progress_dict[const.DATA_ACHIEVEMENT_AWARDED] = False
-                progress_changed = True
-
-            achievement_type = achievement_data.get(const.DATA_ACHIEVEMENT_TYPE)
-            current_value = int(current_value_raw)
-
-            if achievement_type == const.ACHIEVEMENT_TYPE_STREAK:
-                if (
-                    assignee_progress_dict.get(const.DATA_ACHIEVEMENT_CURRENT_STREAK)
-                    != current_value
-                ):
-                    assignee_progress_dict[const.DATA_ACHIEVEMENT_CURRENT_STREAK] = (
-                        current_value
-                    )
-                    progress_changed = True
-            elif (
-                assignee_progress_dict.get(const.DATA_ACHIEVEMENT_CURRENT_VALUE)
-                != current_value
-            ):
-                assignee_progress_dict[const.DATA_ACHIEVEMENT_CURRENT_VALUE] = (
-                    current_value
-                )
-                progress_changed = True
-
-        if progress_changed and not criteria_met:
-            self.coordinator._persist_and_update()
-
-        if criteria_met:
-            const.LOGGER.info(
-                "Assignee %s unlocked achievement %s",
-                assignee_id,
-                achievement_id,
-            )
-            # Persist achievement award (handles data update + notifications)
-            await self.award_achievement(assignee_id, achievement_id)
-
-            # Emit event for any additional listeners
-            self.emit(
-                const.SIGNAL_SUFFIX_ACHIEVEMENT_EARNED,
-                user_id=assignee_id,
-                user_name=eh.get_assignee_name_by_id(self.coordinator, assignee_id)
-                or "",
-                achievement_id=achievement_id,
-                achievement_name=achievement_data.get(
-                    const.DATA_ACHIEVEMENT_NAME, "Unknown"
-                ),
-                result=result,
-            )
-
-    # =========================================================================
     # CHALLENGE EVALUATION
     # =========================================================================
 
@@ -2982,61 +2816,6 @@ class GamificationManager(BaseManager):
         await self._apply_challenge_result(
             assignee_id, challenge_id, challenge_data, result
         )
-
-    def _map_achievement_to_canonical_target(
-        self,
-        assignee_id: str,
-        achievement_id: str,
-        achievement_data: AchievementData,
-        assignee_progress: AchievementProgress | dict[str, Any],
-    ) -> CanonicalTargetDefinition:
-        """Map Achievement Item definitions to canonical target definitions."""
-        raw_type = str(achievement_data.get(const.DATA_ACHIEVEMENT_TYPE, ""))
-        canonical_type = str(
-            const.ACHIEVEMENT_TO_CANONICAL_TARGET_MAP.get(raw_type, "unknown_target")
-        )
-        source_badge_id = str(
-            achievement_data.get(const.DATA_ACHIEVEMENT_SOURCE_BADGE_ID, "")
-        )
-        assignee_data = self.coordinator.assignees_data.get(assignee_id)
-        assignee_badges_earned = (
-            assignee_data.get(const.DATA_USER_BADGES_EARNED, {})
-            if assignee_data
-            else {}
-        )
-
-        if (
-            raw_type == const.ACHIEVEMENT_TYPE_TOTAL
-            and source_badge_id
-            and source_badge_id in assignee_badges_earned
-        ):
-            canonical_type = const.CANONICAL_TARGET_TYPE_BADGE_AWARD_COUNT
-
-        mapped: CanonicalTargetDefinition = {
-            "target_type": cast("Any", canonical_type),
-            "threshold_value": float(
-                achievement_data.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 0.0)
-            ),
-            "source_entity_type": "achievement",
-            "source_item_id": achievement_id,
-            "source_raw_type": raw_type,
-            "baseline_value": float(
-                cast("Any", assignee_progress).get(const.DATA_ACHIEVEMENT_BASELINE, 0)
-            ),
-        }
-        selected_chore_id = str(
-            achievement_data.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID, "")
-        )
-        if selected_chore_id:
-            assignee_assigned_chores = self._get_assignee_assigned_chores(assignee_id)
-            mapped["tracked_chore_ids"] = (
-                [selected_chore_id]
-                if selected_chore_id in assignee_assigned_chores
-                else []
-            )
-        if source_badge_id:
-            mapped["source_badge_id"] = source_badge_id
-        return mapped
 
     def _map_challenge_to_canonical_target(
         self,
@@ -3546,32 +3325,6 @@ class GamificationManager(BaseManager):
         # Cast TypedDict to dict for engine
         badge_dict = cast("dict[str, Any]", badge_data)
         return GamificationEngine.evaluate_badge(context, badge_dict)
-
-    def dry_run_achievement(
-        self,
-        assignee_id: str,
-        achievement_id: str,
-    ) -> EvaluationResult | None:
-        """Evaluate achievement without applying results.
-
-        Args:
-            assignee_id: Assignee's internal ID
-            achievement_id: Achievement internal ID
-
-        Returns:
-            EvaluationResult or None if context/achievement not found
-        """
-        context = self._build_evaluation_context(assignee_id)
-        if not context:
-            return None
-
-        achievement_data = self.coordinator.achievements_data.get(achievement_id)
-        if not achievement_data:
-            return None
-
-        # Cast TypedDict to dict for engine
-        achievement_dict = cast("dict[str, Any]", achievement_data)
-        return GamificationEngine.evaluate_achievement(context, achievement_dict)
 
     def dry_run_challenge(
         self,

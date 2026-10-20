@@ -382,31 +382,6 @@ class TestManagerDryRunMethods:
         assert isinstance(result["overall_progress"], float)
 
     @pytest.mark.asyncio
-    async def test_dry_run_achievement_returns_result(
-        self,
-        scenario_full: SetupResult,
-    ) -> None:
-        """Test dry_run_achievement returns evaluation result."""
-        coordinator = scenario_full.coordinator
-
-        # Get first assignee and achievement
-        assignee_id = next(iter(coordinator.assignees_data.keys()))
-        achievement_id = next(iter(coordinator.achievements_data.keys()), None)
-
-        if not achievement_id:
-            pytest.skip("No achievements in scenario_full")
-
-        # Call dry_run_achievement
-        result = coordinator.gamification_manager.dry_run_achievement(
-            assignee_id, achievement_id
-        )
-
-        # Verify result structure
-        assert result is not None
-        assert "criteria_met" in result
-        assert "overall_progress" in result
-
-    @pytest.mark.asyncio
     async def test_dry_run_challenge_returns_result(
         self,
         scenario_full: SetupResult,

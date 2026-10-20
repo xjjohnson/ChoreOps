@@ -480,6 +480,16 @@ APPLY_BONUS_SCHEMA = vol.Schema(
     _with_service_target_fields(_APPROVER_ASSIGNEE_BONUS_BASE)
 )
 
+AWARD_ACHIEVEMENT_SCHEMA = vol.Schema(
+    _with_service_target_fields(
+        {
+            vol.Optional(const.SERVICE_FIELD_APPROVER_NAME): cv.string,
+            vol.Required(const.SERVICE_FIELD_USER_NAME): cv.string,
+            vol.Required(const.SERVICE_FIELD_ACHIEVEMENT_NAME): cv.string,
+        }
+    )
+)
+
 MANUAL_ADJUST_POINTS_SCHEMA = vol.All(
     vol.Schema(
         _with_service_target_fields(
@@ -3178,6 +3188,55 @@ def async_setup_services(hass: HomeAssistant):
     # BONUS SERVICE HANDLERS
     # ==========================================================================
 
+    async def handle_award_achievement(call: ServiceCall) -> dict[str, Any] | None:
+        """Give an achievement to a person (paying its reward points, if any)."""
+        entry_id = _resolve_target_entry_id(hass, dict(call.data))
+        if not entry_id:
+            const.LOGGER.warning(
+                "Award Achievement: %s", const.TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND
+            )
+            return None
+
+        coordinator = _get_coordinator_by_entry_id(hass, entry_id)
+        assignee_id = get_item_id_or_raise(
+            coordinator,
+            const.ITEM_TYPE_USER,
+            call.data[const.SERVICE_FIELD_USER_NAME],
+            role=const.ROLE_ASSIGNEE,
+        )
+        achievement_id = get_item_id_or_raise(
+            coordinator,
+            const.ITEM_TYPE_ACHIEVEMENT,
+            call.data[const.SERVICE_FIELD_ACHIEVEMENT_NAME],
+        )
+
+        user_id = call.context.user_id
+        if user_id and not await is_user_authorized_for_action(
+            hass,
+            user_id,
+            AUTH_ACTION_MANAGEMENT,
+        ):
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=const.TRANS_KEY_ERROR_NOT_AUTHORIZED_ACTION,
+                translation_placeholders={
+                    "action": const.ERROR_ACTION_AWARD_ACHIEVEMENTS
+                },
+            )
+
+        count = await coordinator.gamification_manager.award_achievement(
+            assignee_id, achievement_id
+        )
+        return {"times_awarded": count}
+
+    hass.services.async_register(
+        const.DOMAIN,
+        const.SERVICE_AWARD_ACHIEVEMENT,
+        handle_award_achievement,
+        schema=AWARD_ACHIEVEMENT_SCHEMA,
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+
     async def handle_apply_bonus(call: ServiceCall):
         """Handle applying a bonus."""
         entry_id = _resolve_target_entry_id(hass, dict(call.data))
@@ -4223,6 +4282,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         const.SERVICE_DISAPPROVE_REWARD,
         const.SERVICE_APPLY_PENALTY,
         const.SERVICE_APPLY_BONUS,
+        const.SERVICE_AWARD_ACHIEVEMENT,
         const.SERVICE_MANUAL_ADJUST_POINTS,
         const.SERVICE_APPROVE_REWARD,
         *POOL_SERVICE_NAMES,

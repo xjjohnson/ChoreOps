@@ -1779,6 +1779,8 @@ DATA_LEDGER_ITEM_NAME: Final = "item_name"
 # ACHIEVEMENTS
 DATA_ACHIEVEMENT_ASSIGNED_USER_IDS: Final = "assigned_user_ids"
 DATA_ACHIEVEMENT_AWARDED: Final = "awarded"
+DATA_ACHIEVEMENT_AWARD_COUNT: Final = "award_count"
+DATA_ACHIEVEMENT_LAST_AWARDED: Final = "last_awarded"
 DATA_ACHIEVEMENT_BASELINE: Final = "baseline"
 DATA_ACHIEVEMENT_CRITERIA: Final = "criteria"
 DATA_ACHIEVEMENT_CURRENT_STREAK: Final = "current_streak"
@@ -3046,6 +3048,7 @@ ISO_DATE_STRING_LENGTH: Final = 10
 # Services
 # ------------------------------------------------------------------------------------------------
 SERVICE_APPLY_BONUS: Final = "apply_bonus"
+SERVICE_AWARD_ACHIEVEMENT: Final = "award_achievement"
 SERVICE_APPLY_PENALTY: Final = "apply_penalty"
 SERVICE_MANUAL_ADJUST_POINTS: Final = "manual_adjust_points"
 SERVICE_APPROVE_CHORE: Final = "approve_chore"
@@ -3263,6 +3266,7 @@ SERVICE_FIELD_REWARD_CRUD_POOL_CHIP_IN: Final = "pool_chip_in"
 SERVICE_FIELD_PENALTY_NAME: Final = "penalty_name"
 
 # Bonus service fields
+SERVICE_FIELD_ACHIEVEMENT_NAME: Final = "achievement_name"
 SERVICE_FIELD_BONUS_NAME: Final = "bonus_name"
 
 # Badge service fields
@@ -3592,6 +3596,7 @@ ERROR_ACTION_APPROVE_REWARDS: Final = "approve_rewards"
 ERROR_ACTION_DISAPPROVE_REWARDS: Final = "disapprove_rewards"
 ERROR_ACTION_APPLY_PENALTIES: Final = "apply_penalties"
 ERROR_ACTION_APPLY_BONUSES: Final = "apply_bonuses"
+ERROR_ACTION_AWARD_ACHIEVEMENTS: Final = "award_achievements"
 ERROR_ACTION_ADJUST_POINTS: Final = "adjust_points"
 ERROR_ACTION_REMOVE_BADGES: Final = "remove_badges"
 ERROR_ACTION_REPAIR_BADGE_STREAK: Final = "repair_badge_streak"

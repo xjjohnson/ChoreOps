@@ -215,7 +215,10 @@ def _build_runtime_template_env(
     env = jinja2.Environment(undefined=jinja2.StrictUndefined)
     env.filters["expand"] = expand_filter
     env.filters["bool"] = bool_filter
-    env.filters["combine"] = lambda value, *others, **_kw: {**value, **{k: v for o in others for k, v in o.items()}}
+    env.filters["combine"] = lambda value, *others, **_kw: {
+        **value,
+        **{k: v for o in others for k, v in o.items()},
+    }
     env.tests["search"] = lambda value, pattern: (
         __import__("re").search(pattern, value) is not None
     )
@@ -937,8 +940,13 @@ def test_admin_chore_management_shows_selector_when_expanded() -> None:
         "entity_id": "select.alice_chores",
         "option": "Wash Dishes (Alice)",
     }
-    assert "Overdue" in grid["cards"][1]["label"] or "overdue" in grid["cards"][1]["label"]
-    assert "err-" not in grid["cards"][2]["label"] or "Not assigned" in grid["cards"][2]["label"]
+    assert (
+        "Overdue" in grid["cards"][1]["label"] or "overdue" in grid["cards"][1]["label"]
+    )
+    assert (
+        "err-" not in grid["cards"][2]["label"]
+        or "Not assigned" in grid["cards"][2]["label"]
+    )
 
 
 def _render_chore_management(selected: str, options: list[str], items, state="pending"):
@@ -974,8 +982,16 @@ def test_admin_chore_names_with_parentheses_still_resolve() -> None:
     only the trailing list of user names is treated as the assignee suffix."""
 
     items = [
-        {"name": "Evening tidy-up (10 min)", "eid": "sensor.alice_chore_eve", "state": "pending"},
-        {"name": "Plain (10 min)", "eid": "sensor.alice_chore_plain", "state": "overdue"},
+        {
+            "name": "Evening tidy-up (10 min)",
+            "eid": "sensor.alice_chore_eve",
+            "state": "pending",
+        },
+        {
+            "name": "Plain (10 min)",
+            "eid": "sensor.alice_chore_plain",
+            "state": "overdue",
+        },
     ]
     options = [
         "None",
@@ -986,7 +1002,9 @@ def test_admin_chore_names_with_parentheses_still_resolve() -> None:
     chips = picker[0]["cards"][1]["cards"]
     assert [c["name"] for c in chips] == ["Evening tidy-up (10 min)", "Plain (10 min)"]
     assert all(c["label"].strip() for c in chips)
-    assert chips[0]["tap_action"]["data"]["option"] == "Evening tidy-up (10 min) (Alice)"
+    assert (
+        chips[0]["tap_action"]["data"]["option"] == "Evening tidy-up (10 min) (Alice)"
+    )
 
     detail = _render_chore_management(
         "Evening tidy-up (10 min) (Alice)", options, items
@@ -1054,7 +1072,11 @@ def test_admin_all_chores_card_only_shows_when_tile_opens_it() -> None:
         selected_dashboard_helper="sensor.alice_dashboard_helper",
         chore_selector_state="None",
         chore_items=[
-            {"name": "Wash Dishes", "eid": "sensor.alice_chore_wash", "state": "pending"}
+            {
+                "name": "Wash Dishes",
+                "eid": "sensor.alice_chore_wash",
+                "state": "pending",
+            }
         ],
         selected_user_ui_control={
             "admin-shared": {"chore-management": {"header-collapse": False}}
@@ -1214,6 +1236,7 @@ def test_admin_peruser_chore_management_resolves_selected_shard_backed_chore() -
     assert overview is not None
     assert overview.get("entity") == "sensor.alice_chore_wash_dishes"
     assert overview.get("name") == "Wash Dishes"
+
 
 def test_user_chores_template_renders_with_button_card_templates() -> None:
     """User chores template renders as full dashboard with root templates."""
@@ -1413,7 +1436,9 @@ def test_user_family_hub_template_renders_without_parse_errors() -> None:
         "shared/button_card_template_chore_row_kids_v1.yaml",
         "shared/button_card_template_chore_row_timeline_v1.yaml",
     ]
-    assets = {"templates/user-family-hub-v1.yaml": _read_template("user-family-hub-v1.yaml")}
+    assets = {
+        "templates/user-family-hub-v1.yaml": _read_template("user-family-hub-v1.yaml")
+    }
     for name in names:
         assets[f"templates/{name}"] = _read_template(name)
     template_str = dh.compile_prepared_template_assets(assets)[
@@ -1474,9 +1499,11 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
     assert len(autos) == 5
     for card in autos:
         env.parse(card["filter"]["template"])
-        assert '["Dad", "Lily"]' in card["filter"]["template"] or "Achievements" in str(
-            card["filter"]["template"]
-        ) or "family_total" in card["filter"]["template"]
+        assert (
+            '["Dad", "Lily"]' in card["filter"]["template"]
+            or "Achievements" in str(card["filter"]["template"])
+            or "family_total" in card["filter"]["template"]
+        )
     assert "family-hub-" in autos[1]["filter"]["template"]
     assert "user-family-home-v1" not in dh.get_assignee_template_ids()
     assert "user-family-home-v1" not in dh.get_admin_template_ids()
@@ -1523,6 +1550,7 @@ def _render_quick_actions(
     tab: str,
     open_state: dict[str, object] | None = None,
     helper_attrs: dict[str, object] | None = None,
+    extra_states: dict[str, _MockState] | None = None,
 ):
     template = _get_admin_filter_template(
         "admin-shared-family-hub-v1", "===== QUICK ACTIONS ====="
@@ -1532,15 +1560,22 @@ def _render_quick_actions(
         selected_dashboard_helper="sensor.alice_dashboard_helper",
         chore_selector_state="None",
         chore_items=[
-            {"name": "Wash Dishes", "eid": "sensor.alice_chore_wash", "state": "overdue"},
+            {
+                "name": "Wash Dishes",
+                "eid": "sensor.alice_chore_wash",
+                "state": "overdue",
+            },
             {"name": "Feed Dog", "eid": "sensor.alice_chore_dog", "state": "pending"},
         ],
         shared_admin_ui_control={
             "admin-shared": {"management-tab": tab, "quick-actions": open_state or {}}
         },
     )
-    mock_states["sensor.alice_dashboard_helper"].attributes["gamification_enabled"] = True
+    mock_states["sensor.alice_dashboard_helper"].attributes["gamification_enabled"] = (
+        True
+    )
     mock_states["sensor.alice_dashboard_helper"].attributes.update(helper_attrs or {})
+    mock_states.update(extra_states or {})
     env, integration_entities, states, state_attr = _build_runtime_template_env(
         mock_states
     )
@@ -1612,8 +1647,18 @@ def test_admin_quick_actions_chores_tab_tiles_and_skip_list() -> None:
 
 
 _ECON_BONUSES = [
-    {"eid": "button.alice_bonus_good", "name": "Good Attitude", "points": 5, "applied": 2},
-    {"eid": "button.alice_bonus_praise", "name": "Praised", "points": 100, "applied": 0},
+    {
+        "eid": "button.alice_bonus_good",
+        "name": "Good Attitude",
+        "points": 5,
+        "applied": 2,
+    },
+    {
+        "eid": "button.alice_bonus_praise",
+        "name": "Praised",
+        "points": 100,
+        "applied": 0,
+    },
 ]
 _ECON_PENALTIES = [
     {"eid": "button.alice_pen_argue", "name": "Argued", "points": -5, "applied": 1},
@@ -1628,7 +1673,12 @@ def test_admin_economy_tab_shows_balance_tabs_and_bonuses_by_default() -> None:
     )
     assert "Available" in eco[0]["custom_fields"]["content"]
     seg = eco[1]["cards"]
-    assert [c["name"] for c in seg] == ["Bonuses", "Penalties", "Points"]
+    assert [c["name"] for c in seg] == [
+        "Bonuses",
+        "Penalties",
+        "Points",
+        "Achievements",
+    ]
     assert seg[0]["styles"]["card"][-1]["background"] == "var(--primary-color)"
     assert seg[1]["tap_action"]["data"] == {
         "config_entry_id": "entry-123",
@@ -1694,7 +1744,9 @@ def test_admin_economy_tab_empty_lists_show_a_hint() -> None:
 
     eco = _render_quick_actions("economy", None, {})
     assert eco[2]["cards"][0]["name"] == "No bonuses set up yet"
-    eco = _render_quick_actions("economy", {"econ-tab": "points"}, {"points_buttons": []})
+    eco = _render_quick_actions(
+        "economy", {"econ-tab": "points"}, {"points_buttons": []}
+    )
     assert eco[2]["cards"][0]["name"] == "No point amounts set up in settings"
 
 
@@ -1705,9 +1757,7 @@ def test_admin_quick_actions_system_tab_tools_and_links() -> None:
         {"name": "Gold Star", "earned": True},
         {"name": "Early Bird", "earned": False},
     ]
-    system = _render_quick_actions(
-        "system", {"badge-open": True}, {"badges": badges}
-    )
+    system = _render_quick_actions("system", {"badge-open": True}, {"badges": badges})
     assert "FIX-IT TOOLS" in system[0]["name"]
     assert [t["name"] for t in system[1]["cards"]] == ["Remove badge", "Repair streak"]
     assert "FAMILY-WIDE" in system[2]["name"]
@@ -1809,9 +1859,9 @@ def _render_home_card(marker: str, mock_states: dict[str, _MockState]):
     env.filters["slugify"] = lambda v: str(v).lower().replace(" ", "_")
     env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 19, 12, 0)
     env.filters["round"] = env.filters["round"]
-    env.globals["as_timestamp"] = lambda v: __import__("datetime").datetime.fromisoformat(
-        str(v)
-    ).timestamp()
+    env.globals["as_timestamp"] = lambda v: (
+        __import__("datetime").datetime.fromisoformat(str(v)).timestamp()
+    )
     output = env.from_string(tpl).render(
         integration_entities=integration_entities,
         states=states,
@@ -1982,12 +2032,17 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     for section in rendered["views"][0]["sections"]:
         for outer in section["cards"]:
             for card in outer.get("cards", []):
-                if "RECENT ACTIVITY CARD" in str(card.get("filter", {}).get("template", "")):
+                if "RECENT ACTIVITY CARD" in str(
+                    card.get("filter", {}).get("template", "")
+                ):
                     tpl = card["filter"]["template"]
     assert tpl is not None
-    assert rendered["views"][0]["sections"][-1]["cards"][-1]["cards"][0][
-        "filter"
-    ]["template"] == tpl
+    assert (
+        rendered["views"][0]["sections"][-1]["cards"][-1]["cards"][0]["filter"][
+            "template"
+        ]
+        == tpl
+    )
 
     mock_states = {
         "sensor.lily_helper": _MockState(
@@ -2033,3 +2088,215 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     html = parsed[0]["custom_fields"]["content"]
     assert "Dishes" in html and "+10" in html and "Today" in html
     assert "Late" in html and "Yesterday" in html and "-2" in html
+
+
+def test_admin_economy_achievements_tab_gives_achievement_to_selected_user() -> None:
+    """Achievements tab: one gold tile per achievement; tapping gives it by name."""
+
+    def ach(eid: str, name: str, points: float, count: int) -> _MockState:
+        return _MockState(
+            entity_id=eid,
+            state=str(count),
+            attributes={
+                "achievement_name": name,
+                "reward_points": points,
+                "award_count": count,
+                "icon": "mdi:trophy",
+            },
+            name=name,
+        )
+
+    eco = _render_quick_actions(
+        "economy",
+        {"econ-tab": "achievements"},
+        {
+            "achievements": [
+                {"eid": "sensor.alice_ach_kitchen", "name": "Kitchen Hero"},
+                {"eid": "sensor.alice_ach_help", "name": "Helped a Sibling"},
+            ]
+        },
+        {
+            "sensor.alice_ach_kitchen": ach(
+                "sensor.alice_ach_kitchen", "Kitchen Hero", 20, 3
+            ),
+            "sensor.alice_ach_help": ach(
+                "sensor.alice_ach_help", "Helped a Sibling", 0, 0
+            ),
+        },
+    )
+    seg = eco[1]["cards"]
+    assert [c["name"] for c in seg] == [
+        "Bonuses",
+        "Penalties",
+        "Points",
+        "Achievements",
+    ]
+    assert seg[3]["styles"]["card"][-1]["background"] == "var(--primary-color)"
+    rows = eco[2]["cards"]
+    assert [r["name"] for r in rows] == ["Kitchen Hero", "Helped a Sibling"]
+    assert rows[0]["label"] == "+20 pts · given 3×"
+    assert rows[1]["label"] == "no points · given 0×"
+    tap = rows[0]["tap_action"]
+    assert tap["service"] == "choreops.award_achievement"
+    assert tap["data"] == {
+        "config_entry_id": "entry-123",
+        "user_name": "Alice",
+        "achievement_name": "Kitchen Hero",
+    }
+    assert "Alice" in tap["confirmation"]["text"]
+    assert "#d4a017" in rows[0]["styles"]["card"][3]["border"]
+
+
+def _hub_card_template(marker: str) -> str:
+    """Return the inner template of the Family Hub card containing marker."""
+    template_str = _read_template("user-family-hub-v1.yaml")
+    context = dh.build_dashboard_context(
+        "Lily",
+        assignee_id="user-lily",
+        integration_entry_id="entry-123",
+        template_profile="user-family-hub-v1",
+        release_ref="0.0.1-beta.3",
+        generated_at="2026-10-19T00:00:00+00:00",
+    )
+    rendered = builder.render_dashboard_template(template_str, context)
+    found: list[str] = []
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            tpl = (
+                node.get("filter", {}).get("template")
+                if isinstance(node.get("filter"), dict)
+                else None
+            )
+            if isinstance(tpl, str) and marker in tpl:
+                found.append(tpl)
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(rendered["views"][0]["sections"])
+    assert found, marker
+    return found[0]
+
+
+def _render_hub_card(
+    tpl: str, helper_attrs: dict[str, object], extra: dict[str, _MockState]
+):
+    import datetime as _dt
+
+    mock_states = {
+        "sensor.lily_helper": _MockState(
+            entity_id="sensor.lily_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "dashboard_lookup_key": "entry-123:user-lily",
+                "user_name": "Lily",
+                "dashboard_helpers": {},
+                "gamification_enabled": True,
+                **helper_attrs,
+            },
+            name="Lily helper",
+        ),
+        **extra,
+    }
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+    env.globals["now"] = lambda: _dt.datetime(2026, 10, 19, 13, 0)
+    env.globals["as_datetime"] = lambda v: _dt.datetime.fromisoformat(str(v))
+    env.globals["as_timestamp"] = lambda v: 0
+    env.filters["as_local"] = lambda v: v
+    output = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+        pref_points_precision="fixed_0",
+    )
+    return output
+
+
+def _achievement_state(eid: str, name: str, count: int, last: str, points: float = 5):
+    return _MockState(
+        entity_id=eid,
+        state=str(count),
+        attributes={
+            "achievement_name": name,
+            "icon": "mdi:trophy",
+            "description": f"{name} description",
+            "reward_points": points,
+            "award_count": count,
+            "awarded": count > 0,
+            "last_awarded": last,
+        },
+        name=name,
+    )
+
+
+def test_family_hub_achievements_tab_shows_gold_badges_and_dims_unearned() -> None:
+    """Earned achievements get the gold frame and a x-count; unearned are dimmed."""
+    tpl = _hub_card_template("gamification/achievements")
+    output = _render_hub_card(
+        tpl,
+        {
+            "achievements": [
+                {"eid": "sensor.lily_ach_a", "name": "Kitchen Hero"},
+                {"eid": "sensor.lily_ach_b", "name": "Honor Roll"},
+                {"eid": "sensor.lily_ach_c", "name": "Not Yet"},
+            ]
+        },
+        {
+            "sensor.lily_ach_a": _achievement_state(
+                "sensor.lily_ach_a", "Kitchen Hero", 3, "2026-10-18T10:00:00"
+            ),
+            "sensor.lily_ach_b": _achievement_state(
+                "sensor.lily_ach_b", "Honor Roll", 1, "2026-10-19T09:00:00"
+            ),
+            "sensor.lily_ach_c": _achievement_state(
+                "sensor.lily_ach_c", "Not Yet", 0, ""
+            ),
+        },
+    )
+    parsed = yaml.safe_load(f"[{output}]")
+    achievement_cards = [
+        c for c in parsed if c.get("entity", "").startswith("sensor.lily_ach_")
+    ]
+    # Newest earned first, then earned, then unearned
+    assert [c["entity"] for c in achievement_cards] == [
+        "sensor.lily_ach_b",
+        "sensor.lily_ach_a",
+        "sensor.lily_ach_c",
+    ]
+    earned = achievement_cards[0]["styles"]["card"]
+    assert any("#d4a017" in str(rule.get("border", "")) for rule in earned)
+    assert "×3" in achievement_cards[1]["custom_fields"]["content"]
+    unearned = achievement_cards[2]["styles"]["card"]
+    assert any(rule.get("opacity") == "0.6" for rule in unearned)
+
+
+def test_family_hub_showcase_lists_earned_achievements_as_gold_tiles() -> None:
+    """The showcase card shows earned achievements only, newest first, with x-count."""
+    tpl = _hub_card_template("ach_ns")
+    output = _render_hub_card(
+        tpl,
+        {
+            "achievements": [
+                {"eid": "sensor.lily_ach_a", "name": "Kitchen Hero"},
+                {"eid": "sensor.lily_ach_c", "name": "Not Yet"},
+            ]
+        },
+        {
+            "sensor.lily_ach_a": _achievement_state(
+                "sensor.lily_ach_a", "Kitchen Hero", 2, "2026-10-18T10:00:00"
+            ),
+            "sensor.lily_ach_c": _achievement_state(
+                "sensor.lily_ach_c", "Not Yet", 0, ""
+            ),
+        },
+    )
+    assert "Kitchen Hero" in output
+    assert "×2" in output
+    assert "#d4a017" in output
+    assert "Not Yet" not in output

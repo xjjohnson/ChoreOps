@@ -392,19 +392,13 @@
       },
       "achievements": {
         "title": "Define Achievement",
-        "description": "Enter details for each achievement.",
+        "description": "An achievement is given by hand, never automatically. Give it from the Economy tab or with the award_achievement service.",
         "data": {
           "name": "Achievement Name",
           "description": "Description (optional)",
-          "achievement_labels": "Achievement Labels",
+          "achievement_labels": "Labels (optional)",
           "icon": "Icon (mdi:xxx)",
-          "assigned_user_ids": "Assigned to",
-          "type": "Type of Achievement",
-          "selected_chore_id": "Select Chore Associated",
-          "criteria": "Criteria (optional)",
-          "target_value": "Achievement Target",
-          "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID"
+          "reward_points": "Points paid each time it is given"
         }
       },
       "challenge_count": {
@@ -1015,20 +1009,17 @@
         }
       },
       "add_achievement": {
-        "title": "Define Achievement",
-        "description": "Enter details for each achievement.\n\n ℹ️ [Configuration Guide]({documentation_url})",
+        "title": "Add Achievement",
+        "description": "An achievement is given by hand, never automatically. Give it from the Economy tab or with the award_achievement service.\n\n ℹ️ [Configuration Guide]({documentation_url})",
         "data": {
           "name": "Achievement Name",
           "description": "Description (optional)",
-          "achievement_labels": "Achievement Labels",
+          "achievement_labels": "Labels (optional)",
           "icon": "Icon (mdi:xxx)",
-          "assigned_user_ids": "Assigned to",
-          "type": "Type of Achievement",
-          "selected_chore_id": "Select Chore Associated",
-          "criteria": "Criteria (optional)",
-          "target_value": "Achievement Target",
-          "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID"
+          "reward_points": "Points paid each time it is given"
+        },
+        "data_description": {
+          "reward_points": "Paid to the person every time you give them this achievement. Use 0 for none."
         }
       },
       "add_challenge": {
@@ -1518,20 +1509,17 @@
         }
       },
       "edit_achievement": {
-        "title": "Define Achievement",
-        "description": "Enter details for each achievement.\n\n ℹ️ [Configuration Guide]({documentation_url})",
+        "title": "Edit Achievement",
+        "description": "An achievement is given by hand, never automatically. Give it from the Economy tab or with the award_achievement service.\n\n ℹ️ [Configuration Guide]({documentation_url})",
         "data": {
           "name": "Achievement Name",
           "description": "Description (optional)",
-          "achievement_labels": "Achievement Labels",
+          "achievement_labels": "Labels (optional)",
           "icon": "Icon (mdi:xxx)",
-          "assigned_user_ids": "Assigned to",
-          "type": "Type of Achievement",
-          "selected_chore_id": "Select Chore Associated",
-          "criteria": "Criteria (optional)",
-          "target_value": "Achievement Target",
-          "reward_points": "Extra Points for Completing Achievement",
-          "internal_id": "Internal ID"
+          "reward_points": "Points paid each time it is given"
+        },
+        "data_description": {
+          "reward_points": "Paid to the person every time you give them this achievement. Use 0 for none."
         }
       },
       "edit_challenge": {
@@ -3694,6 +3682,37 @@
           "name": "User Name (Optional)",
           "description": "Refund only this user's share and leave everyone else's points in the pool. Leave empty to cancel the pool and refund everyone.",
           "example": "Zoë"
+        }
+      }
+    },
+    "award_achievement": {
+      "name": "Award Achievement",
+      "description": "An approver gives an achievement to someone. Any reward points are paid right away and they get a notification.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Config Entry ID (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup. It targets one specific setup.",
+          "example": "abc123def456"
+        },
+        "config_entry_title": {
+          "name": "Config Entry Name (Optional)",
+          "description": "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID.",
+          "example": "Family Chores"
+        },
+        "approver_name": {
+          "name": "Approver Name (Optional)",
+          "description": "The approver giving the achievement.",
+          "example": "Mom"
+        },
+        "user_name": {
+          "name": "User Name",
+          "description": "The user receiving the achievement.",
+          "example": "Alice"
+        },
+        "achievement_name": {
+          "name": "Achievement Name",
+          "description": "The name of the achievement to give.",
+          "example": "Kitchen Hero"
         }
       }
     }

@@ -106,7 +106,6 @@ from .sensor_legacy import (
 )
 from .type_defs import (
     AchievementData,
-    AchievementProgress,
     AssigneeData,
     BadgeData,
     ChallengeData,
@@ -403,27 +402,24 @@ async def async_setup_entry(
             assignee_id,
         ):
             for achievement_id, achievement in coordinator.achievements_data.items():
-                if assignee_id in achievement.get(
-                    const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
-                ):
-                    achievement_name = get_item_name_or_log_error(
-                        "achievement",
+                achievement_name = get_item_name_or_log_error(
+                    "achievement",
+                    achievement_id,
+                    achievement,
+                    const.DATA_ACHIEVEMENT_NAME,
+                )
+                if not achievement_name:
+                    continue
+                entities.append(
+                    AssigneeAchievementProgressSensor(
+                        coordinator,
+                        entry,
+                        assignee_id,
+                        assignee_name,
                         achievement_id,
-                        achievement,
-                        const.DATA_ACHIEVEMENT_NAME,
+                        achievement_name,
                     )
-                    if not achievement_name:
-                        continue
-                    entities.append(
-                        AssigneeAchievementProgressSensor(
-                            coordinator,
-                            entry,
-                            assignee_id,
-                            assignee_name,
-                            achievement_id,
-                            achievement_name,
-                        )
-                    )
+                )
 
         # Highest Streak Sensor per Assignee (EXTRA requirement)
         if should_create_entity_for_user_assignee(
@@ -3173,16 +3169,33 @@ class AssigneeRewardStatusSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         return reward_info.get(const.DATA_REWARD_ICON) or None
 
 
+def _achievement_award_count(entry: Any) -> int:
+    """Return how many times an achievement was given (older awards count as 1)."""
+    if not isinstance(entry, dict):
+        return 0
+    count = int(entry.get(const.DATA_ACHIEVEMENT_AWARD_COUNT, 0) or 0)
+    if count == 0 and entry.get(const.DATA_ACHIEVEMENT_AWARDED):
+        return 1
+    return count
+
+
+def _achievement_labels(hass: Any, achievement: Any) -> list[Any]:
+    """Return friendly label details for an achievement."""
+    if hass is None:
+        return []
+    return [
+        get_friendly_label(hass, label)
+        for label in cast("list", achievement.get(const.DATA_ACHIEVEMENT_LABELS, []))
+    ]
+
+
 # ------------------------------------------------------------------------------------------
 class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
     """Sensor representing an achievement.
 
-    Provides system-wide achievement definition and tracks aggregated progress
-    across all assigned assignees as a percentage (0-100). Supports three achievement
-    types: TOTAL (cumulative completions with baselines), STREAK (consecutive
-    completions), and DAILY_MIN (minimum daily requirements). Includes achievement
-    metadata such as target values, reward points, criteria, associated chore,
-    and list of assignees who have earned the achievement.
+    An achievement is given by an approver, never earned automatically. The state
+    is how many times it has been given across everyone; attributes list who holds
+    it and how many times.
     """
 
     _attr_has_entity_name = True
@@ -3195,269 +3208,61 @@ class SystemAchievementSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         achievement_id: str,
         achievement_name: str,
     ):
-        """Initialize the SystemAchievementSensor.
-
-        Args:
-            coordinator: ChoreOpsDataCoordinator instance for data access.
-            entry: ConfigEntry for this integration instance.
-            achievement_id: Unique identifier for the achievement.
-            achievement_name: Display name of the achievement.
-        """
+        """Initialize the SystemAchievementSensor."""
         super().__init__(coordinator)
         self._entry = entry
         self._achievement_id = achievement_id
         self._achievement_name = achievement_name
         self._attr_unique_id = f"{entry.entry_id}_{achievement_id}{const.SENSOR_KC_UID_SUFFIX_ACHIEVEMENT_SENSOR}"
-        self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_translation_placeholders = {
             const.TRANS_KEY_SENSOR_ATTR_ACHIEVEMENT_NAME: achievement_name,
         }
-        self._attr_device_info = create_system_device_info(entry)
-        # Moving to HA native best practice: auto-generate entity_id from unique_id + has_entity_name
-        # rather than manually constructing to support HA core change 01309191283 (Jan 14, 2026)
-        # self.entity_id = f"{const.SENSOR_KC_PREFIX}{const.SENSOR_KC_EID_MIDFIX_ACHIEVEMENT_SENSOR}{achievement_name}"
 
-    @property
-    def native_value(self) -> Any:
-        """Return the overall progress percentage toward the achievement."""
-
-        achievement: AchievementData = cast(
+    def _achievement(self) -> AchievementData:
+        return cast(
             "AchievementData",
             self.coordinator.achievements_data.get(self._achievement_id, {}),
         )
-        target = achievement.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 1)
-        assigned_assignees = achievement.get(
-            const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
-        )
 
-        if not assigned_assignees:
-            return const.DEFAULT_ZERO
+    def _holders(self) -> dict[str, int]:
+        """Return award count per person name (people who hold it at least once)."""
+        holders: dict[str, int] = {}
+        for assignee_id, entry in (
+            self._achievement().get(const.DATA_ACHIEVEMENT_PROGRESS, {}).items()
+        ):
+            count = _achievement_award_count(entry)
+            if count > 0:
+                name = get_assignee_name_by_id(self.coordinator, assignee_id)
+                if name:
+                    holders[name] = count
+        return holders
 
-        ach_type = achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-        if ach_type == const.ACHIEVEMENT_TYPE_TOTAL:
-            total_current = const.DEFAULT_ZERO
-            total_effective_target = const.DEFAULT_ZERO
-            selected_chore_id = achievement.get(
-                const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID
-            )
-
-            for assignee_id in assigned_assignees:
-                progress_data: AchievementProgress = achievement.get(
-                    const.DATA_ACHIEVEMENT_PROGRESS, {}
-                ).get(assignee_id, {})
-                baseline = (
-                    progress_data.get(
-                        const.DATA_ACHIEVEMENT_BASELINE, const.DEFAULT_ZERO
-                    )
-                    if isinstance(progress_data, dict)
-                    else const.DEFAULT_ZERO
-                )
-                # v43+: chore_stats deleted, use chore_periods.all_time.all_time (nested)
-                # For scoped achievements (selected chore), read the chore-scoped
-                # all-time total so the progress bar matches the evaluation engine
-                # (issue #245). Unscoped achievements keep the global bucket.
-                if selected_chore_id:
-                    scoped_all_time = self.coordinator.statistics_manager.get_badge_scoped_all_time_stats(
-                        assignee_id,
-                        [selected_chore_id],
-                    )
-                    current_total = scoped_all_time.get(
-                        const.DATA_USER_CHORE_DATA_PERIOD_APPROVED,
-                        const.DEFAULT_ZERO,
-                    )
-                else:
-                    assignee_data = cast(
-                        "AssigneeData",
-                        self.coordinator.assignees_data.get(assignee_id, {}),
-                    )
-                    chore_periods = assignee_data.get(const.DATA_USER_CHORE_PERIODS, {})
-                    all_time_container: dict[str, Any] = cast(
-                        "dict[str, Any]",
-                        chore_periods.get(
-                            const.DATA_USER_CHORE_DATA_PERIODS_ALL_TIME, {}
-                        ),
-                    )
-                    all_time_bucket: dict[str, Any] = cast(
-                        "dict[str, Any]",
-                        all_time_container.get(const.PERIOD_ALL_TIME, {}),
-                    )
-                    current_total = all_time_bucket.get(
-                        const.DATA_USER_CHORE_DATA_PERIOD_APPROVED,
-                        const.DEFAULT_ZERO,
-                    )
-                # Baseline guard: mirror the evaluation engine so a global baseline
-                # that exceeds the scoped total does not clamp display to 0.
-                if float(cast("Any", baseline)) > int(current_total):
-                    baseline = const.DEFAULT_ZERO
-                total_current += int(current_total)
-                total_effective_target += baseline + target  # type: ignore[operator]
-
-            percent = (
-                (int(total_current) / total_effective_target * 100)
-                if total_effective_target > const.DEFAULT_ZERO
-                else const.DEFAULT_ZERO
-            )
-
-        elif ach_type == const.ACHIEVEMENT_TYPE_STREAK:
-            total_current = const.DEFAULT_ZERO
-
-            for assignee_id in assigned_assignees:
-                progress_data_2: AchievementProgress = achievement.get(
-                    const.DATA_ACHIEVEMENT_PROGRESS, {}
-                ).get(assignee_id, {})
-                total_current += (
-                    progress_data_2.get(
-                        const.DATA_ACHIEVEMENT_CURRENT_STREAK, const.DEFAULT_ZERO
-                    )
-                    if isinstance(progress_data_2, dict)
-                    else const.DEFAULT_ZERO
-                )
-
-            global_target = target * len(assigned_assignees)
-
-            percent = (
-                (total_current / global_target * 100)
-                if global_target > const.DEFAULT_ZERO
-                else const.DEFAULT_ZERO
-            )
-
-        elif ach_type == const.ACHIEVEMENT_TYPE_DAILY_MIN:
-            total_progress = const.DEFAULT_ZERO
-
-            for assignee_id in assigned_assignees:
-                # Use Phase 7.5 cache API for temporal stats (not storage)
-                cache_stats = self.coordinator.statistics_manager.get_chore_stats(
-                    assignee_id
-                )
-                daily = cache_stats.get(
-                    const.PRES_USER_CHORES_APPROVED_TODAY, const.DEFAULT_ZERO
-                )
-                assignee_progress = (
-                    100
-                    if daily >= target
-                    else (daily / target * 100)
-                    if target > const.DEFAULT_ZERO
-                    else const.DEFAULT_ZERO
-                )
-                total_progress += assignee_progress
-
-            percent = total_progress / len(assigned_assignees)
-
-        else:
-            percent = const.DEFAULT_ZERO
-
-        return min(100, round(percent, const.DATA_FLOAT_PRECISION))
+    @property
+    def native_value(self) -> int:
+        """Return how many times the achievement has been given in total."""
+        return sum(self._holders().values())
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes for this achievement."""
-        achievement: AchievementData = cast(
-            "AchievementData",
-            self.coordinator.achievements_data.get(self._achievement_id, {}),
-        )
-        progress = achievement.get(const.DATA_ACHIEVEMENT_PROGRESS, {})
-        assignees_progress = {}
-
-        earned_by = []
-        for assignee_id, data in progress.items():
-            if data.get(const.DATA_ACHIEVEMENT_AWARDED, False):
-                assignee_name = (
-                    get_assignee_name_by_id(self.coordinator, assignee_id)
-                    or assignee_id
-                )
-                earned_by.append(assignee_name)
-
-        associated_chore = const.SENTINEL_EMPTY
-        selected_chore_id = achievement.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID)
-        if selected_chore_id:
-            associated_chore = (
-                cast(
-                    "ChoreData", self.coordinator.chores_data.get(selected_chore_id, {})
-                ).get(const.DATA_CHORE_NAME)
-                or const.SENTINEL_EMPTY
-            )
-
-        assigned_assignees_ids = achievement.get(
-            const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
-        )
-        assigned_assignees_names = [
-            name
-            for k_id in assigned_assignees_ids
-            if (
-                name := get_item_name_or_log_error(
-                    "assignee",
-                    k_id,
-                    self.coordinator.assignees_data.get(k_id, {}),
-                    const.DATA_USER_NAME,
-                )
-            )
-        ]
-        ach_type = achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-        for assignee_id in assigned_assignees_ids:
-            assignee_name = (
-                get_assignee_name_by_id(self.coordinator, assignee_id) or assignee_id
-            )
-            progress_data: AchievementProgress = achievement.get(
-                const.DATA_ACHIEVEMENT_PROGRESS, {}
-            ).get(assignee_id, {})
-            if ach_type == const.ACHIEVEMENT_TYPE_TOTAL:
-                assignees_progress[assignee_name] = progress_data.get(
-                    const.DATA_ACHIEVEMENT_CURRENT_VALUE, const.DEFAULT_ZERO
-                )
-            elif ach_type == const.ACHIEVEMENT_TYPE_STREAK:
-                assignees_progress[assignee_name] = progress_data.get(
-                    const.DATA_ACHIEVEMENT_CURRENT_STREAK, const.DEFAULT_ZERO
-                )
-            elif (
-                achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-                == const.ACHIEVEMENT_TYPE_DAILY_MIN
-            ):
-                # Use Phase 7.5 cache API for temporal stats (not storage)
-                cache_stats = self.coordinator.statistics_manager.get_chore_stats(
-                    assignee_id
-                )
-                assignees_progress[assignee_name] = cache_stats.get(
-                    const.PRES_USER_CHORES_APPROVED_TODAY, const.DEFAULT_ZERO
-                )
-            else:
-                assignees_progress[assignee_name] = const.DEFAULT_ZERO
-
-        stored_labels = achievement.get(const.DATA_ACHIEVEMENT_LABELS, [])
-        friendly_labels = [
-            get_friendly_label(self.hass, label)
-            for label in cast("list", stored_labels)
-        ]
-
+        achievement = self._achievement()
         return {
             const.ATTR_PURPOSE: const.TRANS_KEY_PURPOSE_ACHIEVEMENT,
             const.ATTR_ACHIEVEMENT_NAME: self._achievement_name,
             const.ATTR_DESCRIPTION: achievement.get(
                 const.DATA_ACHIEVEMENT_DESCRIPTION, const.SENTINEL_EMPTY
             ),
-            const.ATTR_ASSIGNED_USER_NAMES: assigned_assignees_names,
-            const.ATTR_TYPE: ach_type,
-            const.ATTR_ASSOCIATED_CHORE: associated_chore,
-            const.ATTR_CRITERIA: achievement.get(
-                const.DATA_ACHIEVEMENT_CRITERIA, const.SENTINEL_EMPTY
-            ),
-            const.ATTR_TARGET_VALUE: achievement.get(
-                const.DATA_ACHIEVEMENT_TARGET_VALUE
-            ),
             const.ATTR_REWARD_POINTS: achievement.get(
-                const.DATA_ACHIEVEMENT_REWARD_POINTS
+                const.DATA_ACHIEVEMENT_REWARD_POINTS, const.DEFAULT_ZERO
             ),
-            const.ATTR_USERS_EARNED: earned_by,
-            const.ATTR_LABELS: friendly_labels,
+            "awarded_to": self._holders(),
+            const.ATTR_LABELS: _achievement_labels(self.hass, achievement),
         }
 
     @property
     def icon(self) -> str | None:
         """Return achievement custom icon or None for icons.json fallback."""
-        achievement_info: AchievementData = cast(
-            "AchievementData",
-            self.coordinator.achievements_data.get(self._achievement_id, {}),
-        )
-        return achievement_info.get(const.DATA_ACHIEVEMENT_ICON) or None
+        return self._achievement().get(const.DATA_ACHIEVEMENT_ICON) or None
 
 
 # ------------------------------------------------------------------------------------------
@@ -3662,13 +3467,10 @@ class SystemChallengeSensor(ChoreOpsCoordinatorEntity, SensorEntity):
 
 # ------------------------------------------------------------------------------------------
 class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity):
-    """Sensor representing a assignee's progress toward a specific achievement.
+    """Sensor showing how many times one person has been given an achievement.
 
-    Tracks achievement progress as a percentage (0-100) for individual assignee/achievement
-    combinations. Supports multiple achievement types: TOTAL (cumulative count with
-    baseline), STREAK (consecutive completions), and DAILY_MIN (daily minimum
-    requirements). Provides comprehensive metadata including target value, reward
-    points, criteria, associated chore, and award status.
+    The state is the count (0 when never given). Dashboards read ``awarded``,
+    ``award_count`` and ``last_awarded`` to draw the gold achievement badges.
     """
 
     _attr_has_entity_name = True
@@ -3683,16 +3485,7 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
         achievement_id: str,
         achievement_name: str,
     ):
-        """Initialize the sensor.
-
-        Args:
-            coordinator: ChoreOpsDataCoordinator instance for data access.
-            entry: ConfigEntry for this integration instance.
-            assignee_id: Unique identifier for the assignee.
-            assignee_name: Display name of the assignee.
-            achievement_id: Unique identifier for the achievement.
-            achievement_name: Display name of the achievement.
-        """
+        """Initialize the sensor."""
         super().__init__(coordinator)
         self._entry = entry
         self._assignee_id = assignee_id
@@ -3700,225 +3493,35 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
         self._achievement_id = achievement_id
         self._achievement_name = achievement_name
         self._attr_unique_id = f"{entry.entry_id}_{assignee_id}_{achievement_id}{const.SENSOR_KC_UID_SUFFIX_ACHIEVEMENT_PROGRESS_SENSOR}"
-        self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_translation_placeholders = {
             const.TRANS_KEY_SENSOR_ATTR_ASSIGNEE_NAME: assignee_name,
             const.TRANS_KEY_SENSOR_ATTR_ACHIEVEMENT_NAME: achievement_name,
         }
-        # Moving to HA native best practice: auto-generate entity_id from unique_id + has_entity_name
-        # rather than manually constructing to support HA core change 01309191283 (Jan 14, 2026)
-        # self.entity_id = f"{const.SENSOR_KC_PREFIX}{assignee_name}{const.SENSOR_KC_EID_MIDFIX_ACHIEVEMENT_PROGRESS_SENSOR}{achievement_name}"
         self._attr_device_info = create_assignee_device_info_from_coordinator(
             self.coordinator, assignee_id, assignee_name, entry
         )
 
-    @property
-    def native_value(self) -> float:
-        """Return the progress percentage toward the achievement.
-
-        Calculates percentage based on achievement type:
-        - TOTAL: (current_value / (baseline + target)) * 100
-        - STREAK: (current_streak / target) * 100
-        - DAILY_MIN: (daily_completions / target) * 100
-
-        Returns:
-            Progress percentage capped at 100.0, rounded to 1 decimal place.
-        """
-        achievement: AchievementData = cast(
+    def _achievement(self) -> AchievementData:
+        return cast(
             "AchievementData",
             self.coordinator.achievements_data.get(self._achievement_id, {}),
         )
-        target = achievement.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 1)
-        ach_type = achievement.get(const.DATA_ACHIEVEMENT_TYPE)
 
-        if ach_type == const.ACHIEVEMENT_TYPE_TOTAL:
-            progress_data: AchievementProgress = achievement.get(
-                const.DATA_ACHIEVEMENT_PROGRESS, {}
-            ).get(self._assignee_id, {})
-
-            baseline = (
-                progress_data.get(const.DATA_ACHIEVEMENT_BASELINE, const.DEFAULT_ZERO)
-                if isinstance(progress_data, dict)
-                else const.DEFAULT_ZERO
-            )
-
-            # v43+: chore_stats deleted, use chore_periods.all_time.all_time (nested)
-            # For scoped achievements (selected chore), read the chore-scoped
-            # all-time total so the progress bar matches the evaluation engine
-            # (issue #245). Unscoped achievements keep the global bucket.
-            selected_chore_id = achievement.get(
-                const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID
-            )
-            if selected_chore_id:
-                scoped_all_time = (
-                    self.coordinator.statistics_manager.get_badge_scoped_all_time_stats(
-                        self._assignee_id,
-                        [selected_chore_id],
-                    )
-                )
-                current_total = scoped_all_time.get(
-                    const.DATA_USER_CHORE_DATA_PERIOD_APPROVED,
-                    const.DEFAULT_ZERO,
-                )
-            else:
-                assignee_data = cast(
-                    "AssigneeData",
-                    self.coordinator.assignees_data.get(self._assignee_id, {}),
-                )
-                chore_periods = assignee_data.get(const.DATA_USER_CHORE_PERIODS, {})
-                all_time_container: dict[str, Any] = cast(
-                    "dict[str, Any]",
-                    chore_periods.get(const.DATA_USER_CHORE_DATA_PERIODS_ALL_TIME, {}),
-                )
-                all_time_bucket: dict[str, Any] = cast(
-                    "dict[str, Any]",
-                    all_time_container.get(const.PERIOD_ALL_TIME, {}),
-                )
-                current_total = all_time_bucket.get(
-                    const.DATA_USER_CHORE_DATA_PERIOD_APPROVED, const.DEFAULT_ZERO
-                )
-
-            # Baseline guard: mirror the evaluation engine so a global baseline
-            # that exceeds the scoped total does not clamp display to 0.
-            if float(cast("Any", baseline)) > int(current_total):
-                baseline = const.DEFAULT_ZERO
-
-            effective_target = baseline + target  # type: ignore[operator]
-
-            percent = (
-                (int(current_total) / effective_target * 100)
-                if effective_target > const.DEFAULT_ZERO
-                else const.DEFAULT_ZERO
-            )
-
-        elif ach_type == const.ACHIEVEMENT_TYPE_STREAK:
-            progress_data_elif: AchievementProgress = achievement.get(
-                const.DATA_ACHIEVEMENT_PROGRESS, {}
-            ).get(self._assignee_id, {})
-
-            progress = (
-                progress_data_elif.get(
-                    const.DATA_ACHIEVEMENT_CURRENT_STREAK, const.DEFAULT_ZERO
-                )
-                if isinstance(progress_data_elif, dict)
-                else const.DEFAULT_ZERO
-            )
-
-            percent = (
-                (progress / target * 100)
-                if target > const.DEFAULT_ZERO
-                else const.DEFAULT_ZERO
-            )
-
-        elif ach_type == const.ACHIEVEMENT_TYPE_DAILY_MIN:
-            # Use Phase 7.5 cache API for temporal stats (not storage)
-            cache_stats = self.coordinator.statistics_manager.get_chore_stats(
-                self._assignee_id
-            )
-            daily = cache_stats.get(
-                const.PRES_USER_CHORES_APPROVED_TODAY, const.DEFAULT_ZERO
-            )
-
-            percent = (
-                (daily / target * 100)
-                if target > const.DEFAULT_ZERO
-                else const.DEFAULT_ZERO
-            )
-
-        else:
-            percent = const.DEFAULT_ZERO
-
-        return min(100, round(percent, const.DATA_FLOAT_PRECISION))
+    def _entry_data(self) -> dict[str, Any]:
+        progress = self._achievement().get(const.DATA_ACHIEVEMENT_PROGRESS, {})
+        return cast("dict[str, Any]", progress.get(self._assignee_id, {}))
 
     @property
-    def extra_state_attributes(self) -> dict:
-        """Return extra attributes for the achievement progress."""
-        achievement: AchievementData = cast(
-            "AchievementData",
-            self.coordinator.achievements_data.get(self._achievement_id, {}),
-        )
-        target = achievement.get(const.DATA_ACHIEVEMENT_TARGET_VALUE, 1)
-        progress_data: AchievementProgress = achievement.get(
-            const.DATA_ACHIEVEMENT_PROGRESS, {}
-        ).get(self._assignee_id, {})
-        raw_progress = const.DEFAULT_ZERO
+    def native_value(self) -> int:
+        """Return how many times this person has been given the achievement."""
+        return _achievement_award_count(self._entry_data())
 
-        awarded = (
-            progress_data.get(const.DATA_ACHIEVEMENT_AWARDED, False)
-            if isinstance(progress_data, dict)
-            else False
-        )
-
-        if achievement.get(const.DATA_ACHIEVEMENT_TYPE) == const.ACHIEVEMENT_TYPE_TOTAL:
-            current_value = (
-                progress_data.get(
-                    const.DATA_ACHIEVEMENT_CURRENT_VALUE, const.DEFAULT_ZERO
-                )
-                if isinstance(progress_data, dict)
-                else const.DEFAULT_ZERO
-            )
-            raw_progress = (
-                int(current_value)
-                if isinstance(current_value, (int, float, str))
-                else const.DEFAULT_ZERO
-            )
-
-        elif (
-            achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-            == const.ACHIEVEMENT_TYPE_STREAK
-        ):
-            raw_progress = (
-                progress_data.get(
-                    const.DATA_ACHIEVEMENT_CURRENT_STREAK, const.DEFAULT_ZERO
-                )
-                if isinstance(progress_data, dict)
-                else const.DEFAULT_ZERO
-            )
-
-        elif (
-            achievement.get(const.DATA_ACHIEVEMENT_TYPE)
-            == const.ACHIEVEMENT_TYPE_DAILY_MIN
-        ):
-            # Use Phase 7.5 cache API for temporal stats (not storage)
-            cache_stats = self.coordinator.statistics_manager.get_chore_stats(
-                self._assignee_id
-            )
-            raw_progress = cache_stats.get(
-                const.PRES_USER_CHORES_APPROVED_TODAY, const.DEFAULT_ZERO
-            )
-
-        associated_chore = const.SENTINEL_EMPTY
-        selected_chore_id = achievement.get(const.DATA_ACHIEVEMENT_SELECTED_CHORE_ID)
-        if selected_chore_id:
-            associated_chore = (
-                cast(
-                    "ChoreData", self.coordinator.chores_data.get(selected_chore_id, {})
-                ).get(const.DATA_CHORE_NAME)
-                or const.SENTINEL_EMPTY
-            )
-
-        assigned_assignees_ids = achievement.get(
-            const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
-        )
-        assigned_assignees_names = [
-            name
-            for k_id in assigned_assignees_ids
-            if (
-                name := get_item_name_or_log_error(
-                    "assignee",
-                    k_id,
-                    self.coordinator.assignees_data.get(k_id, {}),
-                    const.DATA_USER_NAME,
-                )
-            )
-        ]
-
-        stored_labels = achievement.get(const.DATA_ACHIEVEMENT_LABELS, [])
-        friendly_labels = [
-            get_friendly_label(self.hass, label)
-            for label in cast("list", stored_labels)
-        ]
-
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return extra attributes for the achievement."""
+        achievement = self._achievement()
+        data = self._entry_data()
+        count = _achievement_award_count(data)
         return {
             const.ATTR_PURPOSE: const.TRANS_KEY_PURPOSE_ACHIEVEMENT_PROGRESS,
             const.ATTR_USER_NAME: self._assignee_name,
@@ -3926,29 +3529,19 @@ class AssigneeAchievementProgressSensor(ChoreOpsCoordinatorEntity, SensorEntity)
             const.ATTR_DESCRIPTION: achievement.get(
                 const.DATA_ACHIEVEMENT_DESCRIPTION, const.SENTINEL_EMPTY
             ),
-            const.ATTR_ASSIGNED_USER_NAMES: assigned_assignees_names,
-            const.ATTR_TYPE: achievement.get(const.DATA_ACHIEVEMENT_TYPE),
-            const.ATTR_ASSOCIATED_CHORE: associated_chore,
-            const.ATTR_CRITERIA: achievement.get(
-                const.DATA_ACHIEVEMENT_CRITERIA, const.SENTINEL_EMPTY
-            ),
-            const.ATTR_TARGET_VALUE: target,
             const.ATTR_REWARD_POINTS: achievement.get(
-                const.DATA_ACHIEVEMENT_REWARD_POINTS
+                const.DATA_ACHIEVEMENT_REWARD_POINTS, const.DEFAULT_ZERO
             ),
-            const.ATTR_RAW_PROGRESS: raw_progress,
-            const.ATTR_AWARDED: awarded,
-            const.ATTR_LABELS: friendly_labels,
+            "awarded": count > 0,
+            "award_count": count,
+            "last_awarded": data.get(const.DATA_ACHIEVEMENT_LAST_AWARDED),
+            const.ATTR_LABELS: _achievement_labels(self.hass, achievement),
         }
 
     @property
     def icon(self) -> str | None:
         """Return the icon for the achievement."""
-        achievement: AchievementData = cast(
-            "AchievementData",
-            self.coordinator.achievements_data.get(self._achievement_id, {}),
-        )
-        return achievement.get(const.DATA_ACHIEVEMENT_ICON) or None
+        return self._achievement().get(const.DATA_ACHIEVEMENT_ICON) or None
 
 
 # ------------------------------------------------------------------------------------------
@@ -5350,10 +4943,6 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                 achievement_id,
                 achievement_info,
             ) in self.coordinator.achievements_data.items():
-                if self._assignee_id not in achievement_info.get(
-                    const.DATA_ACHIEVEMENT_ASSIGNED_USER_IDS, []
-                ):
-                    continue
                 achievement_name = get_item_name_or_log_error(
                     "achievement",
                     achievement_id,

@@ -607,67 +607,27 @@ views:
                     {%- endfor -%}
                     {%- set quest_progress_section = "<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('quests', 'err-quests') ~ "</div>" ~ quest_ns.rows_html if quest_ns.rows_html | length > 0 else '' -%}
 
-                    {%- set achievement_ns = namespace(rows_html='', count=0) -%}
+                    {#-- ACHIEVEMENTS: given by an approver, shown as gold-framed badges (newest first) --#}
+                    {%- set ach_ns = namespace(items=[]) -%}
                     {%- for achievement in achievement_list -%}
-                      {%- if achievement is mapping and achievement_ns.count < 3 -%}
-                        {%- set achievement_eid = achievement.get('eid') -%}
-                        {%- if achievement_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(achievement_eid) not in ['unknown', 'unavailable'] -%}
-                          {%- set achievement_attrs = states[achievement_eid].attributes | default({}, true) -%}
-                          {#-- FAMILY GOAL ROW: level chip, level pips and a bar that fills only the current level window --#}
-                          {%- if 'family_total' in achievement_attrs -%}
-                            {%- set fl = (achievement_attrs.get('family_levels') or []) | map('float', 0) | list -%}
-                            {%- set fcnt = fl | length -%}
-                            {%- set flv = achievement_attrs.get('family_level', 0) | int(0) -%}
-                            {%- set ftot = achievement_attrs.get('family_total', 0) | float(0) | round(0) | int -%}
-                            {%- set fnx = achievement_attrs.get('family_next_target', 0) | float(0) -%}
-                            {%- set ftg = (fnx if fnx > 0 else (achievement_attrs.get('target_value', 0) | float(0))) | round(0) | int -%}
-                            {%- set frw = achievement_attrs.get('family_next_reward', 0) | float(0) | round(0) | int -%}
-                            {%- set fraw = fcnt > 0 and flv >= fcnt -%}
-                            {%- set fdn = fraw and ftot >= ((fl | last) | float(0)) -%}
-                            {%- set felv = (fcnt - 1) if (fraw and not fdn) else flv -%}
-                            {%- set fwt = ((fl | last) if (fdn and fcnt > 0) else ftg) | float(1) | round(0) | int -%}
-                            {%- set fpi = (felv - 1) if not fdn else (fcnt - 2) -%}
-                            {%- set fpv = ((fl[fpi] | round(0) | int) if (fcnt > 1 and fpi >= 0) else 0) -%}
-                            {%- set fsp = [fwt - fpv, 1] | max -%}
-                            {%- set fpc = (([[ftot - fpv, 0] | max, fsp] | min / fsp) * 100) | round(1) -%}
-                            {%- set fac = 'var(--success-color)' if fdn else '#8b5cf6' -%}
-                            {%- set fac2 = '#86efac' if fdn else '#ec4899' -%}
-                            {%- set fnm = (achievement_attrs.get('achievement_name') or achievement.get('name') or ui.get('achievements', 'err-achievements')) | string | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set fpp = namespace(v='') -%}
-                            {%- if fcnt > 1 -%}
-                              {%- for lv in fl -%}
-                                {%- set fpp.v = fpp.v ~ "<div style='flex:1;height:4px;border-radius:999px;background:" ~ ('var(--success-color)' if loop.index <= felv else ('#8b5cf6' if loop.index == felv + 1 else 'var(--divider-color)')) ~ ";'></div>" -%}
-                              {%- endfor -%}
-                            {%- endif -%}
-                            {%- set fchip = ('✓ ALL ' ~ fcnt if fdn else 'LV ' ~ (felv + 1) ~ '/' ~ fcnt) if fcnt > 1 else '' -%}
-                            {%- set fsub = ('🎉 All levels complete' if fdn else '') ~ ('' if fdn else '<b style="color:' ~ fac ~ ';">' ~ ([ftg - ftot, 0] | max) ~ ' to go</b>' ~ (' · +' ~ frw ~ ' ⭐' if frw > 0 else '')) -%}
-                            {%- set achievement_ns.count = achievement_ns.count + 1 -%}
-                            {%- set achievement_ns.rows_html = achievement_ns.rows_html ~ "<div style='margin-top:10px;'><div style='display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:700;'><span style='display:flex;align-items:center;gap:6px;min-width:0;'><span style='overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--primary-text-color);'>" ~ fnm ~ "</span>" ~ ("<span style='font-size:9px;font-weight:800;letter-spacing:0.6px;padding:2px 6px;border-radius:999px;background:" ~ fac ~ "26;color:" ~ fac ~ ";white-space:nowrap;'>" ~ fchip ~ "</span>" if fchip else '') ~ "</span><span style='font-size:12px;white-space:nowrap;color:" ~ fac ~ ";'>" ~ ftot ~ ' / ' ~ fwt ~ "</span></div>"
-                              ~ ("<div style='display:flex;gap:3px;margin-top:5px;'>" ~ fpp.v ~ "</div>" if fcnt > 1 else '')
-                              ~ "<div style='margin-top:4px;height:8px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='width:" ~ fpc ~ "%;min-width:" ~ ('8px' if fpc > 0 else '0') ~ ";height:100%;background:linear-gradient(90deg," ~ fac ~ "," ~ fac2 ~ ");border-radius:999px;'></div></div>"
-                              ~ "<div style='display:flex;justify-content:space-between;margin-top:3px;font-size:10px;font-weight:700;color:var(--secondary-text-color);'><span>" ~ fpv ~ "</span><span>" ~ fsub ~ "</span><span>" ~ fwt ~ "</span></div></div>" -%}
-                          {%- endif -%}
-                          {%- set achievement_awarded_raw = achievement_attrs.get('awarded', false) -%}
-                          {%- set achievement_awarded = achievement_awarded_raw if achievement_awarded_raw is boolean else (achievement_awarded_raw | string | lower) == 'true' -%}
-                          {%- set achievement_target = achievement_attrs.get('target_value', 0) | int(default=0) -%}
-                          {%- set achievement_progress = achievement_attrs.get('raw_progress', 0) | float(default=0) -%}
-                          {%- set achievement_progress_clamped = 0 if achievement_progress < 0 else achievement_progress -%}
-                          {%- if achievement_target > 0 and achievement_progress_clamped > achievement_target -%}
-                            {%- set achievement_progress_clamped = achievement_target -%}
-                          {%- endif -%}
-                          {%- set achievement_pct = ((achievement_progress_clamped / achievement_target) * 100) | round(0) | int if achievement_target > 0 else 0 -%}
-                          {%- if 'family_total' not in achievement_attrs and not achievement_awarded and achievement_target > 0 -%}
-                            {%- set achievement_name = ((achievement_attrs.get('achievement_name') or achievement.get('name') or state_attr(achievement_eid, 'friendly_name') or ui.get('achievements', 'err-achievements')) | string | trim) -%}
-                            {%- set achievement_name_safe = achievement_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set achievement_icon = (achievement_attrs.get('icon') or 'mdi:trophy') | string -%}
-                            {%- set achievement_color = 'var(--success-color)' if achievement_pct >= 100 else 'var(--primary-color)' -%}
-                            {%- set achievement_ns.count = achievement_ns.count + 1 -%}
-                            {%- set achievement_ns.rows_html = achievement_ns.rows_html ~ "<div style='margin-top:8px;'><div style='display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:700;'><span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--primary-text-color);'>" ~ achievement_name_safe ~ "</span><span style='font-size:12px;white-space:nowrap;color:" ~ achievement_color ~ ";'>" ~ ((achievement_progress_clamped | round(2)) | string | regex_replace('\.?0+$', '')) ~ ' / ' ~ ((achievement_target | round(2)) | string | regex_replace('\.?0+$', '')) ~ "</span></div><div style='margin-top:4px;height:8px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='width:" ~ achievement_pct|string ~ "%;height:100%;background:" ~ achievement_color ~ ";border-radius:999px;'></div></div></div>" -%}
+                      {%- if achievement is mapping -%}
+                        {%- set ach_eid = achievement.get('eid') -%}
+                        {%- if ach_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(ach_eid) not in ['unknown', 'unavailable'] -%}
+                          {%- set ach_attrs = states[ach_eid].attributes | default({}, true) -%}
+                          {%- set ach_count = ach_attrs.get('award_count', 0) | int(default=0) -%}
+                          {%- if ach_count > 0 -%}
+                            {%- set ach_ns.items = ach_ns.items + [{'name': ((ach_attrs.get('achievement_name') or achievement.get('name') or '') | string | trim), 'icon': ((ach_attrs.get('icon') or 'mdi:trophy') | string), 'count': ach_count, 'last': ((ach_attrs.get('last_awarded') or '') | string)}] -%}
                           {%- endif -%}
                         {%- endif -%}
                       {%- endif -%}
                     {%- endfor -%}
-                    {%- set achievement_progress_section = "<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('achievements', 'err-achievements') ~ "</div>" ~ achievement_ns.rows_html if achievement_ns.rows_html | length > 0 else '' -%}
+                    {%- set ach_tiles = namespace(v='') -%}
+                    {%- for ach in (ach_ns.items | sort(attribute='last', reverse=true))[:6] -%}
+                      {%- set ach_icon_html = ("<ha-icon icon='" ~ ach.icon ~ "' style='--mdc-icon-size:26px;width:26px;height:26px;color:#5b4300;'></ha-icon>") if ach.icon[:4] == 'mdi:' else "<span style='font-size:24px;line-height:1;'>🏆</span>" -%}
+                      {%- set ach_pill = ("<div style='position:absolute;top:-4px;right:2px;padding:1px 6px;border-radius:999px;background:#d4a017;color:#fff;font-size:10px;font-weight:800;line-height:1.3;'>×" ~ ach.count ~ "</div>") if ach.count > 1 else '' -%}
+                      {%- set ach_tiles.v = ach_tiles.v ~ "<div style='position:relative;width:64px;text-align:center;'><div style='width:48px;height:48px;margin:0 auto 3px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(145deg,#f6d365,#d4a017);border:3px solid #d4a017;box-shadow:0 0 0 3px rgba(246,211,101,0.4);'>" ~ ach_icon_html ~ "</div>" ~ ach_pill ~ "<div style='font-size:10.5px;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;'>" ~ (ach.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ "</div></div>" -%}
+                    {%- endfor -%}
+                    {%- set achievement_progress_section = ("<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('achievements', 'err-achievements') ~ "</div><div style='display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;'>" ~ ach_tiles.v ~ "</div>") if ach_tiles.v | length > 0 else '' -%}
 
                     {%- set bonus_ns = namespace(rows_html='', count=0, total_points=0, total_applied=0) -%}
                     {%- for bonus in bonus_list | sort(attribute='applied', reverse=true) -%}
@@ -2881,51 +2841,25 @@ views:
 
                     {%- for achievement in achievement_list -%}
                       {%- set achievement_eid = achievement.get('eid') if achievement is mapping else achievement -%}
-                      {%- if achievement_eid in ['', 'None', 'unknown', 'unavailable', none] -%}
-                        {%- continue -%}
+                      {%- if achievement_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(achievement_eid) not in ['unknown', 'unavailable'] -%}
+                        {%- set achievement_attrs = states[achievement_eid].attributes | default({}, true) -%}
+                        {%- set achievement_count = achievement_attrs.get('award_count', 0) | int(default=0) -%}
+                        {%- set ns.achievements = ns.achievements + [{
+                          'entity_id': achievement_eid,
+                          'name': ((achievement_attrs.get('achievement_name') or (achievement.get('name') if achievement is mapping else none) or state_attr(achievement_eid, 'friendly_name') or '') | string),
+                          'icon': (achievement_attrs.get('icon') or 'mdi:trophy') | string,
+                          'description': (achievement_attrs.get('description') or '') | string,
+                          'reward_points': achievement_attrs.get('reward_points', 0) | float(default=0),
+                          'count': achievement_count,
+                          'awarded': achievement_count > 0,
+                          'last': (achievement_attrs.get('last_awarded') or '') | string,
+                        }] -%}
                       {%- endif -%}
-
-                      {%- set achievement_attrs = states[achievement_eid].attributes | default({}, true) -%}
-                      {%- if 'family_total' in achievement_attrs -%}
-                      {%- continue -%}
-                    {%- endif -%}
-                    {%- set achievement_name = (achievement_attrs.get('achievement_name') or (achievement.get('name') if achievement is mapping else none) or state_attr(achievement_eid, 'friendly_name') or '') | string -%}
-                      {%- set assigned_raw = achievement_attrs.get('assigned_user_names', achievement_attrs.get('assigned_assignees')) -%}
-                      {%- set assigned_users = [] -%}
-                      {%- if assigned_raw is string -%}
-                        {%- set assigned_users = [assigned_raw] -%}
-                      {%- elif assigned_raw is iterable and assigned_raw is not string and assigned_raw is not none -%}
-                        {%- set assigned_users = assigned_raw | list -%}
-                      {%- endif -%}
-                      {%- set awarded_raw = achievement_attrs.get('awarded', false) -%}
-                      {%- set awarded = awarded_raw if awarded_raw is boolean else (awarded_raw | string | lower) == 'true' -%}
-                      {%- set target_value = achievement_attrs.get('target_value', 0) | int(default=0) -%}
-                      {%- set raw_progress = achievement_attrs.get('raw_progress', 0) | float(default=0) -%}
-                      {%- set progress_clamped = raw_progress if raw_progress >= 0 else 0 -%}
-                      {%- if target_value > 0 and progress_clamped > target_value -%}
-                        {%- set progress_clamped = target_value -%}
-                      {%- endif -%}
-                      {%- set progress_pct = ((progress_clamped / target_value) * 100) | round(1) if target_value > 0 else 0 -%}
-
-                      {%- set ns.achievements = ns.achievements + [{
-                        'entity_id': achievement_eid,
-                        'name': achievement_name,
-                        'icon': (achievement_attrs.get('icon') or 'mdi:trophy') | string,
-                        'description': (achievement_attrs.get('description') or '') | string,
-                        'criteria': (achievement_attrs.get('criteria') or '') | string,
-                        'type': (achievement_attrs.get('type') or '') | string | lower,
-                        'associated_chore': (achievement_attrs.get('associated_chore') or '') | string,
-                        'target_value': target_value,
-                        'raw_progress': raw_progress,
-                        'progress_clamped': progress_clamped,
-                        'progress_pct': progress_pct,
-                        'reward_points': achievement_attrs.get('reward_points', 0) | float(default=0),
-                        'assigned_users': assigned_users,
-                        'awarded': awarded,
-                      }] -%}
                     {%- endfor -%}
 
-                    {%- set sorted_achievements = ns.achievements | sort(attribute='name') -%}
+                    {%- set earned_achievements = ns.achievements | selectattr('awarded') | sort(attribute='last', reverse=true) | list -%}
+                    {%- set open_achievements = ns.achievements | rejectattr('awarded') | sort(attribute='name') | list -%}
+                    {%- set sorted_achievements = earned_achievements + open_achievements -%}
 
                     {#-- 5. Render --#}
                     {%- if gamification_enabled -%}
@@ -3234,45 +3168,18 @@ views:
                           }},
                         {%- else -%}
                           {%- for achievement in sorted_achievements -%}
-                            {%- set a_accent = 'var(--success-color)' if achievement.awarded else 'var(--primary-color)' -%}
-                            {%- set a_fill = 100 if achievement.awarded else ([[achievement.progress_pct | float(0), 0] | max, 100] | min) -%}
                             {%- set a_name = achievement.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set a_desc = achievement.description | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set a_crit = achievement.criteria | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set a_chore = achievement.associated_chore | trim | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set a_type = (
-                              ui.get('streak', 'err-streak') if achievement.type == 'chore_streak'
-                              else ui.get('per_day_goal', 'err-per_day_goal') if achievement.type == 'daily_minimum'
-                              else ui.get('total_chores', 'err-total_chores') if achievement.type in ['total_within_window', 'total_chores']
-                              else ui.get(achievement.type, achievement.type | replace('_', ' ') | title)
-                            ) -%}
-                            {%- set a_sub = a_desc if a_desc | length > 0 else (a_crit if a_crit | length > 0 else a_type) -%}
-                            {%- set a_sub2 = '' -%}
-                            {%- if a_desc | length > 0 and a_crit | length > 0 -%}
-                              {%- set a_sub2 = "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;'>📌 " ~ ui.get('criteria', 'err-criteria') ~ ": " ~ a_crit ~ "</div>" -%}
-                            {%- endif -%}
-                            {%- if a_chore | length > 0 -%}
-                              {%- set a_sub2 = a_sub2 ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;'>🛠 " ~ ui.get('related_chore', 'err-related_chore') ~ ": " ~ a_chore ~ "</div>" -%}
-                            {%- endif -%}
-                            {%- if achievement.awarded -%}
-                              {%- set a_right = "<div style='font-size:11px;font-weight:800;color:var(--success-color);white-space:nowrap;'>✓ " ~ (ui.get('earned', 'err-earned') | upper) ~ "</div>" -%}
-                            {%- elif achievement.target_value > 0 -%}
-                              {%- set a_right = "<div style='font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ (achievement.progress_clamped | round(0) | int) ~ "<span style='opacity:0.6;font-weight:600;'> / " ~ achievement.target_value ~ "</span></div>" -%}
-                            {%- else -%}
-                              {%- set a_right = "<div style='font-size:11px;font-weight:800;color:var(--primary-color);white-space:nowrap;'>" ~ (ui.get('in_progress', 'err-in_progress') | upper) ~ "</div>" -%}
-                            {%- endif -%}
-                            {%- if achievement.reward_points > 0 -%}
-                              {%- set a_reward_text = ('%.1f' | format(achievement.reward_points)) | regex_replace('\\.?0+$', '') -%}
-                              {%- set a_right = a_right ~ "<div style='display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:700;color:var(--warning-color);white-space:nowrap;'>+" ~ a_reward_text ~ "<ha-icon icon='" ~ points_icon ~ "' style='width:13px;height:13px;--mdc-icon-size:13px;display:block;'></ha-icon></div>" -%}
-                            {%- endif -%}
-                            {%- set a_edge = "<div style='position:absolute;left:" ~ a_fill ~ "%;top:0;bottom:0;width:3px;margin-left:-3px;background:var(--primary-color);'></div>" if (not achievement.awarded and a_fill > 0 and a_fill < 100) else '' -%}
-                            {%- set a_html = "<div style='position:relative;overflow:hidden;border-radius:16px;text-align:left;'>"
-                              ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ a_fill ~ "%;background:linear-gradient(90deg,color-mix(in srgb," ~ a_accent ~ " 10%,transparent),color-mix(in srgb," ~ a_accent ~ " " ~ ('14' if achievement.awarded else '24') ~ "%,transparent));'></div>" ~ a_edge
-                              ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>"
-                              ~ "<div style='width:44px;height:44px;border-radius:14px;background:color-mix(in srgb," ~ a_accent ~ " 16%,var(--card-background-color));display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ achievement.icon ~ "' style='width:26px;height:26px;--mdc-icon-size:26px;color:" ~ a_accent ~ ";display:block;'></ha-icon></div>"
-                              ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ a_name ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;'>" ~ a_sub ~ "</div>" ~ a_sub2 ~ "</div>"
-                              ~ "<div style='text-align:right;flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px;'>" ~ a_right ~ "</div>"
-                              ~ "</div></div>" -%}
+                            {%- set a_icon_html = ("<ha-icon icon='" ~ achievement.icon ~ "' style='--mdc-icon-size:26px;width:26px;height:26px;color:" ~ ('#5b4300' if achievement.awarded else 'var(--secondary-text-color)') ~ ";'></ha-icon>") if achievement.icon[:4] == 'mdi:' else "<span style='font-size:24px;line-height:1;'>🏆</span>" -%}
+                            {%- set a_pts = ('%.1f' | format(achievement.reward_points)) | regex_replace('\\.?0+$', '') -%}
+                            {%- set a_meta = (("<span style='font-weight:800;color:#b8860b;'>+" ~ a_pts ~ " pts</span>") if achievement.reward_points > 0 else '') ~ (("<span style='font-weight:800;color:#b8860b;'>" ~ (' · ' if achievement.reward_points > 0 else '') ~ "×" ~ achievement.count ~ "</span>") if achievement.count > 1 else '') -%}
+                            {%- set a_html = "<div style='display:flex;align-items:center;gap:12px;padding:12px;text-align:left;'>"
+                              ~ "<div style='width:44px;height:44px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;" ~ ("background:linear-gradient(145deg,#f6d365,#d4a017);border:3px solid #d4a017;box-shadow:0 0 0 3px rgba(246,211,101,0.35);" if achievement.awarded else "background:var(--secondary-background-color);border:2px dashed var(--divider-color);") ~ "'>" ~ a_icon_html ~ "</div>"
+                              ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ a_name ~ "</div>"
+                              ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.3;margin-top:2px;'>" ~ a_desc ~ "</div>" if a_desc | length > 0 else '')
+                              ~ "</div>"
+                              ~ "<div style='text-align:right;flex:0 0 auto;font-size:11px;white-space:nowrap;'>" ~ (("<div style='font-weight:800;color:#b8860b;'>✓ " ~ (ui.get('earned', 'err-earned') | upper) ~ "</div>") if achievement.awarded else '') ~ "<div>" ~ a_meta ~ "</div></div>"
+                              ~ "</div>" -%}
                             {{
                               {
                                 'type': 'custom:button-card',
@@ -3287,8 +3194,9 @@ views:
                                     {'padding': '0px'},
                                     {'border-radius': '16px'},
                                     {'overflow': 'hidden'},
-                                    {'background-color': 'var(--card-background-color)'},
-                                    {'border': ('1px solid color-mix(in srgb, var(--success-color) 55%, var(--divider-color))' if achievement.awarded else '1px solid var(--divider-color)')},
+                                    {'background': ('linear-gradient(135deg, color-mix(in srgb, #f6d365 22%, var(--card-background-color)), var(--card-background-color))' if achievement.awarded else 'var(--card-background-color)')},
+                                    {'border': ('2px solid #d4a017' if achievement.awarded else '1px dashed var(--divider-color)')},
+                                    {'opacity': ('1' if achievement.awarded else '0.6')},
                                     {'box-shadow': 'none'}
                                   ],
                                   'grid': [

@@ -395,6 +395,46 @@ apply_bonus:
       selector:
         text:
 
+award_achievement:
+  name: "Award Achievement"
+  description: "An approver gives an achievement to someone. Any reward points are paid right away and they get a notification."
+  fields:
+    config_entry_id:
+      name: "Config Entry ID (Optional)"
+      description: "Use this if you have more than one ChoreOps setup. It targets one specific setup."
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+    config_entry_title:
+      name: "Config Entry Name (Optional)"
+      description: "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID."
+      required: false
+      example: "Family Chores"
+      selector:
+        text:
+    approver_name:
+      name: "Approver Name (Optional)"
+      description: "The approver giving the achievement."
+      example: "Dad"
+      required: false
+      selector:
+        text:
+    user_name:
+      name: "User Name"
+      description: "The user receiving the achievement."
+      example: "Bob"
+      required: true
+      selector:
+        text:
+    achievement_name:
+      name: "Achievement Name"
+      description: "The name of the achievement to give."
+      example: "Kitchen Hero"
+      required: true
+      selector:
+        text:
+
 manual_adjust_points:
   name: "Manual Adjust Points"
   description: "Adjust points manually for a user using a signed decimal amount with up to 2 fractional digits and a required reason recorded in the ledger."
