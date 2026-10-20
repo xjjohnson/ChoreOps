@@ -1026,7 +1026,7 @@ views:
                           'action': 'call-service',
                           'service': 'choreops.reset_family_goal',
                           'data': {
-                            'achievement_name': gname,
+                            'goal_name': gname,
                             'config_entry_id': fg_entry_id
                           },
                           'confirmation': {'text': 'Reset ' ~ gname ~ '? Progress and awards start over from zero. Points already paid are not taken back.'}

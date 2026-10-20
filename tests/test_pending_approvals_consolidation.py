@@ -89,37 +89,23 @@ def test_recent_activity_returns_newest_five_ledger_entries() -> None:
 
 
 def test_shared_admin_helper_lists_family_goals() -> None:
-    """Family goals are exposed straight from storage for the OpsCenter reset card."""
+    """Family goals are exposed straight from the goal manager for the reset card."""
     from types import SimpleNamespace
 
-    from custom_components.choreops import const
     from custom_components.choreops.sensor import SystemDashboardHelperSensor
 
-    achievements = {
-        "a1": {
-            const.DATA_ACHIEVEMENT_TYPE: const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
-            const.DATA_ACHIEVEMENT_NAME: "Pizza Night",
-            const.DATA_ACHIEVEMENT_TARGET_VALUE: 10,
-        },
-        "a2": {
-            const.DATA_ACHIEVEMENT_TYPE: "chore_total",
-            const.DATA_ACHIEVEMENT_NAME: "Personal",
-        },
-    }
-    fake = SimpleNamespace(
-        coordinator=SimpleNamespace(
-            achievements_data=achievements,
-            gamification_manager=SimpleNamespace(
-                get_family_achievement_total=lambda _id: 4.0
-            ),
-        )
-    )
-    goals = SystemDashboardHelperSensor._build_family_goals(fake)  # type: ignore[arg-type]
-    assert goals == [
+    overview = [
         {
             "name": "Pizza Night",
-            "type": const.ACHIEVEMENT_TYPE_FAMILY_POINTS,
+            "type": "family_points_total",
             "total": 4.0,
             "target": 10.0,
         }
     ]
+    fake = SimpleNamespace(
+        coordinator=SimpleNamespace(
+            family_goal_manager=SimpleNamespace(get_overview=lambda: overview)
+        )
+    )
+    goals = SystemDashboardHelperSensor._build_family_goals(fake)  # type: ignore[arg-type]
+    assert goals == overview

@@ -25,6 +25,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from . import const
 from .engines.statistics_engine import StatisticsEngine
+from .family_goals.manager import FamilyGoalManager
 from .helpers.entity_helpers import (
     remove_entities_by_item_id,
     remove_orphaned_assignee_chore_entities,
@@ -42,6 +43,7 @@ from .managers import (
     UIManager,
     UserManager,
 )
+from .reward_pools.manager import RewardPoolManager
 from .store import ChoreOpsStore
 from .type_defs import (
     AchievementsCollection,
@@ -142,6 +144,12 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
         # Gamification manager for badge/achievement/challenge evaluation (v0.5.x+)
         # Uses debounced evaluation triggered by coordinator events
         self.gamification_manager = GamificationManager(hass, self)
+
+        # Family goals: group goals pooled across everyone assigned
+        self.family_goal_manager = FamilyGoalManager(hass, self)
+
+        # Reward pools: families chip in points toward one shared reward
+        self.reward_pool_manager = RewardPoolManager(hass, self)
 
         # Statistics engine for unified period-based tracking (v0.5.0+)
         self.stats = StatisticsEngine()

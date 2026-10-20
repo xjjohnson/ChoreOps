@@ -12,6 +12,7 @@ from homeassistant.helpers import entity_registry as er
 import pytest
 
 from custom_components.choreops import const
+from custom_components.choreops.reward_pools import const as rp
 from tests.helpers import SetupResult, get_dashboard_helper, setup_from_yaml
 from tests.helpers.workflows import find_reward, get_reward_buttons
 
@@ -73,24 +74,25 @@ async def test_contributions_leave_balance_immediately_and_pool_up(
 ) -> None:
     """Each contribution is withdrawn at once and adds to one shared total."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 50.0)
     _set_points(scenario_full, max_, 50.0)
 
-    assert await rm.contribute_to_pool(zoe, reward_id, 30.0) == 30.0
+    assert await pm.contribute_to_pool(zoe, reward_id, 30.0) == 30.0
     await hass.async_block_till_done()
-    assert await rm.contribute_to_pool(max_, reward_id, 20.0) == 20.0
+    assert await pm.contribute_to_pool(max_, reward_id, 20.0) == 20.0
     await hass.async_block_till_done()
-    assert await rm.contribute_to_pool(zoe, reward_id, 5.0) == 5.0
+    assert await pm.contribute_to_pool(zoe, reward_id, 5.0) == 5.0
     await hass.async_block_till_done()
 
     assert _points(scenario_full, zoe) == 15.0
     assert _points(scenario_full, max_) == 30.0
     assert _pool(scenario_full, reward_id) == {zoe: 35.0, max_: 20.0}
     reward = scenario_full.coordinator.rewards_data[reward_id]
-    assert rm.get_pool_total(reward) == 55.0
+    assert pm.get_pool_total(reward) == 55.0
 
 
 async def test_contribution_is_capped_and_default_amount_is_all_affordable(
@@ -99,6 +101,7 @@ async def test_contribution_is_capped_and_default_amount_is_all_affordable(
 ) -> None:
     """A contribution never overfills the pool; no amount means all you can."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
@@ -106,10 +109,10 @@ async def test_contribution_is_capped_and_default_amount_is_all_affordable(
     _set_points(scenario_full, max_, 500.0)
 
     # No amount: Zoë puts in her whole balance (pool still needs 100)
-    assert await rm.contribute_to_pool(zoe, reward_id) == 40.0
+    assert await pm.contribute_to_pool(zoe, reward_id) == 40.0
     await hass.async_block_till_done()
     # Max asks for 500 but only 60 is still needed
-    assert await rm.contribute_to_pool(max_, reward_id, 500.0) == 60.0
+    assert await pm.contribute_to_pool(max_, reward_id, 500.0) == 60.0
     await hass.async_block_till_done()
 
     assert _points(scenario_full, zoe) == 0.0
@@ -123,6 +126,7 @@ async def test_contribution_rejections(
 ) -> None:
     """Not pooled, not assigned, unaffordable and zero contributions fail cleanly."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
@@ -130,22 +134,22 @@ async def test_contribution_rejections(
     _set_points(scenario_full, zoe, 10.0)
 
     with pytest.raises(HomeAssistantError) as err:
-        await rm.contribute_to_pool(zoe, normal_reward_id, 5.0)
-    assert err.value.translation_key == const.TRANS_KEY_ERROR_REWARD_NOT_POOLED
+        await pm.contribute_to_pool(zoe, normal_reward_id, 5.0)
+    assert err.value.translation_key == rp.TRANS_KEY_ERROR_REWARD_NOT_POOLED
 
     with pytest.raises(HomeAssistantError) as err:
-        await rm.contribute_to_pool(zoe, reward_id, 25.0)
+        await pm.contribute_to_pool(zoe, reward_id, 25.0)
     assert err.value.translation_key == const.TRANS_KEY_ERROR_INSUFFICIENT_POINTS
 
     _set_points(scenario_full, zoe, 0.0)
     with pytest.raises(HomeAssistantError) as err:
-        await rm.contribute_to_pool(zoe, reward_id)
-    assert err.value.translation_key == const.TRANS_KEY_ERROR_REWARD_POOL_INVALID_AMOUNT
+        await pm.contribute_to_pool(zoe, reward_id)
+    assert err.value.translation_key == rp.TRANS_KEY_ERROR_REWARD_POOL_INVALID_AMOUNT
 
     rm.update_reward(reward_id, {const.DATA_REWARD_ASSIGNED_USER_IDS: [zoe]})
     _set_points(scenario_full, max_, 50.0)
     with pytest.raises(HomeAssistantError) as err:
-        await rm.contribute_to_pool(max_, reward_id, 5.0)
+        await pm.contribute_to_pool(max_, reward_id, 5.0)
     assert err.value.translation_key == const.TRANS_KEY_ERROR_NOT_ASSIGNED
 
     assert _pool(scenario_full, reward_id) == {}
@@ -159,6 +163,7 @@ async def test_full_pool_notifies_approvers_and_blocks_more_contributions(
     """Filling the pool tells approvers once; the pool then refuses more points."""
     coordinator = scenario_full.coordinator
     rm = coordinator.reward_manager
+    pm = coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
@@ -169,17 +174,17 @@ async def test_full_pool_notifies_approvers_and_blocks_more_contributions(
     with patch.object(
         coordinator.notification_manager, "broadcast_to_all_approvers", broadcast
     ):
-        await rm.contribute_to_pool(zoe, reward_id, 60.0)
+        await pm.contribute_to_pool(zoe, reward_id, 60.0)
         await hass.async_block_till_done()
         broadcast.assert_not_called()
 
-        await rm.contribute_to_pool(max_, reward_id, 60.0)
+        await pm.contribute_to_pool(max_, reward_id, 60.0)
         await hass.async_block_till_done()
 
     broadcast.assert_awaited_once()
     assert (
         broadcast.await_args.kwargs["title_key"]
-        == const.TRANS_KEY_NOTIF_TITLE_REWARD_POOL_FULL_APPROVER
+        == rp.TRANS_KEY_NOTIF_TITLE_REWARD_POOL_FULL_APPROVER
     )
     assert broadcast.await_args.kwargs["placeholders"]["reward_name"] == (
         "Pick Next Movie"
@@ -187,8 +192,8 @@ async def test_full_pool_notifies_approvers_and_blocks_more_contributions(
     assert _points(scenario_full, max_) == 20.0
 
     with pytest.raises(HomeAssistantError) as err:
-        await rm.contribute_to_pool(max_, reward_id, 5.0)
-    assert err.value.translation_key == const.TRANS_KEY_ERROR_REWARD_POOL_FULL
+        await pm.contribute_to_pool(max_, reward_id, 5.0)
+    assert err.value.translation_key == rp.TRANS_KEY_ERROR_REWARD_POOL_FULL
 
 
 async def test_approve_pool_empties_it_without_charging_again(
@@ -198,26 +203,27 @@ async def test_approve_pool_empties_it_without_charging_again(
     """Approval needs a full pool, then resets it and tells each contributor."""
     coordinator = scenario_full.coordinator
     rm = coordinator.reward_manager
+    pm = coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 70.0)
     _set_points(scenario_full, max_, 70.0)
 
-    await rm.contribute_to_pool(zoe, reward_id, 70.0)
+    await pm.contribute_to_pool(zoe, reward_id, 70.0)
     await hass.async_block_till_done()
     with pytest.raises(HomeAssistantError) as err:
-        await rm.approve_pool("Mom", reward_id)
-    assert err.value.translation_key == const.TRANS_KEY_ERROR_REWARD_POOL_NOT_FULL
+        await pm.approve_pool("Mom", reward_id)
+    assert err.value.translation_key == rp.TRANS_KEY_ERROR_REWARD_POOL_NOT_FULL
 
-    await rm.contribute_to_pool(max_, reward_id, 30.0)
+    await pm.contribute_to_pool(max_, reward_id, 30.0)
     await hass.async_block_till_done()
 
     notify = AsyncMock()
     with patch.object(
         coordinator.notification_manager, "notify_assignee_translated", notify
     ):
-        await rm.approve_pool("Mom", reward_id)
+        await pm.approve_pool("Mom", reward_id)
         await hass.async_block_till_done()
 
     assert _pool(scenario_full, reward_id) == {}
@@ -230,7 +236,7 @@ async def test_approve_pool_empties_it_without_charging_again(
 
     # The family can save up again
     _set_points(scenario_full, zoe, 10.0)
-    assert await rm.contribute_to_pool(zoe, reward_id, 10.0) == 10.0
+    assert await pm.contribute_to_pool(zoe, reward_id, 10.0) == 10.0
 
 
 async def test_approve_refunds_overfill_when_cost_was_lowered(
@@ -239,20 +245,21 @@ async def test_approve_refunds_overfill_when_cost_was_lowered(
 ) -> None:
     """Lowering the cost below the pool refunds the excess by share on approval."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 60.0)
     _set_points(scenario_full, max_, 20.0)
 
-    await rm.contribute_to_pool(zoe, reward_id, 60.0)
-    await rm.contribute_to_pool(max_, reward_id, 20.0)
+    await pm.contribute_to_pool(zoe, reward_id, 60.0)
+    await pm.contribute_to_pool(max_, reward_id, 20.0)
     await hass.async_block_till_done()
 
     # Pool holds 80; cost drops to 40, so 40 comes back split 3:1
     rm.update_reward(reward_id, {const.DATA_REWARD_COST: 40.0})
     assert _pool(scenario_full, reward_id) == {zoe: 60.0, max_: 20.0}
-    await rm.approve_pool("Mom", reward_id)
+    await pm.approve_pool("Mom", reward_id)
     await hass.async_block_till_done()
 
     assert _points(scenario_full, zoe) == 30.0
@@ -262,11 +269,11 @@ async def test_approve_refunds_overfill_when_cost_was_lowered(
 
 def test_split_overfill_sums_exactly() -> None:
     """Rounding residue goes to the largest contributor so refunds sum exactly."""
-    from custom_components.choreops.managers.reward_manager import RewardManager
+    from custom_components.choreops.reward_pools.manager import RewardPoolManager
 
-    refunds = RewardManager._split_overfill({"a": 1.0, "b": 1.0, "c": 1.0}, 1.0)
+    refunds = RewardPoolManager._split_overfill({"a": 1.0, "b": 1.0, "c": 1.0}, 1.0)
     assert round(sum(refunds.values()), 2) == 1.0
-    assert RewardManager._split_overfill({"a": 5.0}, 0.0) == {}
+    assert RewardPoolManager._split_overfill({"a": 5.0}, 0.0) == {}
 
 
 async def test_refund_returns_exact_contributions_without_counting_as_earned(
@@ -275,6 +282,7 @@ async def test_refund_returns_exact_contributions_without_counting_as_earned(
 ) -> None:
     """Refunds restore balances and reverse points spent, not points earned."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
@@ -284,11 +292,11 @@ async def test_refund_returns_exact_contributions_without_counting_as_earned(
         const.DATA_USER_POINT_PERIOD_POINTS_EARNED, 0.0
     )
 
-    await rm.contribute_to_pool(zoe, reward_id, 25.5)
-    await rm.contribute_to_pool(max_, reward_id, 10.0)
+    await pm.contribute_to_pool(zoe, reward_id, 25.5)
+    await pm.contribute_to_pool(max_, reward_id, 10.0)
     await hass.async_block_till_done()
 
-    assert await rm.refund_pool(reward_id) == {zoe: 25.5, max_: 10.0}
+    assert await pm.refund_pool(reward_id) == {zoe: 25.5, max_: 10.0}
     await hass.async_block_till_done()
 
     assert _points(scenario_full, zoe) == 50.0
@@ -300,7 +308,7 @@ async def test_refund_returns_exact_contributions_without_counting_as_earned(
     )
     assert all_time.get(const.DATA_USER_POINT_PERIOD_POINTS_SPENT, 0.0) == 0.0
     # Refunding an empty pool is a no-op
-    assert await rm.refund_pool(reward_id) == {}
+    assert await pm.refund_pool(reward_id) == {}
 
 
 async def test_deleting_pooled_reward_refunds_everyone(
@@ -309,11 +317,12 @@ async def test_deleting_pooled_reward_refunds_everyone(
 ) -> None:
     """Deleting a pooled reward gives contributors their points back."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 50.0)
 
-    await rm.contribute_to_pool(zoe, reward_id, 40.0)
+    await pm.contribute_to_pool(zoe, reward_id, 40.0)
     await hass.async_block_till_done()
     assert _points(scenario_full, zoe) == 10.0
 
@@ -329,10 +338,11 @@ async def test_pool_survives_reward_edits(
 ) -> None:
     """Editing other reward fields keeps the points in the pool."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 50.0)
-    await rm.contribute_to_pool(zoe, reward_id, 15.0)
+    await pm.contribute_to_pool(zoe, reward_id, 15.0)
     await hass.async_block_till_done()
 
     rm.update_reward(reward_id, {const.DATA_REWARD_DESCRIPTION: "Popcorn included"})
@@ -341,7 +351,7 @@ async def test_pool_survives_reward_edits(
     # Turning the pool off keeps the points so they can still be refunded
     rm.update_reward(reward_id, {const.DATA_REWARD_POOLED: False})
     assert _pool(scenario_full, reward_id) == {zoe: 15.0}
-    await rm.refund_pool(reward_id)
+    await pm.refund_pool(reward_id)
     await hass.async_block_till_done()
     assert _points(scenario_full, zoe) == 50.0
 
@@ -352,6 +362,7 @@ async def test_pooled_reward_cannot_be_redeemed_or_charged_to_one_person(
 ) -> None:
     """Redeem and a full-cost approve are refused; free badge-style grants still work."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 500.0)
@@ -396,7 +407,7 @@ async def test_pool_services_end_to_end(
 
     response = await hass.services.async_call(
         const.DOMAIN,
-        const.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
+        rp.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
         {"user_name": "Zoë", "reward_name": "Family Pizza Night"},
         blocking=True,
         return_response=True,
@@ -404,7 +415,7 @@ async def test_pool_services_end_to_end(
     assert response == {const.SERVICE_FIELD_POINTS_AMOUNT: 30.0}
     await hass.services.async_call(
         const.DOMAIN,
-        const.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
+        rp.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
         {"user_name": "Max!", "reward_name": "Family Pizza Night", "amount": 20},
         blocking=True,
     )
@@ -414,7 +425,7 @@ async def test_pool_services_end_to_end(
 
     await hass.services.async_call(
         const.DOMAIN,
-        const.SERVICE_APPROVE_REWARD_POOL,
+        rp.SERVICE_APPROVE_REWARD_POOL,
         {"reward_name": "Family Pizza Night", "approver_name": "Mom"},
         blocking=True,
     )
@@ -423,13 +434,13 @@ async def test_pool_services_end_to_end(
 
     await hass.services.async_call(
         const.DOMAIN,
-        const.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
+        rp.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
         {"user_name": "Max!", "reward_name": "Family Pizza Night", "amount": 10},
         blocking=True,
     )
     await hass.services.async_call(
         const.DOMAIN,
-        const.SERVICE_REFUND_REWARD_POOL,
+        rp.SERVICE_REFUND_REWARD_POOL,
         {"reward_name": "Family Pizza Night"},
         blocking=True,
     )
@@ -444,6 +455,7 @@ async def test_reward_status_sensor_shows_pool(
     """The reward status sensor exposes pool progress and reports a full pool."""
     coordinator = scenario_full.coordinator
     rm = coordinator.reward_manager
+    pm = coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
@@ -459,7 +471,7 @@ async def test_reward_status_sensor_shows_pool(
     )
     assert entity_id
 
-    await rm.contribute_to_pool(zoe, reward_id, 25.0)
+    await pm.contribute_to_pool(zoe, reward_id, 25.0)
     await hass.async_block_till_done()
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
@@ -467,15 +479,15 @@ async def test_reward_status_sensor_shows_pool(
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == const.REWARD_STATE_AVAILABLE
-    assert state.attributes[const.ATTR_REWARD_POOLED] is True
-    assert state.attributes[const.ATTR_REWARD_POOL_TOTAL] == 25.0
-    assert state.attributes[const.ATTR_REWARD_POOL_REMAINING] == 75.0
-    assert state.attributes[const.ATTR_REWARD_POOL_MY_CONTRIBUTION] == 25.0
-    assert state.attributes[const.ATTR_REWARD_POOL_CONTRIBUTIONS] == {"Zoë": 25.0}
+    assert state.attributes[rp.ATTR_REWARD_POOLED] is True
+    assert state.attributes[rp.ATTR_REWARD_POOL_TOTAL] == 25.0
+    assert state.attributes[rp.ATTR_REWARD_POOL_REMAINING] == 75.0
+    assert state.attributes[rp.ATTR_REWARD_POOL_MY_CONTRIBUTION] == 25.0
+    assert state.attributes[rp.ATTR_REWARD_POOL_CONTRIBUTIONS] == {"Zoë": 25.0}
 
-    await rm.contribute_to_pool(max_, reward_id, 60.0)
+    await pm.contribute_to_pool(max_, reward_id, 60.0)
     await hass.async_block_till_done()
-    await rm.contribute_to_pool(zoe, reward_id, 15.0)
+    await pm.contribute_to_pool(zoe, reward_id, 15.0)
     await hass.async_block_till_done()
     coordinator.async_update_listeners()
     await hass.async_block_till_done()
@@ -483,7 +495,7 @@ async def test_reward_status_sensor_shows_pool(
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == const.REWARD_STATE_REQUESTED
-    assert state.attributes[const.ATTR_REWARD_POOL_FULL] is True
+    assert state.attributes[rp.ATTR_REWARD_POOL_FULL] is True
 
 
 # =============================================================================
@@ -523,6 +535,7 @@ async def test_redeem_button_chips_in_by_chip_in_amount(
 ) -> None:
     """On a pooled reward the dashboard button pays in the chip-in amount per press."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     reward_id = _make_pool(scenario_full)
     rm.update_reward(reward_id, {const.DATA_REWARD_POOL_CHIP_IN: 10.0})
@@ -565,10 +578,11 @@ async def test_approve_button_confirms_full_pool_and_disapprove_refuses(
 ) -> None:
     """Approve on a full pool empties it; disapprove never refunds from a tap."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 100.0)
-    await rm.contribute_to_pool(zoe, reward_id)
+    await pm.contribute_to_pool(zoe, reward_id)
     await hass.async_block_till_done()
     scenario_full.coordinator.async_update_listeners()
     await hass.async_block_till_done()
@@ -596,22 +610,23 @@ async def test_refund_single_contributor_leaves_the_rest_in_the_pool(
 ) -> None:
     """Refunding one person returns only their share and keeps the others."""
     rm = scenario_full.coordinator.reward_manager
+    pm = scenario_full.coordinator.reward_pool_manager
     zoe = scenario_full.assignee_ids["Zoë"]
     max_ = scenario_full.assignee_ids["Max!"]
     reward_id = _make_pool(scenario_full)
     _set_points(scenario_full, zoe, 50.0)
     _set_points(scenario_full, max_, 50.0)
 
-    await rm.contribute_to_pool(zoe, reward_id, 25.0)
-    await rm.contribute_to_pool(max_, reward_id, 10.0)
+    await pm.contribute_to_pool(zoe, reward_id, 25.0)
+    await pm.contribute_to_pool(max_, reward_id, 10.0)
     await hass.async_block_till_done()
 
-    assert await rm.refund_pool(reward_id, zoe) == {zoe: 25.0}
+    assert await pm.refund_pool(reward_id, zoe) == {zoe: 25.0}
     await hass.async_block_till_done()
 
     assert _points(scenario_full, zoe) == 50.0
     assert _points(scenario_full, max_) == 40.0
     assert _pool(scenario_full, reward_id) == {max_: 10.0}
     # Refunding someone who has nothing in the pool is a no-op
-    assert await rm.refund_pool(reward_id, zoe) == {}
+    assert await pm.refund_pool(reward_id, zoe) == {}
     assert _pool(scenario_full, reward_id) == {max_: 10.0}

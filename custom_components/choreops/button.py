@@ -1140,7 +1140,7 @@ class AssigneeRewardRedeemButton(ChoreOpsCoordinatorEntity, ButtonEntity):
                 chip_in = float(
                     reward_info.get(const.DATA_REWARD_POOL_CHIP_IN, const.DEFAULT_ZERO)
                 )
-                await self.coordinator.reward_manager.contribute_to_pool(
+                await self.coordinator.reward_pool_manager.contribute_to_pool(
                     self._assignee_id,
                     self._reward_id,
                     chip_in if chip_in > 0 else None,
@@ -1273,7 +1273,7 @@ class ApproverRewardApproveButton(ChoreOpsCoordinatorEntity, ButtonEntity):
             reward_info = self.coordinator.rewards_data.get(self._reward_id)
             if reward_info and reward_info.get(const.DATA_REWARD_POOLED, False):
                 # Family pool: confirm the full pool's reward was delivered
-                await self.coordinator.reward_manager.approve_pool(
+                await self.coordinator.reward_pool_manager.approve_pool(
                     approver_name, self._reward_id
                 )
                 return

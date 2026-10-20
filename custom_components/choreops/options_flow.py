@@ -21,6 +21,7 @@ import voluptuous as vol
 
 from . import const, data_builders as db
 from .data_builders import EntityValidationError
+from .family_goals.flow import FamilyGoalsOptionsMixin
 from .helpers import backup_helpers as bh, entity_helpers as eh, flow_helpers as fh
 from .helpers.storage_helpers import get_entry_storage_key_from_entry
 from .utils.dt_utils import dt_now_utc, dt_parse, validate_daily_multi_times
@@ -53,7 +54,7 @@ def _sanitize_select_values(values: Any, valid_values: set[str]) -> list[str]:
     ]
 
 
-class ChoreOpsOptionsFlowHandler(config_entries.OptionsFlow):
+class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.OptionsFlow):
     """Options Flow for adding/editing/deleting configuration elements."""
 
     def __init__(self, _config_entry: config_entries.ConfigEntry):
@@ -3860,12 +3861,6 @@ class ChoreOpsOptionsFlowHandler(config_entries.OptionsFlow):
                 const.DATA_ACHIEVEMENT_REWARD_POINTS,
                 const.DEFAULT_ACHIEVEMENT_REWARD_POINTS,
             ),
-            const.CFOF_ACHIEVEMENTS_INPUT_LEVELS: achievement_data.get(
-                const.DATA_ACHIEVEMENT_LEVELS, const.SENTINEL_EMPTY
-            ),
-            const.CFOF_ACHIEVEMENTS_INPUT_TOP_MULTIPLIER: achievement_data.get(
-                const.DATA_ACHIEVEMENT_TOP_MULTIPLIER, 1
-            ),
         }
 
         # On validation error, merge user's attempted input (preserves user changes)
@@ -3949,37 +3944,6 @@ class ChoreOpsOptionsFlowHandler(config_entries.OptionsFlow):
                 const.OPTIONS_FLOW_PLACEHOLDER_ACHIEVEMENT_NAME: achievement_name
             },
         )
-
-    # ----------------------------------------------------------------------------------
-    # CHALLENGES MANAGEMENT
-    # ----------------------------------------------------------------------------------
-
-    async def async_step_challenge_coming_soon(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Show the challenge sunset coming-soon messaging."""
-        if user_input is not None:
-            return await self.async_step_init()
-
-        return self.async_show_form(
-            step_id=const.OPTIONS_FLOW_STEP_CHALLENGE_COMING_SOON,
-            data_schema=vol.Schema({}),
-            description_placeholders={
-                const.PLACEHOLDER_DOCUMENTATION_URL: const.DOC_URL_BADGES_OVERVIEW
-            },
-        )
-
-    async def async_step_add_challenge(self, user_input=None):
-        """Show challenge sunset messaging for add action."""
-        return await self.async_step_challenge_coming_soon(user_input)
-
-    async def async_step_edit_challenge(self, user_input=None):
-        """Show challenge sunset messaging for edit action."""
-        return await self.async_step_challenge_coming_soon(user_input)
-
-    async def async_step_delete_challenge(self, user_input=None):
-        """Show challenge sunset messaging for delete action."""
-        return await self.async_step_challenge_coming_soon(user_input)
 
     # ----------------------------------------------------------------------------------
     # DASHBOARD GENERATOR

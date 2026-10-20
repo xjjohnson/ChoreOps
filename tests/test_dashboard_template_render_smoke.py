@@ -1512,7 +1512,7 @@ def test_admin_family_goals_card_lists_goals_with_reset_service() -> None:
     reset_tap = parsed[1]["custom_fields"]["reset"]["card"]["tap_action"]
     assert reset_tap["service"] == "choreops.reset_family_goal"
     assert reset_tap["data"] == {
-        "achievement_name": "Pizza Night",
+        "goal_name": "Pizza Night",
         "config_entry_id": "entry-123",
     }
     assert "confirmation" in reset_tap
