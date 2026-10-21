@@ -3632,6 +3632,17 @@
         }
       }
     },
+    "approve_all_pending": {
+      "name": "Approve All Pending",
+      "description": "Press several ChoreOps chore or reward approve buttons at once, with one dashboard refresh at the end. Each button still checks who is approving.",
+      "fields": {
+        "entity_id": {
+          "name": "Approve Buttons",
+          "description": "The chore and reward approve buttons to press.",
+          "example": "button.zoe_approve_chore_dishes"
+        }
+      }
+    },
     "approve_reward_pool": {
       "name": "Approve Reward Pool",
       "description": "Confirm that a full family pool's reward has been delivered. The pool is emptied so the family can save up for it again.",
@@ -5856,6 +5867,9 @@
     },
     "reward_is_pooled": {
       "message": "{reward} is a family pool reward. Contribute points to the pool instead of redeeming it."
+    },
+    "approve_all_failed": {
+      "message": "{failed} of {total} approvals failed. First error: {error}"
     },
     "reward_pool_cost_zero": {
       "message": "A family pool reward needs a cost above 0, because the cost is the pool's target."

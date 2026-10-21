@@ -3123,3 +3123,80 @@ def test_family_views_use_build_time_wording() -> None:
         root_button_card_templates={},
     )
     assert plain["title"] == "Home"
+
+
+def test_family_home_race_track_moves_with_todays_chores() -> None:
+    """ "N chores a day" goals place each person by today's chore count."""
+    view = builder._render_family_home_view(
+        _read_template("user-family-home-v1.yaml"),
+        integration_entry_id="entry-123",
+        release_ref=None,
+        release_version=None,
+        generated_at="2026-10-21T00:00:00+00:00",
+        root_button_card_templates={},
+        user_names=["Olivia", "Lily", "Mom", "Dad"],
+    )
+    tpl = next(
+        c["filter"]["template"]
+        for sec in view["sections"]
+        for c in sec["cards"]
+        if c["type"] == "custom:auto-entities"
+        and "special_occasion" in c["filter"]["template"]
+    )
+    people = {
+        "Olivia": (5, "earned"),
+        "Lily": (4, "in_progress"),
+        "Mom": (0, "in_progress"),
+        "Dad": (3, "in_progress"),
+    }
+    states: dict[str, _MockState] = {}
+    for name, (done, status) in people.items():
+        slug = name.lower()
+        badge_eid = f"sensor.{slug}_badge_5aday"
+        states[f"sensor.{slug}_helper"] = _MockState(
+            entity_id=f"sensor.{slug}_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "user_name": name,
+                "dashboard_helpers": {},
+                "badges": [{"eid": badge_eid, "badge_type": "daily"}],
+            },
+            name=name,
+        )
+        states[badge_eid] = _MockState(
+            entity_id=badge_eid,
+            state="100" if status == "earned" else "0",
+            attributes={
+                "badge_name": "5 chores a day",
+                "status": status,
+                "today_chores_done": done,
+                "today_chores_required": 5,
+                "threshold_value": 1,
+                "end_date": "2026-10-21",
+                "start_date": "2026-10-21",
+            },
+            name="badge",
+        )
+    env, integration_entities, states_fn, state_attr = _build_runtime_template_env(
+        states
+    )
+    env.add_extension("jinja2.ext.loopcontrols")
+    env.filters["slugify"] = lambda v: str(v).lower()
+    env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 21, 12, 0)
+    env.globals["as_timestamp"] = lambda v: (
+        __import__("datetime").datetime.fromisoformat(str(v)).timestamp()
+    )
+    output = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states_fn,
+        state_attr=state_attr,
+    )
+    positions = {
+        initial: float(pos)
+        for pos, initial in re.findall(
+            r"left:calc\(([\d.]+)% - 8px[^>]*><div[^>]*>([A-Z])</div>", output
+        )
+    }
+    # Olivia is done (sits at the finish, drawn at 94%); the rest by today's count
+    assert positions == {"O": 94.0, "L": 80.0, "D": 60.0, "M": 0.0}

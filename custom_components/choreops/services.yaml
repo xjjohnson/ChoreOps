@@ -2163,6 +2163,23 @@ contribute_to_reward_pool:
           step: 0.01
           mode: box
 
+approve_all_pending:
+  name: "Approve All Pending"
+  description: >
+    Press several ChoreOps chore or reward approve buttons at once, with one
+    dashboard refresh at the end. Each button still checks who is approving.
+  fields:
+    entity_id:
+      name: "Approve Buttons"
+      description: "The chore and reward approve buttons to press."
+      required: true
+      example: "button.zoe_approve_chore_dishes"
+      selector:
+        entity:
+          integration: choreops
+          domain: button
+          multiple: true
+
 approve_reward_pool:
   name: "Approve Reward Pool"
   description: >

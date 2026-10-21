@@ -82,6 +82,10 @@ DATA_LEVEL_START: Final = "family_level_start"
 DATA_RECORD: Final = "family_record"
 DATA_RECORD_DAY: Final = "family_record_day"
 DATA_RECORD_TOP: Final = "family_record_top"
+# Version of what a points goal counts. 2 = award points left out; goals from
+# before carry snapshots that still include them and are converted on start.
+DATA_POINTS_BASIS: Final = "family_points_basis"
+POINTS_BASIS_NO_AWARDS: Final = 2
 
 # Runtime state that must survive an edit of the goal's settings.
 RUNTIME_KEYS: Final = (
@@ -93,6 +97,7 @@ RUNTIME_KEYS: Final = (
     DATA_RECORD,
     DATA_RECORD_DAY,
     DATA_RECORD_TOP,
+    DATA_POINTS_BASIS,
     DATA_PROGRESS,
 )
 

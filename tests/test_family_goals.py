@@ -897,3 +897,55 @@ def test_broken_goal_wording_falls_back_to_the_name() -> None:
     words = {fg.GOAL_WORD_LEVEL: "{name} - Stufe {stufe}"}
     assert _fill(words, fg.GOAL_WORD_LEVEL, name="Pizza", level=1) == "Pizza"
     assert _fill({}, fg.GOAL_WORD_LEVEL, name="Pizza", level=1) == "Pizza"
+
+
+async def test_old_points_goal_snapshots_are_converted(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Points goals saved before award points were left out keep working.
+
+    Their level-start snapshot still included award points, so every share
+    read 0 until a person out-earned all their past awards.
+    """
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = gm.create_goal(
+        {
+            fg.DATA_NAME: "Old points goal",
+            fg.DATA_ASSIGNED_USER_IDS: [zoe, max_],
+            fg.DATA_TYPE: fg.GOAL_TYPE_POINTS,
+            fg.DATA_TARGET_VALUE: 300.0,
+            fg.DATA_REWARD_POINTS: 50.0,
+            fg.DATA_LEVELS: "100:50, 300:50",
+        }
+    )
+    # Zoë already held 500 badge points before the goal's level began
+    await coordinator.economy_manager.deposit(
+        assignee_id=zoe, amount=500.0, source=const.POINTS_SOURCE_BADGES
+    )
+    await _earn_points(scenario_full, zoe, 60.0)
+    await _earn_points(scenario_full, max_, 40.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_level_info(goal_id)["level"] == 1
+
+    # What an older version saved: snapshots counting award points
+    goal = coordinator.challenges_data[goal_id]
+    goal[fg.DATA_LEVEL_START] = {zoe: 560.0, max_: 40.0}
+    del goal[fg.DATA_POINTS_BASIS]
+
+    await _earn_points(scenario_full, zoe, 30.0)
+    assert gm.get_level_contributions(goal_id) == {zoe: 0.0, max_: 0.0}  # the bug
+
+    assert gm.migrate_points_basis() == 1
+    # Zoë's 30 since the level began counts; Max earned nothing since
+    assert gm.get_level_contributions(goal_id) == {
+        zoe: pytest.approx(30.0),
+        max_: pytest.approx(0.0),
+    }
+    assert gm.get_total(goal_id) == pytest.approx(130.0)
+    # Runs once
+    assert gm.migrate_points_basis() == 0
