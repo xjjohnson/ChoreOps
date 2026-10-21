@@ -1764,7 +1764,9 @@ def test_admin_economy_tab_points_stepper_reason_and_apply() -> None:
         "Helped out",
         "Good behavior",
         "Extra effort",
-        "Correction",
+        "Kindness",
+        "Missed credit",
+        "Gift",
     ]
     # The picked reason clears when tapped again; another one sets it.
     assert reasons[0]["tap_action"]["data"]["ui_control_action"] == "remove"
@@ -1783,6 +1785,40 @@ def test_admin_economy_tab_points_stepper_reason_and_apply() -> None:
 
     recent = eco[7]["custom_fields"]["content"]
     assert "Left shoes out" in recent and "-50" in recent
+
+
+def test_admin_economy_tab_points_reasons_switch_with_the_direction() -> None:
+    """Removing stars offers its own reasons, and drops a reason from the other list."""
+
+    eco = _render_quick_actions(
+        "economy",
+        {"econ-tab": "points", "pts-amount": -100, "pts-reason": "Helped out"},
+        {},
+    )
+    assert [c["name"] for c in eco[5]["cards"]] == [
+        "Correction",
+        "Cashed out",
+        "Rule broken",
+        "Attitude",
+    ]
+    # "Helped out" was picked while adding; it does not carry over to a deduction.
+    apply_btn = eco[6]
+    assert apply_btn["tap_action"]["data"]["reason"] == "Adjustment"
+    assert "Adjustment" in apply_btn["tap_action"]["confirmation"]["text"]
+
+    kept = _render_quick_actions(
+        "economy",
+        {"econ-tab": "points", "pts-amount": -100, "pts-reason": "Rule broken"},
+        {},
+    )
+    assert kept[6]["tap_action"]["data"]["reason"] == "Rule broken"
+
+
+def test_admin_economy_tab_points_zero_amount_shows_the_adding_reasons() -> None:
+    """Before an amount is picked the adding list shows."""
+
+    eco = _render_quick_actions("economy", {"econ-tab": "points"}, {})
+    assert [c["name"] for c in eco[5]["cards"]][0] == "Helped out"
 
 
 def test_admin_economy_tab_points_defaults_to_pick_an_amount() -> None:
@@ -2402,6 +2438,148 @@ def test_family_hub_showcase_lists_earned_achievements_as_gold_tiles() -> None:
     assert "×2" in output
     assert "#d4a017" in output
     assert "Not Yet" not in output
+
+
+_SHOWCASE_UI = {
+    "good_afternoon": "Good afternoon",
+    "total_earned": "Total earned",
+    "multiplier": "Multiplier",
+    "chores_completed": "Chores completed",
+    "due_today": "Due Today",
+    "overdue": "Overdue",
+    "all_caught_up": "All Caught Up!",
+    "none": "None",
+}
+
+
+def _showcase_card(
+    *,
+    due_today: int = 2,
+    overdue: int = 0,
+    streak: dict[str, int] | None = None,
+    gamification: bool = True,
+    extra_helper: dict[str, object] | None = None,
+    marker: str = "SHOWCASE CARD",
+) -> str:
+    """Render the Showcase (or Welcome) card with a fully wired Lily."""
+    helper = {
+        "dashboard_helpers": {"translation_sensor_eid": "sensor.lily_ui"},
+        "core_sensors": {
+            "points_eid": "sensor.lily_points",
+            "chores_eid": "sensor.lily_chores",
+            "badges_eid": "sensor.lily_rank",
+        },
+        "caught_up_streak": streak or {"count": 1, "best": 1},
+        "gamification_enabled": gamification,
+        "badges": [],
+        "achievements": [],
+        "bonuses": [],
+        "penalties": [],
+        **(extra_helper or {}),
+    }
+    states = {
+        "sensor.lily_ui": _MockState(
+            entity_id="sensor.lily_ui",
+            state="ok",
+            attributes={"ui_translations": _SHOWCASE_UI},
+            name="ui",
+        ),
+        "sensor.lily_points": _MockState(
+            entity_id="sensor.lily_points",
+            state="9515",
+            attributes={
+                "icon": "mdi:star-outline",
+                "points_multiplier": 1.5,
+                "point_stat_points_earned_all_time": 9525,
+            },
+            name="points",
+        ),
+        "sensor.lily_chores": _MockState(
+            entity_id="sensor.lily_chores",
+            state="ok",
+            attributes={
+                "chore_stat_approved_all_time": 61,
+                "chore_stat_current_due_today": due_today,
+                "chore_stat_current_overdue": overdue,
+            },
+            name="chores",
+        ),
+        "sensor.lily_rank": _MockState(
+            entity_id="sensor.lily_rank",
+            state="Gold",
+            attributes={"icon": "mdi:medal"},
+            name="rank",
+        ),
+    }
+    return _render_hub_card(_hub_card_template(marker), helper, states)
+
+
+def test_family_hub_showcase_is_the_header_with_level_and_status_tiles() -> None:
+    """One card carries the greeting, level, total earned and the status tiles."""
+    output = _showcase_card()
+    assert "Good afternoon" in output
+    assert ">L</div>" in output  # avatar initial
+    assert "Lily" in output
+    assert ">Gold</span>" in output  # current level chip
+    assert "9525" in output  # total earned, not the 9515 spendable balance
+    assert "Total earned" in output
+    assert ">2</div>" in output  # due today
+    assert "Due Today" in output
+    assert "<span>1</span>" in output  # streak length
+    assert "Day streak" in output
+    assert "at risk · best 1" in output
+    assert ">x1.5</div>" in output
+    assert ">61</span>" in output and "Chores completed" in output
+    assert "Showcase" not in output
+    assert "Highest Rank" not in output
+
+
+def test_family_hub_showcase_status_tile_follows_the_chore_state() -> None:
+    """The first tile reads caught up, due today or overdue, like the old chip."""
+    clear = _showcase_card(due_today=0, streak={"count": 4, "best": 9})
+    assert "All Caught Up!" in clear
+    assert "var(--success-color)" in clear
+    assert "best 9" in clear and "at risk" not in clear
+
+    overdue = _showcase_card(overdue=3, streak={"count": 0, "best": 5})
+    assert "Overdue" in overdue
+    assert "var(--error-color)" in overdue
+    assert "ended · best 5" in overdue
+
+
+def test_family_hub_showcase_has_no_goal_bars() -> None:
+    """Goals live in their own card; the showcase no longer repeats them."""
+    output = _showcase_card(
+        extra_helper={
+            "badges": [
+                {
+                    "eid": "sensor.lily_goal",
+                    "name": "Perfect Week",
+                    "badge_type": "periodic",
+                }
+            ]
+        }
+    )
+    assert "Perfect Week" not in output
+
+
+def test_family_hub_welcome_card_only_renders_when_gamification_is_off() -> None:
+    """With gamification on the Showcase is the header; off, Welcome still greets."""
+    on = _showcase_card(marker="WELCOME CARD", gamification=True)
+    assert "custom:button-card" not in on
+    off = _showcase_card(marker="WELCOME CARD", gamification=False)
+    assert "custom:button-card" in off
+    assert "Good afternoon" in off
+
+
+def test_family_hub_showcase_card_comes_first() -> None:
+    """The merged header sits above Chores on the page."""
+    template = _read_template("user-family-hub-v1.yaml")
+    assert (
+        template.index("SHOWCASE CARD")
+        < template.index("WELCOME CARD")
+        < template.index("CHORES CARD")
+    )
 
 
 def _goal_badge_states(attrs: dict[str, object], progress: int = 20):
