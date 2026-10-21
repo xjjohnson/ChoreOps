@@ -15,7 +15,7 @@
 <#-- ============================================= --#>
 
 views:
-- title: OpsCenter
+- title: Parents
   path: admin
   max_columns: 3
   sections:
