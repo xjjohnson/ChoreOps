@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 import pytest
 
@@ -12,6 +11,9 @@ from custom_components.choreops import const
 from custom_components.choreops.family_goals import const as fg
 from tests.helpers import SetupResult, setup_from_yaml
 from tests.helpers.flow_test_helpers import FlowTestHelper
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 @pytest.fixture

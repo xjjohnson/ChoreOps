@@ -2364,13 +2364,12 @@ def _render_hub_card(
             _dt.datetime.fromtimestamp(float(v)).strftime(f)
         )
     env.filters["as_local"] = lambda v: v
-    output = env.from_string(tpl).render(
+    return env.from_string(tpl).render(
         integration_entities=integration_entities,
         states=states,
         state_attr=state_attr,
         pref_points_precision="fixed_0",
     )
-    return output
 
 
 def _achievement_state(eid: str, name: str, count: int, last: str, points: float = 5):
@@ -2964,13 +2963,13 @@ def _caught_up_chip_icons(output: str) -> dict[str, str]:
     """Return each person's chip icon (check or close) from rendered HTML."""
     import re
 
-    return dict(
-        (name, icon)
+    return {
+        name: icon
         for icon, name in re.findall(
             r"icon=\\?'mdi:(check-bold|close)\\?'[^<]*></ha-icon></span>([^<]+)</div>",
             output,
         )
-    )
+    }
 
 
 def test_family_hub_caught_up_chips_read_counts() -> None:
@@ -2986,7 +2985,10 @@ def test_family_hub_caught_up_chips_read_counts() -> None:
     assert _caught_up_chip_icons(output) == {"Lily": "check-bold", "Dad": "close"}
 
     # Sensors from before the update still sent sentences; those keep working.
-    legacy = {"Lily": "0 still to do today, 2 done", "Dad": "2 still to do today, 1 done"}
+    legacy = {
+        "Lily": "0 still to do today, 2 done",
+        "Dad": "2 still to do today, 1 done",
+    }
     output = _render_hub_card(
         tpl, {}, {"sensor.family_caught_up": _caught_up_goal_state(legacy)}
     )

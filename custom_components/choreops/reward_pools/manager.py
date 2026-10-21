@@ -55,7 +55,7 @@ class RewardPoolManager(BaseManager):
 
     def _grant(self, **kwargs: Any) -> None:
         """Record the reward as delivered to a contributor."""
-        self.coordinator.reward_manager._grant_to_assignee(**kwargs)  # noqa: SLF001
+        self.coordinator.reward_manager._grant_to_assignee(**kwargs)
 
     # =========================================================================
     # Public API: Family Pool

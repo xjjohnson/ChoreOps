@@ -591,7 +591,7 @@ def _clear_schema45_challenges_container(data: dict[str, Any]) -> None:
     Family Goals store their records in this same bucket, so they are kept.
     This runs on every startup, so wiping the bucket would delete the goals.
     """
-    from ..family_goals import const as family_goal_const
+    from custom_components.choreops.family_goals import const as family_goal_const
 
     challenges = data.get(const.DATA_CHALLENGES)
     if not isinstance(challenges, dict):

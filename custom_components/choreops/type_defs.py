@@ -692,6 +692,8 @@ class AssigneeData(TypedDict):
     # Current streak (daily approval streak)
     current_streak: NotRequired[int]
     last_date: NotRequired[str]  # ISO date
+    # "All Caught Up" day streak (family goals): {count, last_day, best}
+    caught_up_streak: NotRequired[dict[str, Any]]
 
     # Overdue tracking
     overdue_chores: NotRequired[list[str]]  # Chore UUIDs

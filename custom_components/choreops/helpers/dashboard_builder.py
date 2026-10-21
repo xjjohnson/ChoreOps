@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-import json
 import inspect
+import json
 from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any
@@ -791,7 +791,6 @@ def _render_family_home_view(
     view["path"] = FAMILY_HOME_VIEW_PATH
     view.setdefault("title", "Home")
     return view
-
 
 
 def _family_home_user_names(

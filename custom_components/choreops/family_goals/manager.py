@@ -578,7 +578,9 @@ class FamilyGoalManager(BaseManager):
         if assignee_info is None:
             return False
         today_iso = dt_today_iso()
-        streak = assignee_info.get(base.DATA_USER_CAUGHT_UP_STREAK) or {}
+        streak: dict[str, Any] = (
+            assignee_info.get(base.DATA_USER_CAUGHT_UP_STREAK) or {}
+        )
         count = int(streak.get("count", 0))
         best = int(streak.get("best", 0))
         last_day = str(streak.get("last_day", ""))
@@ -596,7 +598,7 @@ class FamilyGoalManager(BaseManager):
             last_day = today_iso
             changed = True
         if changed:
-            assignee_info[base.DATA_USER_CAUGHT_UP_STREAK] = {  # type: ignore[typeddict-unknown-key]
+            assignee_info[base.DATA_USER_CAUGHT_UP_STREAK] = {
                 "count": count,
                 "last_day": last_day,
                 "best": best,
@@ -885,11 +887,15 @@ class FamilyGoalManager(BaseManager):
             words.update(local.get(fg.TRANS_SECTION_GOAL_WORDS, {}))
         return {key: str(value) for key, value in words.items()}
 
-    async def _words_by_assignee(self, goal: dict[str, Any]) -> dict[str, dict[str, str]]:
+    async def _words_by_assignee(
+        self, goal: dict[str, Any]
+    ) -> dict[str, dict[str, str]]:
         """Return each assigned person's goal wording, in their own language."""
         words: dict[str, dict[str, str]] = {}
         for assignee_id in self._assigned_ids(goal):
-            assignee_info = self.coordinator.assignees_data.get(assignee_id, {})
+            assignee_info: dict[str, Any] = cast(
+                "dict[str, Any]", self.coordinator.assignees_data.get(assignee_id, {})
+            )
             language = str(
                 assignee_info.get(base.DATA_USER_DASHBOARD_LANGUAGE)
                 or self.hass.config.language

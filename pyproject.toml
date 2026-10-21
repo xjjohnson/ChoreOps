@@ -141,6 +141,10 @@ split-on-trailing-comma = false
 # Managers subdirectory uses relative imports for parent package (consistency)
 "custom_components/choreops/managers/**" = ["TID252"]
 
+# Fork feature packages use relative imports for the parent package (like managers)
+"custom_components/choreops/family_goals/**" = ["TID252"]
+"custom_components/choreops/reward_pools/**" = ["TID252"]
+
 # Calendar platform uses relative imports (HA component pattern)
 "custom_components/choreops/calendar.py" = ["TID252"]
 

@@ -114,11 +114,9 @@ class _FamilyGoalBase(ChoreOpsCoordinatorEntity, SensorEntity):
 
         associated_chore = base.SENTINEL_EMPTY
         selected = goal.get(fg.DATA_SELECTED_CHORE_ID)
-        if selected:
-            associated_chore = (
-                self.coordinator.chores_data.get(selected, {}).get(base.DATA_CHORE_NAME)
-                or base.SENTINEL_EMPTY
-            )
+        chore = self.coordinator.chores_data.get(str(selected)) if selected else None
+        if chore:
+            associated_chore = chore.get(base.DATA_CHORE_NAME) or base.SENTINEL_EMPTY
 
         assigned_names = [
             name

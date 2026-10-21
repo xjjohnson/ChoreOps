@@ -34,9 +34,9 @@ POOL_SERVICE_NAMES: tuple[str, ...] = (
 
 def register_pool_services(hass: HomeAssistant) -> None:
     """Register the contribute / approve / refund pool services."""
-    from .. import services as svc  # noqa: PLC0415 - circular at import time
+    from .. import services as svc  # Imported here: circular at import time
 
-    with_target = svc._with_service_target_fields  # noqa: SLF001
+    with_target = svc._with_service_target_fields
 
     contribute_schema = vol.Schema(
         with_target(
@@ -60,7 +60,7 @@ def register_pool_services(hass: HomeAssistant) -> None:
 
     async def handle_contribute(call: ServiceCall) -> dict[str, Any] | None:
         """Pay points from a user's balance into a pooled reward."""
-        entry_id = svc._resolve_target_entry_id(hass, dict(call.data))  # noqa: SLF001
+        entry_id = svc._resolve_target_entry_id(hass, dict(call.data))
         if not entry_id:
             const.LOGGER.warning(
                 "Contribute To Reward Pool: %s",
@@ -68,7 +68,7 @@ def register_pool_services(hass: HomeAssistant) -> None:
             )
             return None
 
-        coordinator = svc._get_coordinator_by_entry_id(hass, entry_id)  # noqa: SLF001
+        coordinator = svc._get_coordinator_by_entry_id(hass, entry_id)
         assignee_id = get_item_id_or_raise(
             coordinator,
             const.ITEM_TYPE_USER,
@@ -107,14 +107,14 @@ def register_pool_services(hass: HomeAssistant) -> None:
         call: ServiceCall, log_label: str
     ) -> tuple[ChoreOpsDataCoordinator, str] | None:
         """Resolve coordinator and reward for an approver pool action."""
-        entry_id = svc._resolve_target_entry_id(hass, dict(call.data))  # noqa: SLF001
+        entry_id = svc._resolve_target_entry_id(hass, dict(call.data))
         if not entry_id:
             const.LOGGER.warning(
                 "%s: %s", log_label, const.TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND
             )
             return None
 
-        coordinator = svc._get_coordinator_by_entry_id(hass, entry_id)  # noqa: SLF001
+        coordinator = svc._get_coordinator_by_entry_id(hass, entry_id)
         user_id = call.context.user_id
         if user_id and not await is_user_authorized_for_action(
             hass, user_id, AUTH_ACTION_MANAGEMENT
