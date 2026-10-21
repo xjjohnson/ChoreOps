@@ -2966,6 +2966,14 @@ def validate_rewards_inputs(
             const.CFOF_REWARDS_INPUT_ASSIGNED_USER_IDS
         ]
 
+    # Family pool settings (CFOF keys are aligned with DATA keys)
+    for pool_key in (
+        const.CFOF_REWARDS_INPUT_POOLED,
+        const.CFOF_REWARDS_INPUT_POOL_CHIP_IN,
+    ):
+        if pool_key in user_input:
+            data_dict[pool_key] = user_input[pool_key]
+
     # Call shared validation (single source of truth)
     is_update = current_reward_id is not None
     return db.validate_reward_data(

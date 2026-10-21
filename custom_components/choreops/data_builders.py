@@ -50,6 +50,7 @@ from typing import Any, Literal, cast
 import uuid
 
 from . import const
+from .reward_pools.validation import validate_pool_settings
 from .type_defs import AssigneeData, BadgeData, ChoreData, RewardData, UserData
 from .utils.dt_utils import dt_now_utc, dt_parse, dt_to_utc_iso
 from .utils.math_utils import parse_points_value
@@ -278,6 +279,8 @@ def validate_reward_data(
         1. Name not empty (create) or not blank (update if provided)
         2. Name not duplicate
         3. Cost >= 0 (if provided)
+        4. Assigned user IDs are a list of strings
+        5. Family pool: cost > 0 and chip-in <= cost
     """
     errors: dict[str, str] = {}
 
@@ -335,6 +338,10 @@ def validate_reward_data(
                 const.TRANS_KEY_CFOF_INVALID_REWARD_ASSIGNED_USERS
             )
             return errors
+
+    # === 5. Family pool: cost above 0, chip-in no more than the cost ===
+    existing = (existing_rewards or {}).get(current_reward_id or "")
+    errors.update(validate_pool_settings(data, existing))
 
     return errors
 

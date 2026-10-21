@@ -14,13 +14,14 @@ Family pools are different: people *spend* their points into them.
 1. **Settings → Devices & Services → ChoreOps → Configure → Manage Reward → Add Reward**
    (or edit an existing reward)
 2. Tick **Family pool**.
-3. Set **Reward Cost**. This is the pool's target.
+3. Set **Reward Cost**. This is the pool's target, and it must be more than 0.
 4. Set **Assigned to**. Only these people can pay into the pool.
 5. Optionally set **Chip-in amount**: the points paid in each time the dashboard
    button is pressed. Leave it at 0 to put in as much as the person can afford.
+   It can't be more than the reward's cost.
 
 The `create_reward` and `update_reward` services also take `pooled: true` and
-`pool_chip_in`.
+`pool_chip_in`, with the same rules.
 
 ## On the dashboard
 
@@ -32,12 +33,10 @@ A pooled reward uses the same reward buttons every dashboard already shows:
 | Approve | Confirms a full pool was delivered and empties it (approvers only) |
 | Disapprove / undo | Refused: contributors can't take points back, and refunds go through `refund_reward_pool` |
 
-So a pooled reward works on any dashboard. The bundled Gamification Premier and
-KidsChores Classic templates also replace the cost with the pool's progress
-("Pool: 55 / 100 · You: 20"), and Chores Lite adds the pool total to the tile.
-Those template changes are in the copies bundled with the integration. To use
-them, pick the currently installed release under **Dashboard Release Version**
-when generating the dashboard.
+So a pooled reward works on any dashboard. Only the Family Hub dashboards show
+the pool's progress (how much is in the pool and each person's share). The
+upstream templates (Gamification Premier, KidsChores Classic, Chores Lite)
+show a pooled reward like any other reward.
 
 ## Paying in from automations
 
@@ -67,7 +66,8 @@ approval in proportion to what each person paid in.
 ## Refunds
 
 - `choreops.refund_reward_pool` cancels the pool and gives everyone back exactly
-  what they paid in.
+  what they paid in. Add `user_name` to refund only that person and leave
+  everyone else's points in the pool.
 - Deleting a pooled reward refunds everyone automatically.
 - Unticking **Family pool** keeps the points in the pool, so they can still be
   refunded.

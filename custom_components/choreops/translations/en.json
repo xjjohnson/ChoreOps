@@ -502,6 +502,8 @@
       "invalid_reward_count": "Invalid reward count",
       "invalid_reward_name": "Invalid reward name",
       "invalid_reward_cost": "Reward cost must be zero or greater with up to 2 decimal places",
+      "reward_pool_cost_zero": "A family pool reward needs a cost above 0, because the cost is the pool's target",
+      "reward_pool_chip_in_too_high": "The chip-in amount can't be more than the reward's cost",
       "invalid_reward_assigned_users": "One or more assigned users are not valid",
       "mixed_reward_assignment_sentinel": "Cannot mix 'all users' with specific users",
       "invalid_bonus": "Invalid bonus",
@@ -1957,7 +1959,9 @@
       "family_goal_invalid_target": "The target must be a number above zero",
       "family_goal_invalid_levels": "Levels must look like 100:10, 250:25, 500:50 - targets above zero that increase, rewards zero or more",
       "family_goal_invalid_top_multiplier": "Top contributor multiplier must be a number, 1 or higher",
-      "family_goal_invalid_reward_points": "Points must be zero or more"
+      "family_goal_invalid_reward_points": "Points must be zero or more",
+      "reward_pool_cost_zero": "A family pool reward needs a cost above 0, because the cost is the pool's target",
+      "reward_pool_chip_in_too_high": "The chip-in amount can't be more than the reward's cost"
     },
     "abort": {
       "invalid_action": "Invalid Action",
@@ -5852,6 +5856,12 @@
     },
     "reward_is_pooled": {
       "message": "{reward} is a family pool reward. Contribute points to the pool instead of redeeming it."
+    },
+    "reward_pool_cost_zero": {
+      "message": "A family pool reward needs a cost above 0, because the cost is the pool's target."
+    },
+    "reward_pool_chip_in_too_high": {
+      "message": "The chip-in amount can't be more than the reward's cost."
     },
     "reward_pool_full": {
       "message": "The family pool for {reward} is already full"
