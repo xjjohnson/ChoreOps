@@ -17,6 +17,7 @@ from homeassistant.util import dt as dt_util
 import voluptuous as vol
 
 from . import const
+from .approve_all import SERVICE_APPROVE_ALL_PENDING, register_approve_all_service
 from .engines.chore_engine import ChoreEngine
 from .engines.schedule_engine import coerce_applicable_days
 from .family_goals import const as fg
@@ -3104,6 +3105,8 @@ def async_setup_services(hass: HomeAssistant):
 
     # Family reward pool services live in the reward_pools package
     register_pool_services(hass)
+    # Batched "Approve all" for the dashboards (one entity refresh)
+    register_approve_all_service(hass)
 
     # NOTE: reset_rewards service REMOVED - superseded by reset_transactional_data
     # with scope="assignee" or scope="global" and item_type="rewards"
@@ -4286,6 +4289,7 @@ async def async_unload_services(hass: HomeAssistant) -> None:
         const.SERVICE_MANUAL_ADJUST_POINTS,
         const.SERVICE_APPROVE_REWARD,
         *POOL_SERVICE_NAMES,
+        SERVICE_APPROVE_ALL_PENDING,
         const.SERVICE_MANAGE_UI_CONTROL,
         const.SERVICE_RESET_CHORES_TO_PENDING_STATE,  # Renamed from SERVICE_RESET_ALL_CHORES
         const.SERVICE_RESET_OVERDUE_CHORES,

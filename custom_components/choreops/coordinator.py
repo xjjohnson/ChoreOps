@@ -12,6 +12,8 @@ Architecture (v0.5.0+):
 """
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 import sys
@@ -19,7 +21,7 @@ import time
 from typing import Any, Literal, cast
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -109,6 +111,9 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
         self.config_entry = config_entry
         self.store = store
         self._data: dict[str, Any] = {}
+        # Entity refreshes asked for inside batched_updates() run once at the end
+        self._update_batch_depth = 0
+        self._update_batch_pending = False
 
         # Test mode detection for reminder delays and persist debounce
         self._test_mode = "pytest" in sys.modules
@@ -375,6 +380,32 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
 
         self._data[const.DATA_META] = meta
         self._data.pop(const.DATA_SCHEMA_VERSION, None)
+
+    @callback
+    def async_update_listeners(self) -> None:
+        """Refresh entities now, or once at the end of a batched_updates() block."""
+        if self._update_batch_depth > 0:
+            self._update_batch_pending = True
+            return
+        super().async_update_listeners()
+
+    @asynccontextmanager
+    async def batched_updates(self) -> AsyncIterator[None]:
+        """Run many changes with one entity refresh at the end.
+
+        Every change refreshes every entity, and one approval alone asks for
+        several refreshes, so dozens of approvals in a row blocked Home
+        Assistant for seconds. Inside this block the refreshes wait and run
+        once when it ends. Outside it, refreshes stay immediate.
+        """
+        self._update_batch_depth += 1
+        try:
+            yield
+        finally:
+            self._update_batch_depth -= 1
+            if self._update_batch_depth == 0 and self._update_batch_pending:
+                self._update_batch_pending = False
+                super().async_update_listeners()
 
     def _persist_and_update(self, immediate: bool = False) -> None:
         """Persist data AND update entity listeners to reflect state changes.

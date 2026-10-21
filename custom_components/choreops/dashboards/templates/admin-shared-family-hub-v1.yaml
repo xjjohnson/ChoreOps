@@ -468,7 +468,7 @@ views:
                         'name': (ui.get('approve_all', 'Approve all') if k_cards | length > 1 else ui.get('approve', 'Approve')),
                         'tap_action': {
                           'action': 'call-service',
-                          'service': 'button.press',
+                          'service': 'choreops.approve_all_pending',
                           'data': {'entity_id': k_ids},
                           'confirmation': {'text': (ui.get('approve', 'Approve') ~ ' ' ~ (k_ids | length) ~ ' ' ~ k_noun ~ ' · ' ~ helper_name ~ '?')}
                         } if k_ids | length > 0 else {'action': 'none'},
@@ -672,7 +672,7 @@ views:
                       'label': (ns.total_chore_pending | string) ~ ' ' ~ ui.get('chores', 'Chores') | lower ~ ' · ' ~ (ns.total_reward_pending | string) ~ ' ' ~ ui.get('rewards', 'Rewards') | lower ~ ' · ' ~ (ns.pending_user_count | string) ~ ' ' ~ (ui.get('people', 'People') | lower),
                       'tap_action': {
                         'action': 'call-service',
-                        'service': 'button.press',
+                        'service': 'choreops.approve_all_pending',
                         'data': {'entity_id': ns.all_ids},
                         'confirmation': {'text': (ui.get('approve_all_confirm', 'Approve {count} pending item(s) for everyone?') | replace('{count}', (ns.all_ids | length) | string))}
                       },
