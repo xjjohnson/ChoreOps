@@ -24,7 +24,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity_registry import async_get
 
 from . import const
-from .coordinator import ChoreOpsConfigEntry, ChoreOpsDataCoordinator
+from .coordinator import ChoreOpsConfigEntry, ChoreOpsDataCoordinator, batched_press
 from .entity import ChoreOpsCoordinatorEntity
 from .helpers.auth_helpers import (
     AUTH_ACTION_APPROVAL,
@@ -671,6 +671,7 @@ class AssigneeChoreClaimButton(ChoreOpsCoordinatorEntity, ButtonEntity):
     def press(self) -> None:
         """Synchronous press - not used, Home Assistant calls async_press."""
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event."""
         try:
@@ -806,6 +807,7 @@ class ApproverChoreApproveButton(ChoreOpsCoordinatorEntity, ButtonEntity):
     def press(self) -> None:
         """Synchronous press - not used, Home Assistant calls async_press."""
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event.
 
@@ -928,6 +930,7 @@ class ApproverChoreDisapproveButton(ChoreOpsCoordinatorEntity, ButtonEntity):
     def press(self) -> None:
         """Synchronous press - not used, Home Assistant calls async_press."""
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event.
 
@@ -1093,6 +1096,7 @@ class AssigneeRewardRedeemButton(ChoreOpsCoordinatorEntity, ButtonEntity):
     def press(self) -> None:
         """Synchronous press - not used, Home Assistant calls async_press."""
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event.
 
@@ -1251,6 +1255,7 @@ class ApproverRewardApproveButton(ChoreOpsCoordinatorEntity, ButtonEntity):
     def press(self) -> None:
         """Synchronous press - not used, Home Assistant calls async_press."""
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event.
 
@@ -1384,6 +1389,7 @@ class ApproverRewardDisapproveButton(ChoreOpsCoordinatorEntity, ButtonEntity):
     def press(self) -> None:
         """Synchronous press - not used, Home Assistant calls async_press."""
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event.
 
@@ -1568,6 +1574,7 @@ class ApproverBonusApplyButton(ChoreOpsCoordinatorEntity, ButtonEntity):
         """
         return self._user_icon or None
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event.
 
@@ -1702,6 +1709,7 @@ class ApproverPenaltyApplyButton(ChoreOpsCoordinatorEntity, ButtonEntity):
         """
         return self._user_icon or None
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle the button press event.
 
@@ -1866,6 +1874,7 @@ class ApproverPointsAdjustButton(ChoreOpsCoordinatorEntity, ButtonEntity):
     def press(self) -> None:
         """Synchronous press - not used, Home Assistant calls async_press."""
 
+    @batched_press
     async def async_press(self) -> None:
         """Handle button press event."""
         await self._internal_press_logic()

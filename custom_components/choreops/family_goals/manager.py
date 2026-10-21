@@ -210,7 +210,10 @@ class FamilyGoalManager(BaseManager):
         self._pending.clear()
         for assignee_id in queued:
             try:
-                await self.evaluate_assignee(assignee_id)
+                # Caught-up checks ask for every chore's status for everyone in
+                # a goal; reuse those lookups within one person's evaluation
+                with self.coordinator.chore_manager.status_cache():
+                    await self.evaluate_assignee(assignee_id)
             except Exception:
                 base.LOGGER.exception(
                     "Error evaluating family goals for assignee %s", assignee_id
@@ -1025,6 +1028,8 @@ class FamilyGoalManager(BaseManager):
         is_final: bool,
     ) -> None:
         """Mark one person's award and pay it through the challenge signal."""
+        # Payout handlers may change data; nothing cached may outlive them
+        self.coordinator.chore_manager.clear_status_cache()
         entry = goal.setdefault(fg.DATA_PROGRESS, {}).setdefault(assignee_id, {})
         entry[fg.DATA_AWARDED] = is_final
         entry[fg.PROGRESS_CURRENT_VALUE] = goal.get(fg.DATA_TARGET_VALUE, 1)
