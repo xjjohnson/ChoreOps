@@ -351,6 +351,11 @@ views:
                     {%- set prog = states(be) | float(default=0) -%}
                     {%- set prog = 0 if prog < 0 else (100 if prog > 100 else prog) -%}
                     {%- set earned = status in ['earned', 'completed'] -%}
+                    {#-- "N chores a day" goals move with today's chore count, like the ring on the person page --#}
+                    {%- set t_req = ba.get('today_chores_required') | int(default=0) -%}
+                    {%- if not earned and t_req > 0 and (ba.get('threshold_value') | float(default=0)) <= 1 -%}
+                      {%- set prog = [100, (ba.get('today_chores_done') | int(default=0)) * 100 / t_req] | min -%}
+                    {%- endif -%}
                     {%- set b_end = ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', '') -%}
                     {%- set b_start = ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', '') -%}
                     {%- set dl = (((as_timestamp(b_end ~ 'T12:00:00') - as_timestamp(today ~ 'T12:00:00')) / 86400) | round(0) | int) if b_end | length > 0 else 999 -%}
