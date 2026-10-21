@@ -34,6 +34,14 @@ _DEBOUNCE_SECONDS: float = 2.0
 # Points that goals pay out must not trigger another evaluation of themselves.
 _OWN_POINT_SOURCES = {base.POINTS_SOURCE_CHALLENGES}
 
+# Award points never count toward a points goal: only chores, bonuses and
+# manual adds do.
+_AWARD_POINT_SOURCES = (
+    base.POINTS_SOURCE_CHALLENGES,
+    base.POINTS_SOURCE_ACHIEVEMENTS,
+    base.POINTS_SOURCE_BADGES,
+)
+
 _NO_CHORE = (
     base.SENTINEL_EMPTY,
     base.SENTINEL_NONE_TEXT,
@@ -315,7 +323,7 @@ class FamilyGoalManager(BaseManager):
 
         if goal_type == fg.GOAL_TYPE_POINTS:
             point_periods = assignee_data.get(base.DATA_USER_POINT_PERIODS, {})
-            return float(
+            earned = float(
                 self.coordinator.stats.get_period_total(
                     point_periods,
                     base.PERIOD_ALL_TIME,
@@ -325,6 +333,25 @@ class FamilyGoalManager(BaseManager):
                     },
                 )
             )
+            # Award points (goal payouts, achievements, badges) are not effort
+            # toward a goal, and a level's own payout must not carry the goal
+            # toward its next level.
+            all_time = cast(
+                "dict[str, Any]",
+                cast(
+                    "dict[str, Any]",
+                    point_periods.get(base.DATA_USER_POINT_PERIODS_ALL_TIME, {}),
+                ).get(base.PERIOD_ALL_TIME, {}),
+            )
+            by_source = cast(
+                "dict[str, Any]",
+                all_time.get(base.DATA_USER_POINT_PERIOD_BY_SOURCE, {}),
+            )
+            awarded = sum(
+                max(0.0, float(by_source.get(source, 0.0) or 0.0))
+                for source in _AWARD_POINT_SOURCES
+            )
+            return max(0.0, earned - awarded)
 
         if goal_type == fg.GOAL_TYPE_DAY:
             return float(self._approved_today(assignee_id))

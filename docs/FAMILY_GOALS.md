@@ -22,8 +22,10 @@ total reaches the target, **everyone assigned is awarded at the same time**.
 - Counts are **all-time**: everything each assigned person has ever earned/completed
   counts, including history from before the goal was created. A goal can therefore
   start partway to its target.
-- "Points earned" counts points added to balances (chores, bonuses, manual adds,
-  other awards). Spending points on rewards or penalties does **not** reduce it.
+- "Points earned" counts points added to balances from chores, bonuses and manual
+  adds. Award points (family goal payouts, achievements and badges) don't count,
+  so a level's own payout never carries the goal toward the next level. Spending
+  points on rewards or penalties does **not** reduce it.
 - Only people listed under **Assigned Assignees** contribute and receive the award.
 - Evaluation runs whenever any assigned person is re-evaluated (for example when a
   chore is approved), so the goal completes as soon as the pooled total is reached.

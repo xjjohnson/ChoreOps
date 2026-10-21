@@ -787,3 +787,52 @@ async def test_goals_survive_a_restart(
         if "family_contributions" in state.attributes
     ]
     assert sensors
+
+
+async def test_points_goal_does_not_count_award_points(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Goal payouts, achievement points and badge points don't feed a points goal.
+
+    Otherwise a level's own payout would carry the goal toward the next level.
+    """
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = gm.create_goal(
+        {
+            fg.DATA_NAME: "Levelled points goal",
+            fg.DATA_ASSIGNED_USER_IDS: [zoe, max_],
+            fg.DATA_TYPE: fg.GOAL_TYPE_POINTS,
+            fg.DATA_TARGET_VALUE: 300.0,
+            fg.DATA_REWARD_POINTS: 50.0,
+            fg.DATA_LEVELS: "100:50, 300:50",
+        }
+    )
+
+    await _earn_points(scenario_full, zoe, 60.0)
+    await _earn_points(scenario_full, max_, 40.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    # Level 1 paid 50 to each person; the goal still only holds the 100 earned.
+    assert gm.get_level_info(goal_id)["level"] == 1
+    assert gm.get_total(goal_id) == pytest.approx(100.0)
+
+    for source in (const.POINTS_SOURCE_ACHIEVEMENTS, const.POINTS_SOURCE_BADGES):
+        await coordinator.economy_manager.deposit(
+            assignee_id=zoe, amount=500.0, source=source
+        )
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    assert gm.get_total(goal_id) == pytest.approx(100.0)
+    assert gm.get_level_info(goal_id)["level"] == 1
+
+    # Bonuses still count
+    await coordinator.economy_manager.deposit(
+        assignee_id=max_, amount=25.0, source=const.POINTS_SOURCE_BONUSES
+    )
+    assert gm.get_total(goal_id) == pytest.approx(125.0)
