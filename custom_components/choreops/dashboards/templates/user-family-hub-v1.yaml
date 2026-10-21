@@ -48,355 +48,6 @@ views:
               card_param: cards
               filter:
                 template: |-
-                  {#-- ===== WELCOME CARD ===== --#}
-
-                  << template_snippets.meta_stamp >>
-
-
-                  {#-- 1. User Configuration --#}
-
-                  << template_snippets.user_override_helper >>
-
-                  {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the welcome-card background when fill is enabled. Allowed: 0-100. --#}
-
-                  {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the welcome-card background fill and leave it transparent. Allowed: true, false. --#}
-
-                  {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
-
-
-                  {#-- 2. Dynamic Lookups & Validations --#}
-
-                  {%- set pref_primary_tint_mix_pct = pref_primary_tint_mix_pct | int(default=14) -%}
-                  {%- set pref_show_header_background = (pref_show_header_background | default('true') | string | lower) == 'true' -%}
-                  {%- set pref_show_header_thin_border = (pref_show_header_thin_border | default('true') | string | lower) == 'true' -%}
-                  {%- if pref_primary_tint_mix_pct < 0 -%}
-                    {%- set pref_primary_tint_mix_pct = 0 -%}
-                  {%- elif pref_primary_tint_mix_pct > 100 -%}
-                    {%- set pref_primary_tint_mix_pct = 100 -%}
-                  {%- endif -%}
-                  << template_snippets.user_setup >>
-
-                  << template_snippets.user_validation >>
-
-                  {%- if not skip_render -%}
-
-                    {#-- 3. Collect Data --#}
-                    {%- set core_sensors = state_attr(dashboard_helper, 'core_sensors') or {} -%}
-                    {%- set dashboard_helpers = state_attr(dashboard_helper, 'dashboard_helpers') or {} -%}
-                    {%- set dashboard_config = state_attr(dashboard_helper, 'dashboard_config') or {} -%}
-                    {%- set gamification_enabled = state_attr(dashboard_helper, 'gamification_enabled') | default(false, true) -%}
-                    {%- set points_sensor = core_sensors.get('points_eid') -%}
-                    {%- set total_sensor = core_sensors.get('chores_eid') -%}
-                    {%- set highest_badge_entity = core_sensors.get('badges_eid') -%}
-                    {%- set pref_points_precision = dashboard_config.get('points_precision', 'fixed_0') if dashboard_config is mapping else 'fixed_0' -%}
-                    {%- set pref_points_precision = pref_points_precision | default('fixed_0') | string | lower -%}
-                    {%- if pref_points_precision not in ['fixed_0', 'adaptive', 'fixed_1', 'fixed_2'] -%}
-                      {%- set pref_points_precision = 'fixed_0' -%}
-                    {%- endif -%}
-                    {%- set translation_sensor = dashboard_helpers.get('translation_sensor_eid') -%}
-                    {%- set ui = state_attr(translation_sensor, 'ui_translations') if translation_sensor else {} -%}
-                    {%- set points_value = (states(points_sensor) | float(default=0)) if points_sensor else 0 -%}
-                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or 'Points' -%}
-                    {%- set points_icon = (state_attr(points_sensor, 'icon') if points_sensor else None) or 'mdi:star-circle' -%}
-                    {%- set points_multiplier = (state_attr(points_sensor, 'points_multiplier') | float(default=1)) if points_sensor else 1 -%}
-                    {%- set highest_badge = ((states(highest_badge_entity) if highest_badge_entity else 'None') or 'None') -%}
-                    {%- set highest_badge_icon = (state_attr(highest_badge_entity, 'icon') if highest_badge_entity else None) or 'mdi:medal-outline' -%}
-                    {%- set overdue_now = (state_attr(total_sensor, 'chore_stat_current_overdue') | int(default=0)) if total_sensor else 0 -%}
-                    {%- set due_today_open = (state_attr(total_sensor, 'chore_stat_current_due_today') | int(default=0)) if total_sensor else 0 -%}
-                    {%- set chores_paused = state_attr(dashboard_helper, 'chores_paused') | bool(false) -%}
-
-                    {#-- 4. Build Display - essentials minimal --#}
-                    {%- set p_icon = points_icon | default('mdi:star', true) -%}
-                    {%- set points_value = points_value | round(2) -%}
-                    {%- if pref_points_precision == 'adaptive' -%}
-                      {%- if points_value == (points_value | int) -%}
-                        {%- set points_display = (points_value | int) | string -%}
-                      {%- elif points_value == (points_value | round(1)) -%}
-                        {%- set points_display = '%.1f' | format(points_value) -%}
-                      {%- else -%}
-                        {%- set points_display = '%.2f' | format(points_value) -%}
-                      {%- endif -%}
-                    {%- elif pref_points_precision == 'fixed_1' -%}
-                      {%- set points_display = '%.1f' | format(points_value) -%}
-                    {%- elif pref_points_precision == 'fixed_2' -%}
-                      {%- set points_display = '%.2f' | format(points_value) -%}
-                    {%- else -%}
-                      {%- set points_display = (points_value | round(0) | int) | string -%}
-                    {%- endif -%}
-                    {%- set multiplier_display = points_multiplier | int if points_multiplier == (points_multiplier | int) else points_multiplier -%}
-
-                    {%- set rank_pill = '' -%}
-                    {%- if highest_badge not in ['None', 'unknown', 'Unknown', 'unavailable'] -%}
-                      {%- set mult_text = " <span style='color: var(--warning-color);'>(x" ~ multiplier_display|string ~ ")</span>" if points_multiplier > 1 else '' -%}
-                      {%- set rank_pill = "<span style='font-size: 12px; background: var(--secondary-background-color); padding: 4px 12px; border-radius: 999px; border: 1px solid var(--divider-color); display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='width: 18px; height: 14px; margin-right: 5px; color: var(--warning-color);'></ha-icon><span style='font-weight: 600; color: var(--primary-text-color);'>" ~ highest_badge ~ mult_text ~ "</span></span>" -%}
-                    {%- endif -%}
-
-                    {%- if chores_paused -%}
-                      {%- set status_icon = 'mdi:pause-circle-outline' -%}
-                      {%- set status_color = 'var(--warning-color)' -%}
-                      {%- set status_text = ui.get('chores_are_paused', 'err-chores_are_paused') -%}
-                    {%- elif overdue_now > 0 -%}
-                      {%- set status_icon = 'mdi:alert-octagon' -%}
-                      {%- set status_color = 'var(--error-color)' -%}
-                      {%- set status_text = ui.get('overdue', 'err-overdue') ~ ': ' ~ overdue_now|string -%}
-                    {%- elif due_today_open > 0 -%}
-                      {%- set status_icon = 'mdi:calendar-clock' -%}
-                      {%- set status_color = 'var(--warning-color)' -%}
-                      {%- set status_text = ui.get('due_today', 'err-due_today') ~ ': ' ~ due_today_open|string -%}
-                    {%- else -%}
-                      {%- set status_icon = 'mdi:check-circle' -%}
-                      {%- set status_color = 'var(--success-color)' -%}
-                      {%- set status_text = ui.get('all_caught_up', 'All Caught Up!') -%}
-                    {%- endif -%}
-
-                    {%- set cu = state_attr(dashboard_helper, 'caught_up_streak') or {} -%}
-                    {%- set cu_n = cu.get('count', 0) | int(0) -%}
-                    {%- set cu_best = cu.get('best', 0) | int(0) -%}
-                    {%- set cu_open = (overdue_now + due_today_open) > 0 -%}
-                    {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue_now > 0 -%}
-                    {%- set cu_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
-                    {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' (at risk)' if (cu_open and cu_n > 0) else '') -%}
-                    {%- set streak_chip = ("<span style='display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ cu_col ~ "; background: color-mix(in srgb, " ~ cu_col ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'><ha-icon icon='mdi:fire' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ cu_col ~ "; display: block;'></ha-icon><span>" ~ cu_txt ~ "</span></span>") if (cu_n > 0 or cu_broken) else '' -%}
-                    {%- set streak_note = ("<span style='font-size: 11px; opacity: 0.65; white-space: nowrap;'>" ~ (('Streak ended. ') if cu_broken else '') ~ 'Best: ' ~ (cu_best | string) ~ (' days' if cu_best != 1 else ' day') ~ "</span>") if cu_best > 0 else '' -%}
-                    {%- set name_safe = name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                    {%- set hour_now = now().hour -%}
-                    {%- if hour_now < 12 -%}
-                      {%- set greeting_text = ui.get('good_morning', ui.get('welcome', 'err-welcome')) -%}
-                    {%- elif hour_now < 18 -%}
-                      {%- set greeting_text = ui.get('good_afternoon', ui.get('welcome', 'err-welcome')) -%}
-                    {%- else -%}
-                      {%- set greeting_text = ui.get('good_evening', ui.get('welcome', 'err-welcome')) -%}
-                    {%- endif -%}
-                    {%- set avatar_initial = (name_safe[:1] | upper) if name_safe else '?' -%}
-                    {%- set status_chip =
-                      "<span style='display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ status_color ~ "; background: color-mix(in srgb, " ~ status_color ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'>"
-                      ~ "<ha-icon icon='" ~ status_icon ~ "' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ status_color ~ "; display: block;'></ha-icon>"
-                      ~ "<span>" ~ status_text ~ "</span></span>"
-                    -%}
-                    {%- set right_col = "" -%}
-                    {%- if gamification_enabled -%}
-                      {%- set right_col =
-                        "<div style='text-align: right; flex-shrink: 0; margin-left: 12px;'>"
-                        ~ "<div style='display: inline-flex; align-items: center; color: var(--primary-color); font-size: 24px; font-weight: 800; line-height: 1; white-space: nowrap;'><ha-icon icon='" ~ p_icon ~ "' style='width: 24px; height: 24px; --mdc-icon-size: 24px; margin-right: 5px; display: block;'></ha-icon>" ~ points_display ~ "</div>"
-                        ~ "<div style='font-size: 10px; text-transform: uppercase; font-weight: 700; opacity: 0.65; margin-top: 4px; letter-spacing: 0.5px;'>" ~ points_label ~ "</div>"
-                        ~ "</div>"
-                      -%}
-                    {%- endif -%}
-
-                    {%- set content_html =
-                      "<div style='width: 100%; text-align: left;'>"
-                      ~ "<div style='display: flex; align-items: center; gap: 12px;'>"
-                      ~ "<div style='width: 48px; height: 48px; border-radius: 50%; background: var(--primary-color); color: var(--text-primary-color, #fff); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex: 0 0 auto;'>" ~ avatar_initial ~ "</div>"
-                      ~ "<div style='flex: 1; min-width: 0;'>"
-                      ~ "<div style='font-size: 12px; font-weight: 700; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.6px; line-height: 1.2;'>" ~ greeting_text ~ "</div>"
-                      ~ "<div style='font-size: 20px; font-weight: 700; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'>" ~ name_safe ~ "</div>"
-                      ~ "</div>"
-                      ~ right_col
-                      ~ "</div>"
-                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ streak_chip ~ streak_note ~ "</div>"
-                      ~ "</div>"
-                    -%}
-
-                    {#-- 5. Render --#}
-                    {{
-                      {
-                        'type': 'custom:button-card',
-                        'entity': points_sensor if gamification_enabled and points_sensor else total_sensor,
-                        'show_name': false,
-                        'show_icon': false,
-                        'tap_action': {'action': 'more-info'},
-                        'styles': {
-                          'card': [
-                            {'padding': '16px'},
-                            {'border-radius': '16px'},
-                            {'border': '1px solid color-mix(in srgb, var(--primary-color) 25%, var(--divider-color))' if pref_show_header_thin_border else 'none'},
-                            {'background': ('linear-gradient(135deg, color-mix(in srgb, var(--primary-color) ' ~ (pref_primary_tint_mix_pct * 3 // 2)|string ~ '%, var(--card-background-color)), color-mix(in srgb, var(--primary-color) ' ~ (pref_primary_tint_mix_pct // 3)|string ~ '%, var(--card-background-color)))') if pref_show_header_background else 'transparent'},
-                            {'box-shadow': 'none'}
-                          ],
-                          'grid': [
-                            {'grid-template-areas': '"content"'},
-                            {'grid-template-columns': '1fr'}
-                          ],
-                          'custom_fields': {
-                            'content': [{'width': '100%'}]
-                          }
-                        },
-                        'custom_fields': {
-                          'content': content_html
-                        }
-                      }
-                    }},
-
-                  {%- endif -%}
-
-        - type: grid
-          square: false
-          columns: 1
-          grid_options:
-            columns: full
-          cards:
-            - type: custom:auto-entities
-              card:
-                square: false
-                type: grid
-                columns: 1
-              card_param: cards
-              filter:
-                template: |-
-                  {#-- ===== CHORES CARD ===== --#}
-
-                  << template_snippets.meta_stamp >>
-
-
-                  {#-- ═══════════════════════════════════════════════════════════════════════ --#}
-                  {#-- PREFERENCE DEFAULTS                                             --#}
-                  {#-- ═══════════════════════════════════════════════════════════════════════ --#}
-                  {#--                                                                       --#}
-                  {#-- Full reference: https://github.com/ccpk1/ChoreOps-Dashboards/blob/main/preferences/user-family-hub-v1.md --#}
-                  {#--                                                                       --#}
-                  {#-- Groups: Layout & Grid · Time Buckets · Exclude Filters ·              --#}
-                  {#--         Include Filters · Labels & Sorting · Display ·                --#}
-                  {#--         Colors & Accents · Header & UI Control                        --#}
-                  {#-- ═══════════════════════════════════════════════════════════════════════ --#}
-
-                  << template_snippets.user_override_helper >>
-
-
-                  {#-- ── Layout & Grid ─────────────────────────────────────────────────── --#}
-
-                  {%- set pref_chore_row_variant = 'standard' -%}  {#-- Options: 'standard', 'kids' --#}
-
-                  {%- set pref_chore_engine_layout_mode = 'single' -%}  {#-- Options: 'single', 'responsive' --#}
-
-                  {%- set pref_settings_column_count_mobile = 3 -%}
-
-                  {%- set pref_settings_column_count_wide = 3 -%}
-
-                  {%- set pref_column_count_standard = 1 -%}
-
-                  {%- set pref_column_count_kids = 3 -%}
-
-
-                  {#-- ── Time Buckets ─────────────────────────────────────────────────── --#}
-
-                  {%- set pref_use_overdue_grouping = true -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_today_grouping_mode = 'today_morning' -%}  {#-- Options: 'off', 'today', 'today_morning' --#}
-
-                  {%- set pref_include_daily_recurring_in_today = true -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_use_this_week_grouping = true -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_use_standby_grouping = true -%}  {#-- Allowed: true, false --#}
-
-
-                  {#-- ── Exclude Filters ──────────────────────────────────────────────── --#}
-
-                  {%- set pref_exclude_completed = false -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_exclude_blocked = false -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_exclude_states = [] -%}  {#-- Example: ['completed', 'completed_by_other', 'paused', 'not_my_turn', 'standby', 'missed'] --#}
-
-                  {%- set pref_exclude_nonrecurring_no_due_date = false -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_max_due_date_days = 0 -%}  {#-- 0 disables; positive integer hides chores due beyond this many days ahead. --#}
-
-                  {%- set pref_exclude_group_list = [] -%}  {#-- Example: ['later', 'this_week'] --#}
-
-                  {%- set pref_exclude_label_list = [] -%}  {#-- Example: ['junk_label', 'skip_this'] --#}
-
-
-                  {#-- ── Include Filters (whitelist, Step 0 priority) ─────────────────── --#}
-
-                  {%- set pref_include_label_list = [] -%}  {#-- Example: ['shared_chores', 'kitchen'] --#}
-
-                  {%- set pref_include_group_list = [] -%}  {#-- Values: 'today', 'this_week', 'other'. Example: ['today', 'this_week'] --#}
-
-                  {%- set pref_include_state_list = [] -%}  {#-- Example: ['pending', 'due'] --#}
-
-
-                  {#-- ── Labels & Sorting ─────────────────────────────────────────────── --#}
-
-                  {%- set pref_use_label_grouping = false -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_label_display_order = [] -%}  {#-- Example: ['Kitchen', 'Bedroom', 'Outdoor'] --#}
-
-                  {%- set pref_sort_within_groups = 'by_state_and_date' -%}  {#-- Options: 'default', 'name_asc', 'name_desc', 'date_asc', 'date_desc', 'by_state_and_date' --#}
-
-
-                  {#-- ── Display ──────────────────────────────────────────────────────── --#}
-
-                  {%- set pref_show_chore_description = false -%}  {#-- Allowed: true, false --#}
-
-
-                  {#-- ── Colors & Accents ─────────────────────────────────────────────── --#}
-
-                  {%- set pref_claim_accent = '#a957fa' -%}  {#-- Accent color for claimed state highlights. --#}
-
-                  {%- set pref_due_accent = '#ff9800' -%}  {#-- Accent color for due state highlights. --#}
-
-                  {%- set pref_overdue_accent = '#ff4444' -%}  {#-- Accent color for overdue and missed state highlights. --#}
-
-                  {%- set pref_steal_accent = '#F2C94C' -%}  {#-- Accent color for steal-available state highlights. --#}
-
-                  {%- set pref_standby_accent = '#5B8DEF' -%}  {#-- Accent color for standby-available state highlights. --#}
-
-
-                  {#-- ── Header & UI Control ──────────────────────────────────────────── --#}
-
-                  {%- set pref_ui_control_key_root = 'gamification/chores' -%}  {#-- Slash-delimited key path for per-user UI state. --#}
-
-                  {%- set pref_default_header_collapsed = false -%}  {#-- Allowed: true, false --#}
-
-                  {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- 0-100: percent of var(--primary-color) mixed into header background when fill is enabled. --#}
-
-                  {%- set pref_show_header_background = true -%}  {#-- Set to false to remove header background fill. Allowed: true, false. --#}
-
-                  {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders unaffected. Allowed: true, false. --#}
-
-
-                  {#-- 2. Dynamic Lookups & Validations --#}
-
-                  << template_snippets.user_setup >>
-
-                  << template_snippets.user_validation >>
-
-                  << template_shared.chore_engine/context_v1 >>
-
-                    << template_shared.chore_engine/prepare_groups_v1 >>
-
-                    << template_shared.chore_engine/header_v1 >>
-
-                    {%- if not header_collapsed -%}
-                      << template_shared.chore_engine/settings_panel_v1 >>
-
-                      {%- set chore_row_template_name = 'chore_row_kids_v1' if effective_row_variant == 'kids' else 'chore_row_timeline_v1' -%}
-                      {%- if effective_row_variant == 'kids' -%}
-                        << template_shared.chore_engine/group_render_v1 >>
-                      {%- else -%}
-                        << template_shared.chore_engine/group_render_timeline_v1 >>
-                      {%- endif -%}
-                    {%- endif -%}
-                  {%- endif -%}
-
-    - type: grid
-      column_span: 1
-      cards:
-        - type: grid
-          square: false
-          columns: 1
-          grid_options:
-            columns: full
-          cards:
-            - type: custom:auto-entities
-              card:
-                square: false
-                type: grid
-                columns: 1
-              card_param: cards
-              filter:
-                template: |-
                   {#-- ===== SHOWCASE CARD ===== --#}
 
                   << template_snippets.meta_stamp >>
@@ -477,6 +128,45 @@ views:
                     {%- set highest_badge = ((states(highest_badge_entity) if highest_badge_entity else 'None') or 'None') -%}
                     {%- set highest_badge_icon = (state_attr(highest_badge_entity, 'icon') if highest_badge_entity else None) or 'mdi:medal-outline' -%}
                     {%- set highest_badge_display = ui.get('none', 'err-none') if highest_badge in ['None', 'unknown', 'Unknown', 'unavailable'] else highest_badge -%}
+
+                    {#-- greeting, today's status and the caught-up streak (the Showcase card is also the header) --#}
+                    {%- set overdue_now = (state_attr(all_time_sensor, 'chore_stat_current_overdue') | int(default=0)) if all_time_sensor else 0 -%}
+                    {%- set due_today_open = (state_attr(all_time_sensor, 'chore_stat_current_due_today') | int(default=0)) if all_time_sensor else 0 -%}
+                    {%- set chores_paused = state_attr(dashboard_helper, 'chores_paused') | bool(false) -%}
+                    {%- if chores_paused -%}
+                      {%- set due_val = '⏸' -%}
+                      {%- set due_lbl = ui.get('paused', 'Paused') -%}
+                      {%- set due_col = 'var(--warning-color)' -%}
+                    {%- elif overdue_now > 0 -%}
+                      {%- set due_val = overdue_now | string -%}
+                      {%- set due_lbl = ui.get('overdue', 'Overdue') -%}
+                      {%- set due_col = 'var(--error-color)' -%}
+                    {%- elif due_today_open > 0 -%}
+                      {%- set due_val = due_today_open | string -%}
+                      {%- set due_lbl = ui.get('due_today', 'Due today') -%}
+                      {%- set due_col = 'var(--warning-color)' -%}
+                    {%- else -%}
+                      {%- set due_val = '✓' -%}
+                      {%- set due_lbl = ui.get('all_caught_up', 'All caught up') -%}
+                      {%- set due_col = 'var(--success-color)' -%}
+                    {%- endif -%}
+                    {%- set cu = state_attr(dashboard_helper, 'caught_up_streak') or {} -%}
+                    {%- set cu_n = cu.get('count', 0) | int(0) -%}
+                    {%- set cu_best = cu.get('best', 0) | int(0) -%}
+                    {%- set cu_open = (overdue_now + due_today_open) > 0 -%}
+                    {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue_now > 0 -%}
+                    {%- set cu_col = 'var(--secondary-text-color)' if cu_broken else 'var(--warning-color)' -%}
+                    {%- set cu_bits = [] -%}
+                    {%- if cu_broken -%}{%- set cu_bits = cu_bits + ['ended'] -%}{%- elif cu_open and cu_n > 0 -%}{%- set cu_bits = cu_bits + ['at risk'] -%}{%- endif -%}
+                    {%- if cu_best > 0 -%}{%- set cu_bits = cu_bits + ['best ' ~ cu_best] -%}{%- endif -%}
+                    {%- set hour_now = now().hour -%}
+                    {%- if hour_now < 12 -%}
+                      {%- set greeting_text = ui.get('good_morning', ui.get('welcome', 'err-welcome')) -%}
+                    {%- elif hour_now < 18 -%}
+                      {%- set greeting_text = ui.get('good_afternoon', ui.get('welcome', 'err-welcome')) -%}
+                    {%- else -%}
+                      {%- set greeting_text = ui.get('good_evening', ui.get('welcome', 'err-welcome')) -%}
+                    {%- endif -%}
                     {%- set points_multiplier_text = ('%.2f' | format(points_multiplier)) | regex_replace('\.?0+$', '') -%}
                     {%- set points_value = points_value | round(2) -%}
                     {%- set points_earned_all_time_value = points_earned_all_time_value | round(2) -%}
@@ -569,43 +259,6 @@ views:
 
                     {%- set rank_progress_section = "<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('ranks', 'err-ranks') ~ "</div>" ~ rank_rows_html if rank_rows_html | length > 0 else '' -%}
 
-                    {%- set quest_ns = namespace(rows_html='', count=0) -%}
-                    {%- for badge in badge_list -%}
-                      {%- if badge is mapping and quest_ns.count < 3 -%}
-                        {%- set quest_eid = badge.get('eid') -%}
-                        {%- set quest_type = (badge.get('badge_type') | string | lower) -%}
-                        {%- if quest_type in ['periodic', 'daily', 'special_occasion'] and quest_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(quest_eid) not in ['unknown', 'unavailable'] -%}
-                          {%- set quest_attrs = states[quest_eid].attributes | default({}, true) -%}
-                          {%- set quest_status = ((quest_attrs.get('status') or badge.get('status') or 'in_progress') | string | lower) -%}
-                          {%- set quest_progress = states(quest_eid) | float(default=0) -%}
-                          {%- set quest_pct = 0 if quest_progress < 0 else (100 if quest_progress > 100 else (quest_progress | round(0) | int)) -%}
-                          {%- set quest_start = ((quest_attrs.get('start_date') or ((quest_attrs.get('reset_schedule') if quest_attrs.get('reset_schedule') is mapping else {}).get('start_date')) or '') | string | regex_replace('T.*$', '')) -%}
-                          {%- set quest_end = ((quest_attrs.get('end_date') or ((quest_attrs.get('reset_schedule') if quest_attrs.get('reset_schedule') is mapping else {}).get('end_date')) or '') | string | regex_replace('T.*$', '')) -%}
-                          {%- set quest_today = now().strftime('%Y-%m-%d') -%}
-                          {%- set quest_window_active = false -%}
-                          {%- if quest_start | length > 0 and quest_end | length > 0 -%}
-                            {%- set quest_window_active = quest_today >= quest_start and quest_today <= quest_end -%}
-                          {%- elif quest_start | length > 0 -%}
-                            {%- set quest_window_active = quest_today >= quest_start -%}
-                          {%- elif quest_end | length > 0 -%}
-                            {%- set quest_window_active = quest_today <= quest_end -%}
-                          {%- endif -%}
-                          {%- set quest_has_window = quest_start | length > 0 or quest_end | length > 0 -%}
-                          {%- set quest_is_active = quest_window_active if quest_has_window else (quest_status in ['in_progress', 'active'] or (quest_progress > 0 and quest_progress <= 100)) -%}
-                          {%- if quest_is_active and (quest_window_active or quest_status not in ['locked', 'inactive']) -%}
-                            {%- set quest_name_raw = ((quest_attrs.get('badge_name') or badge.get('name') or state_attr(quest_eid, 'friendly_name') or ui.get('goals_heading', 'Goals')) | string | trim) -%}
-                            {%- set quest_name = quest_name_raw[8:] if quest_name_raw[:8] == 'Badge - ' else quest_name_raw -%}
-                            {%- set quest_name_safe = quest_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                            {%- set quest_icon = (quest_attrs.get('icon') or 'mdi:calendar-refresh-outline') | string -%}
-                            {%- set quest_color = 'var(--success-color)' if quest_pct >= 100 else 'var(--primary-color)' -%}
-                            {%- set quest_ns.count = quest_ns.count + 1 -%}
-                            {%- set quest_ns.rows_html = quest_ns.rows_html ~ "<div style='margin-top:8px;'><div style='display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:700;'><span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--primary-text-color);'>" ~ quest_name_safe ~ "</span><span style='font-size:12px;white-space:nowrap;color:" ~ quest_color ~ ";'>" ~ quest_pct|string ~ '%' ~ "</span></div><div style='margin-top:4px;height:8px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='width:" ~ quest_pct|string ~ "%;height:100%;background:" ~ quest_color ~ ";border-radius:999px;'></div></div></div>" -%}
-                          {%- endif -%}
-                        {%- endif -%}
-                      {%- endif -%}
-                    {%- endfor -%}
-                    {%- set quest_progress_section = "<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('goals_heading', 'Goals') ~ "</div>" ~ quest_ns.rows_html if quest_ns.rows_html | length > 0 else '' -%}
-
                     {#-- ACHIEVEMENTS: given by an approver, shown as gold-framed badges (newest first) --#}
                     {%- set ach_ns = namespace(items=[]) -%}
                     {%- for achievement in achievement_list -%}
@@ -672,8 +325,18 @@ views:
                     {%- set penalty_card_html = "<div style='padding:10px;border-radius:14px;background:color-mix(in srgb, var(--error-color) 7%, var(--card-background-color));overflow:hidden;'><div style='display:flex;justify-content:space-between;align-items:baseline;gap:6px;'><span style='font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--error-color);'>" ~ ui.get('penalty', 'err-penalty') ~ "</span><span style='font-size:13px;font-weight:800;color:var(--error-color);'>-" ~ ((penalty_ns.total_points | abs | round(0) | int) | string) ~ "</span></div>" ~ (penalty_ns.rows_html if penalty_ns.rows_html | length > 0 else "<div style='margin-top:4px;font-size:12px;color:var(--secondary-text-color);opacity:0.8;'>" ~ ui.get('none', 'err-none') ~ "</div>") ~ "</div>" -%}
                     {%- set adjustment_section = "<div style='margin-top:16px;display:grid;grid-template-columns:" ~ ('minmax(0,1fr)' if effective_hide_penalties else 'repeat(2,minmax(0,1fr))') ~ ";gap:10px;align-items:stretch;'>" ~ bonus_card_html ~ ('' if effective_hide_penalties else penalty_card_html) ~ "</div>" -%}
 
-                    {%- set highest_badge_line = "<div style='margin-top:10px;display:inline-block;max-width:100%;padding:3px 12px;border-radius:999px;background:rgba(255,255,255,.2);font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ ui.get('highest_rank', 'err-highest_rank') ~ ": " ~ (highest_badge_display | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ "</div>" if highest_badge_display != ui.get('none', 'err-none') else '' -%}
-                    {%- set content_html = "<div style='width:100%;box-sizing:border-box;'><div style='padding:16px 16px 56px;border-radius:14px;background:linear-gradient(135deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 55%, #1a237e));color:#fff;'><div style='padding-right:40px;font-size:14px;font-weight:700;opacity:0.92;'>" ~ safe_name ~ "'s " ~ ui.get('showcase', 'err-showcase') ~ "</div><div style='margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;'><div style='min-width:0;'><div style='display:flex;align-items:center;gap:8px;font-size:40px;font-weight:800;line-height:1;'><ha-icon icon='" ~ points_icon ~ "' style='width:32px;height:32px;--mdc-icon-size:32px;color:#fff;display:block;flex:0 0 auto;'></ha-icon><span>" ~ points_earned_all_time_display ~ "</span></div><div style='margin-top:4px;font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;opacity:0.85;'>" ~ ui.get('total_earned', 'err-total_earned') ~ "</div></div><div style='width:68px;height:68px;flex:0 0 auto;border-radius:50%;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.6);box-sizing:border-box;display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='width:36px;height:36px;--mdc-icon-size:36px;color:#fff;display:block;'></ha-icon></div></div>" ~ highest_badge_line ~ "</div><div style='margin:-36px 10px 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;position:relative;'><div style='padding:12px 8px;border-radius:14px;background:var(--card-background-color);box-shadow:0 2px 8px rgba(0,0,0,.12);text-align:center;'><div style='font-size:20px;font-weight:800;line-height:1.1;color:" ~ 'var(--primary-text-color)' ~ ";'>" ~ all_time_completed|string ~ "</div><div style='margin-top:3px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);line-height:1.2;'>" ~ ui.get('chores_completed', 'err-chores_completed') ~ "</div></div><div style='padding:12px 8px;border-radius:14px;background:var(--card-background-color);box-shadow:0 2px 8px rgba(0,0,0,.12);text-align:center;'><div style='font-size:20px;font-weight:800;line-height:1.1;color:" ~ ('var(--warning-color)' if points_multiplier > 1 else 'var(--primary-text-color)') ~ ";'>" ~ 'x' ~ points_multiplier_text ~ "</div><div style='margin-top:3px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);line-height:1.2;'>" ~ ui.get('multiplier', 'err-multiplier') ~ "</div></div></div>" ~ earned_badges_section ~ ('' if effective_hide_overviews else rank_progress_section ~ quest_progress_section ~ achievement_progress_section ~ adjustment_section) ~ "</div>" -%}
+                    {#-- hero: greeting, level and total earned, then status tiles --#}
+                    {%- set highest_badge_safe = highest_badge_display | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                    {%- set level_chip = ("<div style='margin-top:5px;display:inline-flex;align-items:center;gap:5px;max-width:100%;box-sizing:border-box;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.2);font-size:12px;font-weight:800;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#ffd54f;display:block;flex:0 0 auto;'></ha-icon><span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ highest_badge_safe ~ "</span></div>") if highest_badge_display != ui.get('none', 'err-none') else '' -%}
+                    {%- set tile_open = "<div style='min-width:0;box-sizing:border-box;padding:12px 6px;border-radius:14px;background:var(--card-background-color);box-shadow:0 2px 8px rgba(0,0,0,.12);text-align:center;'>" -%}
+                    {%- set tile_lbl_open = "<div style='margin-top:3px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);line-height:1.2;'>" -%}
+                    {%- set tile_sub_open = "<div style='margin-top:2px;font-size:10px;color:var(--secondary-text-color);line-height:1.2;'>" -%}
+                    {%- set due_tile = tile_open ~ "<div style='font-size:20px;font-weight:800;line-height:1.1;color:" ~ due_col ~ ";'>" ~ due_val ~ "</div>" ~ tile_lbl_open ~ due_lbl ~ "</div></div>" -%}
+                    {%- set streak_tile = tile_open ~ "<div style='display:flex;align-items:center;justify-content:center;gap:2px;font-size:20px;font-weight:800;line-height:1.1;color:" ~ cu_col ~ ";'><ha-icon icon='mdi:fire' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ cu_col ~ ";display:block;'></ha-icon><span>" ~ cu_n ~ "</span></div>" ~ tile_lbl_open ~ "Day streak</div>" ~ (tile_sub_open ~ (cu_bits | join(' · ')) ~ "</div>" if cu_bits | length > 0 else '') ~ "</div>" -%}
+                    {%- set mult_tile = tile_open ~ "<div style='font-size:20px;font-weight:800;line-height:1.1;color:" ~ ('var(--warning-color)' if points_multiplier > 1 else 'var(--primary-text-color)') ~ ";'>x" ~ points_multiplier_text ~ "</div>" ~ tile_lbl_open ~ ui.get('multiplier', 'err-multiplier') ~ "</div></div>" -%}
+                    {%- set done_tile = "<div style='margin:9px 10px 0;box-sizing:border-box;padding:9px 6px;border-radius:14px;background:var(--card-background-color);box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:baseline;justify-content:center;gap:8px;position:relative;'><span style='font-size:18px;font-weight:800;line-height:1.1;color:var(--primary-text-color);'>" ~ all_time_completed | string ~ "</span><span style='font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('chores_completed', 'err-chores_completed') ~ "</span></div>" -%}
+                    {%- set avatar_initial = (safe_name[:1] | upper) if safe_name else '?' -%}
+                    {%- set content_html = "<div style='width:100%;box-sizing:border-box;'><div style='padding:16px 16px 48px;border-radius:14px;background:linear-gradient(135deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 55%, #1a237e));color:#fff;'><div style='display:flex;align-items:center;gap:10px;padding-right:38px;'><div style='width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;flex:0 0 auto;'>" ~ avatar_initial ~ "</div><div style='flex:1;min-width:0;'><div style='font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;opacity:0.8;line-height:1.2;'>" ~ greeting_text ~ "</div><div style='font-size:19px;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ safe_name ~ "</div>" ~ level_chip ~ "</div><div style='flex:0 0 auto;text-align:right;'><div style='display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:26px;font-weight:800;line-height:1;'><ha-icon icon='" ~ points_icon ~ "' style='width:24px;height:24px;--mdc-icon-size:24px;color:#fff;display:block;flex:0 0 auto;'></ha-icon><span>" ~ points_earned_all_time_display ~ "</span></div><div style='margin-top:3px;font-size:10px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;opacity:0.85;'>" ~ ui.get('total_earned', 'err-total_earned') ~ "</div></div></div></div><div style='margin:-34px 10px 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;position:relative;'>" ~ due_tile ~ streak_tile ~ mult_tile ~ "</div>" ~ done_tile ~ earned_badges_section ~ ('' if effective_hide_overviews else rank_progress_section ~ achievement_progress_section ~ adjustment_section) ~ "</div>" -%}
 
                     {%- if gamification_enabled -%}
                       {{
@@ -925,6 +588,359 @@ views:
                   {%- endif -%}
 
 
+        - type: grid
+          square: false
+          columns: 1
+          grid_options:
+            columns: full
+          cards:
+            - type: custom:auto-entities
+              card:
+                square: false
+                type: grid
+                columns: 1
+              card_param: cards
+              show_empty: false
+              filter:
+                template: |-
+                  {#-- ===== WELCOME CARD ===== --#}
+                  {#-- With gamification on, the Showcase card above carries the greeting, level and status; this card only renders when it is off. --#}
+
+                  << template_snippets.meta_stamp >>
+
+
+                  {#-- 1. User Configuration --#}
+
+                  << template_snippets.user_override_helper >>
+
+                  {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- Percent of var(--primary-color) mixed into the welcome-card background when fill is enabled. Allowed: 0-100. --#}
+
+                  {%- set pref_show_header_background = true -%}  {#-- Set to false to remove the welcome-card background fill and leave it transparent. Allowed: true, false. --#}
+
+                  {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders are unaffected. Allowed: true, false. --#}
+
+
+                  {#-- 2. Dynamic Lookups & Validations --#}
+
+                  {%- set pref_primary_tint_mix_pct = pref_primary_tint_mix_pct | int(default=14) -%}
+                  {%- set pref_show_header_background = (pref_show_header_background | default('true') | string | lower) == 'true' -%}
+                  {%- set pref_show_header_thin_border = (pref_show_header_thin_border | default('true') | string | lower) == 'true' -%}
+                  {%- if pref_primary_tint_mix_pct < 0 -%}
+                    {%- set pref_primary_tint_mix_pct = 0 -%}
+                  {%- elif pref_primary_tint_mix_pct > 100 -%}
+                    {%- set pref_primary_tint_mix_pct = 100 -%}
+                  {%- endif -%}
+                  << template_snippets.user_setup >>
+
+                  << template_snippets.user_validation >>
+
+                  {%- if not skip_render -%}
+
+                    {#-- 3. Collect Data --#}
+                    {%- set core_sensors = state_attr(dashboard_helper, 'core_sensors') or {} -%}
+                    {%- set dashboard_helpers = state_attr(dashboard_helper, 'dashboard_helpers') or {} -%}
+                    {%- set dashboard_config = state_attr(dashboard_helper, 'dashboard_config') or {} -%}
+                    {%- set gamification_enabled = state_attr(dashboard_helper, 'gamification_enabled') | default(false, true) -%}
+                    {%- set points_sensor = core_sensors.get('points_eid') -%}
+                    {%- set total_sensor = core_sensors.get('chores_eid') -%}
+                    {%- set highest_badge_entity = core_sensors.get('badges_eid') -%}
+                    {%- set pref_points_precision = dashboard_config.get('points_precision', 'fixed_0') if dashboard_config is mapping else 'fixed_0' -%}
+                    {%- set pref_points_precision = pref_points_precision | default('fixed_0') | string | lower -%}
+                    {%- if pref_points_precision not in ['fixed_0', 'adaptive', 'fixed_1', 'fixed_2'] -%}
+                      {%- set pref_points_precision = 'fixed_0' -%}
+                    {%- endif -%}
+                    {%- set translation_sensor = dashboard_helpers.get('translation_sensor_eid') -%}
+                    {%- set ui = state_attr(translation_sensor, 'ui_translations') if translation_sensor else {} -%}
+                    {%- set points_value = (states(points_sensor) | float(default=0)) if points_sensor else 0 -%}
+                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or 'Points' -%}
+                    {%- set points_icon = (state_attr(points_sensor, 'icon') if points_sensor else None) or 'mdi:star-circle' -%}
+                    {%- set points_multiplier = (state_attr(points_sensor, 'points_multiplier') | float(default=1)) if points_sensor else 1 -%}
+                    {%- set highest_badge = ((states(highest_badge_entity) if highest_badge_entity else 'None') or 'None') -%}
+                    {%- set highest_badge_icon = (state_attr(highest_badge_entity, 'icon') if highest_badge_entity else None) or 'mdi:medal-outline' -%}
+                    {%- set overdue_now = (state_attr(total_sensor, 'chore_stat_current_overdue') | int(default=0)) if total_sensor else 0 -%}
+                    {%- set due_today_open = (state_attr(total_sensor, 'chore_stat_current_due_today') | int(default=0)) if total_sensor else 0 -%}
+                    {%- set chores_paused = state_attr(dashboard_helper, 'chores_paused') | bool(false) -%}
+
+                    {#-- 4. Build Display - essentials minimal --#}
+                    {%- set p_icon = points_icon | default('mdi:star', true) -%}
+                    {%- set points_value = points_value | round(2) -%}
+                    {%- if pref_points_precision == 'adaptive' -%}
+                      {%- if points_value == (points_value | int) -%}
+                        {%- set points_display = (points_value | int) | string -%}
+                      {%- elif points_value == (points_value | round(1)) -%}
+                        {%- set points_display = '%.1f' | format(points_value) -%}
+                      {%- else -%}
+                        {%- set points_display = '%.2f' | format(points_value) -%}
+                      {%- endif -%}
+                    {%- elif pref_points_precision == 'fixed_1' -%}
+                      {%- set points_display = '%.1f' | format(points_value) -%}
+                    {%- elif pref_points_precision == 'fixed_2' -%}
+                      {%- set points_display = '%.2f' | format(points_value) -%}
+                    {%- else -%}
+                      {%- set points_display = (points_value | round(0) | int) | string -%}
+                    {%- endif -%}
+                    {%- set multiplier_display = points_multiplier | int if points_multiplier == (points_multiplier | int) else points_multiplier -%}
+
+                    {%- set rank_pill = '' -%}
+                    {%- if highest_badge not in ['None', 'unknown', 'Unknown', 'unavailable'] -%}
+                      {%- set mult_text = " <span style='color: var(--warning-color);'>(x" ~ multiplier_display|string ~ ")</span>" if points_multiplier > 1 else '' -%}
+                      {%- set rank_pill = "<span style='font-size: 12px; background: var(--secondary-background-color); padding: 4px 12px; border-radius: 999px; border: 1px solid var(--divider-color); display: inline-flex; align-items: center; justify-content: center; white-space: nowrap;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='width: 18px; height: 14px; margin-right: 5px; color: var(--warning-color);'></ha-icon><span style='font-weight: 600; color: var(--primary-text-color);'>" ~ highest_badge ~ mult_text ~ "</span></span>" -%}
+                    {%- endif -%}
+
+                    {%- if chores_paused -%}
+                      {%- set status_icon = 'mdi:pause-circle-outline' -%}
+                      {%- set status_color = 'var(--warning-color)' -%}
+                      {%- set status_text = ui.get('chores_are_paused', 'err-chores_are_paused') -%}
+                    {%- elif overdue_now > 0 -%}
+                      {%- set status_icon = 'mdi:alert-octagon' -%}
+                      {%- set status_color = 'var(--error-color)' -%}
+                      {%- set status_text = ui.get('overdue', 'err-overdue') ~ ': ' ~ overdue_now|string -%}
+                    {%- elif due_today_open > 0 -%}
+                      {%- set status_icon = 'mdi:calendar-clock' -%}
+                      {%- set status_color = 'var(--warning-color)' -%}
+                      {%- set status_text = ui.get('due_today', 'err-due_today') ~ ': ' ~ due_today_open|string -%}
+                    {%- else -%}
+                      {%- set status_icon = 'mdi:check-circle' -%}
+                      {%- set status_color = 'var(--success-color)' -%}
+                      {%- set status_text = ui.get('all_caught_up', 'All Caught Up!') -%}
+                    {%- endif -%}
+
+                    {%- set cu = state_attr(dashboard_helper, 'caught_up_streak') or {} -%}
+                    {%- set cu_n = cu.get('count', 0) | int(0) -%}
+                    {%- set cu_best = cu.get('best', 0) | int(0) -%}
+                    {%- set cu_open = (overdue_now + due_today_open) > 0 -%}
+                    {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue_now > 0 -%}
+                    {%- set cu_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
+                    {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' (at risk)' if (cu_open and cu_n > 0) else '') -%}
+                    {%- set streak_chip = ("<span style='display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ cu_col ~ "; background: color-mix(in srgb, " ~ cu_col ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'><ha-icon icon='mdi:fire' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ cu_col ~ "; display: block;'></ha-icon><span>" ~ cu_txt ~ "</span></span>") if (cu_n > 0 or cu_broken) else '' -%}
+                    {%- set streak_note = ("<span style='font-size: 11px; opacity: 0.65; white-space: nowrap;'>" ~ (('Streak ended. ') if cu_broken else '') ~ 'Best: ' ~ (cu_best | string) ~ (' days' if cu_best != 1 else ' day') ~ "</span>") if cu_best > 0 else '' -%}
+                    {%- set name_safe = name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                    {%- set hour_now = now().hour -%}
+                    {%- if hour_now < 12 -%}
+                      {%- set greeting_text = ui.get('good_morning', ui.get('welcome', 'err-welcome')) -%}
+                    {%- elif hour_now < 18 -%}
+                      {%- set greeting_text = ui.get('good_afternoon', ui.get('welcome', 'err-welcome')) -%}
+                    {%- else -%}
+                      {%- set greeting_text = ui.get('good_evening', ui.get('welcome', 'err-welcome')) -%}
+                    {%- endif -%}
+                    {%- set avatar_initial = (name_safe[:1] | upper) if name_safe else '?' -%}
+                    {%- set status_chip =
+                      "<span style='display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ status_color ~ "; background: color-mix(in srgb, " ~ status_color ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'>"
+                      ~ "<ha-icon icon='" ~ status_icon ~ "' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ status_color ~ "; display: block;'></ha-icon>"
+                      ~ "<span>" ~ status_text ~ "</span></span>"
+                    -%}
+                    {%- set right_col = "" -%}
+                    {%- if gamification_enabled -%}
+                      {%- set right_col =
+                        "<div style='text-align: right; flex-shrink: 0; margin-left: 12px;'>"
+                        ~ "<div style='display: inline-flex; align-items: center; color: var(--primary-color); font-size: 24px; font-weight: 800; line-height: 1; white-space: nowrap;'><ha-icon icon='" ~ p_icon ~ "' style='width: 24px; height: 24px; --mdc-icon-size: 24px; margin-right: 5px; display: block;'></ha-icon>" ~ points_display ~ "</div>"
+                        ~ "<div style='font-size: 10px; text-transform: uppercase; font-weight: 700; opacity: 0.65; margin-top: 4px; letter-spacing: 0.5px;'>" ~ points_label ~ "</div>"
+                        ~ "</div>"
+                      -%}
+                    {%- endif -%}
+
+                    {%- set content_html =
+                      "<div style='width: 100%; text-align: left;'>"
+                      ~ "<div style='display: flex; align-items: center; gap: 12px;'>"
+                      ~ "<div style='width: 48px; height: 48px; border-radius: 50%; background: var(--primary-color); color: var(--text-primary-color, #fff); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex: 0 0 auto;'>" ~ avatar_initial ~ "</div>"
+                      ~ "<div style='flex: 1; min-width: 0;'>"
+                      ~ "<div style='font-size: 12px; font-weight: 700; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.6px; line-height: 1.2;'>" ~ greeting_text ~ "</div>"
+                      ~ "<div style='font-size: 20px; font-weight: 700; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'>" ~ name_safe ~ "</div>"
+                      ~ "</div>"
+                      ~ right_col
+                      ~ "</div>"
+                      ~ "<div style='display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px;'>" ~ rank_pill ~ status_chip ~ streak_chip ~ streak_note ~ "</div>"
+                      ~ "</div>"
+                    -%}
+
+                    {#-- 5. Render --#}
+                    {%- if not gamification_enabled -%}
+                    {{
+                      {
+                        'type': 'custom:button-card',
+                        'entity': points_sensor if gamification_enabled and points_sensor else total_sensor,
+                        'show_name': false,
+                        'show_icon': false,
+                        'tap_action': {'action': 'more-info'},
+                        'styles': {
+                          'card': [
+                            {'padding': '16px'},
+                            {'border-radius': '16px'},
+                            {'border': '1px solid color-mix(in srgb, var(--primary-color) 25%, var(--divider-color))' if pref_show_header_thin_border else 'none'},
+                            {'background': ('linear-gradient(135deg, color-mix(in srgb, var(--primary-color) ' ~ (pref_primary_tint_mix_pct * 3 // 2)|string ~ '%, var(--card-background-color)), color-mix(in srgb, var(--primary-color) ' ~ (pref_primary_tint_mix_pct // 3)|string ~ '%, var(--card-background-color)))') if pref_show_header_background else 'transparent'},
+                            {'box-shadow': 'none'}
+                          ],
+                          'grid': [
+                            {'grid-template-areas': '"content"'},
+                            {'grid-template-columns': '1fr'}
+                          ],
+                          'custom_fields': {
+                            'content': [{'width': '100%'}]
+                          }
+                        },
+                        'custom_fields': {
+                          'content': content_html
+                        }
+                      }
+                    }},
+                    {%- endif -%}
+
+                  {%- endif -%}
+
+        - type: grid
+          square: false
+          columns: 1
+          grid_options:
+            columns: full
+          cards:
+            - type: custom:auto-entities
+              card:
+                square: false
+                type: grid
+                columns: 1
+              card_param: cards
+              filter:
+                template: |-
+                  {#-- ===== CHORES CARD ===== --#}
+
+                  << template_snippets.meta_stamp >>
+
+
+                  {#-- ═══════════════════════════════════════════════════════════════════════ --#}
+                  {#-- PREFERENCE DEFAULTS                                             --#}
+                  {#-- ═══════════════════════════════════════════════════════════════════════ --#}
+                  {#--                                                                       --#}
+                  {#-- Full reference: https://github.com/ccpk1/ChoreOps-Dashboards/blob/main/preferences/user-family-hub-v1.md --#}
+                  {#--                                                                       --#}
+                  {#-- Groups: Layout & Grid · Time Buckets · Exclude Filters ·              --#}
+                  {#--         Include Filters · Labels & Sorting · Display ·                --#}
+                  {#--         Colors & Accents · Header & UI Control                        --#}
+                  {#-- ═══════════════════════════════════════════════════════════════════════ --#}
+
+                  << template_snippets.user_override_helper >>
+
+
+                  {#-- ── Layout & Grid ─────────────────────────────────────────────────── --#}
+
+                  {%- set pref_chore_row_variant = 'standard' -%}  {#-- Options: 'standard', 'kids' --#}
+
+                  {%- set pref_chore_engine_layout_mode = 'single' -%}  {#-- Options: 'single', 'responsive' --#}
+
+                  {%- set pref_settings_column_count_mobile = 3 -%}
+
+                  {%- set pref_settings_column_count_wide = 3 -%}
+
+                  {%- set pref_column_count_standard = 1 -%}
+
+                  {%- set pref_column_count_kids = 3 -%}
+
+
+                  {#-- ── Time Buckets ─────────────────────────────────────────────────── --#}
+
+                  {%- set pref_use_overdue_grouping = true -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_today_grouping_mode = 'today_morning' -%}  {#-- Options: 'off', 'today', 'today_morning' --#}
+
+                  {%- set pref_include_daily_recurring_in_today = true -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_use_this_week_grouping = true -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_use_standby_grouping = true -%}  {#-- Allowed: true, false --#}
+
+
+                  {#-- ── Exclude Filters ──────────────────────────────────────────────── --#}
+
+                  {%- set pref_exclude_completed = false -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_exclude_blocked = false -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_exclude_states = [] -%}  {#-- Example: ['completed', 'completed_by_other', 'paused', 'not_my_turn', 'standby', 'missed'] --#}
+
+                  {%- set pref_exclude_nonrecurring_no_due_date = false -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_max_due_date_days = 0 -%}  {#-- 0 disables; positive integer hides chores due beyond this many days ahead. --#}
+
+                  {%- set pref_exclude_group_list = [] -%}  {#-- Example: ['later', 'this_week'] --#}
+
+                  {%- set pref_exclude_label_list = [] -%}  {#-- Example: ['junk_label', 'skip_this'] --#}
+
+
+                  {#-- ── Include Filters (whitelist, Step 0 priority) ─────────────────── --#}
+
+                  {%- set pref_include_label_list = [] -%}  {#-- Example: ['shared_chores', 'kitchen'] --#}
+
+                  {%- set pref_include_group_list = [] -%}  {#-- Values: 'today', 'this_week', 'other'. Example: ['today', 'this_week'] --#}
+
+                  {%- set pref_include_state_list = [] -%}  {#-- Example: ['pending', 'due'] --#}
+
+
+                  {#-- ── Labels & Sorting ─────────────────────────────────────────────── --#}
+
+                  {%- set pref_use_label_grouping = false -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_label_display_order = [] -%}  {#-- Example: ['Kitchen', 'Bedroom', 'Outdoor'] --#}
+
+                  {%- set pref_sort_within_groups = 'by_state_and_date' -%}  {#-- Options: 'default', 'name_asc', 'name_desc', 'date_asc', 'date_desc', 'by_state_and_date' --#}
+
+
+                  {#-- ── Display ──────────────────────────────────────────────────────── --#}
+
+                  {%- set pref_show_chore_description = false -%}  {#-- Allowed: true, false --#}
+
+
+                  {#-- ── Colors & Accents ─────────────────────────────────────────────── --#}
+
+                  {%- set pref_claim_accent = '#a957fa' -%}  {#-- Accent color for claimed state highlights. --#}
+
+                  {%- set pref_due_accent = '#ff9800' -%}  {#-- Accent color for due state highlights. --#}
+
+                  {%- set pref_overdue_accent = '#ff4444' -%}  {#-- Accent color for overdue and missed state highlights. --#}
+
+                  {%- set pref_steal_accent = '#F2C94C' -%}  {#-- Accent color for steal-available state highlights. --#}
+
+                  {%- set pref_standby_accent = '#5B8DEF' -%}  {#-- Accent color for standby-available state highlights. --#}
+
+
+                  {#-- ── Header & UI Control ──────────────────────────────────────────── --#}
+
+                  {%- set pref_ui_control_key_root = 'gamification/chores' -%}  {#-- Slash-delimited key path for per-user UI state. --#}
+
+                  {%- set pref_default_header_collapsed = false -%}  {#-- Allowed: true, false --#}
+
+                  {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- 0-100: percent of var(--primary-color) mixed into header background when fill is enabled. --#}
+
+                  {%- set pref_show_header_background = true -%}  {#-- Set to false to remove header background fill. Allowed: true, false. --#}
+
+                  {%- set pref_show_header_thin_border = true -%}  {#-- Set to false to remove the thin outer border line. Accent borders unaffected. Allowed: true, false. --#}
+
+
+                  {#-- 2. Dynamic Lookups & Validations --#}
+
+                  << template_snippets.user_setup >>
+
+                  << template_snippets.user_validation >>
+
+                  << template_shared.chore_engine/context_v1 >>
+
+                    << template_shared.chore_engine/prepare_groups_v1 >>
+
+                    << template_shared.chore_engine/header_v1 >>
+
+                    {%- if not header_collapsed -%}
+                      << template_shared.chore_engine/settings_panel_v1 >>
+
+                      {%- set chore_row_template_name = 'chore_row_kids_v1' if effective_row_variant == 'kids' else 'chore_row_timeline_v1' -%}
+                      {%- if effective_row_variant == 'kids' -%}
+                        << template_shared.chore_engine/group_render_v1 >>
+                      {%- else -%}
+                        << template_shared.chore_engine/group_render_timeline_v1 >>
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endif -%}
+
+    - type: grid
+      column_span: 1
+      cards:
         - type: grid
           square: false
           columns: 1

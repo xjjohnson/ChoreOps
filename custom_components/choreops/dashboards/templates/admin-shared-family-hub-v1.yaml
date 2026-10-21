@@ -1665,6 +1665,12 @@ views:
               {#-- ===== QUICK ACTIONS ===== --#}
               << template_snippets.user_override_helper >>
 
+              {#-- Points tab reasons. The first list shows while adding stars, the second while removing them. The tapped text is saved as the reason in Points history. --#}
+              {%- set pref_points_reasons_add = ['Helped out', 'Good behavior', 'Extra effort', 'Kindness', 'Missed credit', 'Gift'] -%}
+              {%- set pref_points_reasons_remove = ['Correction', 'Cashed out', 'Rule broken', 'Attitude'] -%}
+              {%- set pref_points_reasons_add = pref_points_reasons_add if (pref_points_reasons_add is iterable and pref_points_reasons_add is not string and pref_points_reasons_add | length > 0) else ['Adjustment'] -%}
+              {%- set pref_points_reasons_remove = pref_points_reasons_remove if (pref_points_reasons_remove is iterable and pref_points_reasons_remove is not string and pref_points_reasons_remove | length > 0) else ['Adjustment'] -%}
+
               << template_snippets.admin_setup_shared >>
 
               {%- set qa_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
@@ -1997,6 +2003,9 @@ views:
                       {%- set pt_step = 100 -%}
                     {%- endif -%}
                     {%- set pt_reason = (qa_open.get('pts-reason', '') or '') | string -%}
+                    {#-- Reasons follow the direction; a reason picked for the other direction is dropped --#}
+                    {%- set pt_reason_list = (pref_points_reasons_remove if pt_amount < 0 else pref_points_reasons_add) | list -%}
+                    {%- set pt_reason = pt_reason if pt_reason in pt_reason_list else '' -%}
                     {%- set pt_base = {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update'} -%}
                     {%- set pt_col = 'var(--success-color)' if pt_amount > 0 else ('var(--error-color)' if pt_amount < 0 else 'var(--secondary-text-color)') -%}
                     {%- set pt_amount_txt = ('+' if pt_amount > 0 else '') ~ (pt_amount | string) -%}
@@ -2045,7 +2054,7 @@ views:
                       {'type': 'grid', 'columns': 4, 'square': false, 'cards': pt_steps.c}
                     }},
                     {%- set pt_reasons = namespace(c=[]) -%}
-                    {%- for rv in ['Helped out', 'Good behavior', 'Extra effort', 'Correction'] -%}
+                    {%- for rv in pt_reason_list -%}
                       {%- set rv_on = rv == pt_reason -%}
                       {%- set pt_reasons.c = pt_reasons.c + [{
                         'type': 'custom:button-card', 'name': rv, 'show_name': true, 'show_icon': false,
