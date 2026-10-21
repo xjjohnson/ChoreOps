@@ -13,14 +13,14 @@
 <#-- ============================================= --#>
 
 views:
-- title: Home
+- title: << t.get('home', 'Home') >>
   path: home
   max_columns: 3
   sections:
     - type: grid
       cards:
         - type: heading
-          heading: Family
+          heading: << t.get('family', 'Family') >>
           heading_style: title
           icon: mdi:account-group
         - type: custom:auto-entities
@@ -45,6 +45,8 @@ views:
               {%- if pref_users | length > 0 -%}
                 {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
               {%- endif -%}
+              {%- set tsensor = ((helpers | first).attributes.get('dashboard_helpers') or {}).get('translation_sensor_eid') if helpers else none -%}
+              {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
               {%- set t = namespace(over=0, due=0, worst='', worst_n=0, pending_c=0, pending_r=0, people=0) -%}
               {%- for h in helpers -%}
                 {%- set ha = h.attributes -%}
@@ -66,16 +68,16 @@ views:
               {%- if t.people > 0 -%}
                 {%- if t.over > 0 -%}
                   {%- set col = 'var(--error-color)' -%}{%- set ic = 'mdi:alert-octagon' -%}
-                  {%- set head = (t.due | string) ~ ' due today · ' ~ (t.over | string) ~ ' overdue' -%}
-                  {%- set sub = 'Most overdue: ' ~ (t.worst | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ ' (' ~ (t.worst_n | string) ~ ')' -%}
+                  {%- set head = (t.due | string) ~ ' ' ~ (ui.get('due_today', 'Due Today') | lower) ~ ' · ' ~ (t.over | string) ~ ' ' ~ (ui.get('overdue', 'Overdue') | lower) -%}
+                  {%- set sub = ui.get('most_overdue', 'Most overdue') ~ ': ' ~ (t.worst | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ ' (' ~ (t.worst_n | string) ~ ')' -%}
                 {%- elif t.due > 0 -%}
                   {%- set col = 'var(--warning-color)' -%}{%- set ic = 'mdi:calendar-clock' -%}
-                  {%- set head = (t.due | string) ~ ' due today' -%}
-                  {%- set sub = 'Nothing overdue' -%}
+                  {%- set head = (t.due | string) ~ ' ' ~ (ui.get('due_today', 'Due Today') | lower) -%}
+                  {%- set sub = ui.get('nothing_overdue', 'Nothing overdue') -%}
                 {%- else -%}
                   {%- set col = 'var(--success-color)' -%}{%- set ic = 'mdi:check-circle' -%}
-                  {%- set head = 'All caught up' -%}
-                  {%- set sub = 'Nothing due or overdue right now' -%}
+                  {%- set head = ui.get('everyone_caught_up', 'All caught up') -%}
+                  {%- set sub = ui.get('nothing_due_right_now', 'Nothing due or overdue right now') -%}
                 {%- endif -%}
                 {%- set html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><ha-icon icon='" ~ ic ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ col ~ ";flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;'>" ~ head ~ "</div><div style='font-size:11px;opacity:.7;'>" ~ sub ~ "</div></div></div>" -%}
                 {%- set bcol = 'color-mix(in srgb,' ~ col ~ ' 45%, var(--divider-color))' -%}
@@ -105,8 +107,8 @@ views:
                 {%- if pend > 0 -%}
                   {%- set col = 'var(--primary-color)' -%}
                   {%- set parts = [] -%}
-                  {%- set head = 'Parents' -%}
-                  {%- set sub = ((t.pending_c | string) ~ (' chore' if t.pending_c == 1 else ' chores')) ~ ((' · ' ~ (t.pending_r | string) ~ (' reward' if t.pending_r == 1 else ' rewards')) if t.pending_r > 0 else '') ~ ' waiting for approval' -%}
+                  {%- set head = ui.get('parents', 'Parents') -%}
+                  {%- set sub = ((t.pending_c | string) ~ ' ' ~ ((ui.get('chore', 'Chore') if t.pending_c == 1 else ui.get('chores', 'Chores')) | lower)) ~ ((' · ' ~ (t.pending_r | string) ~ ' ' ~ ((ui.get('reward', 'Reward') if t.pending_r == 1 else ui.get('rewards', 'Rewards')) | lower)) if t.pending_r > 0 else '') ~ ' ' ~ (ui.get('waiting_for_approval', 'Waiting for approval') | lower) -%}
                   {%- set html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><ha-icon icon='mdi:shield-check-outline' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ col ~ ";flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;'>" ~ head ~ "</div><div style='font-size:11px;opacity:.7;'>" ~ sub ~ "</div></div><span style='font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;background:var(--error-color);color:#fff;'>" ~ (pend | string) ~ "</span></div>" -%}
                   {%- set bcol = col -%}
                   {%- set bg = 'color-mix(in srgb,' ~ col ~ ' 8%, var(--card-background-color))' -%}
@@ -158,6 +160,8 @@ views:
               {%- if pref_users | length > 0 -%}
                 {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
               {%- endif -%}
+              {%- set tsensor = ((helpers | first).attributes.get('dashboard_helpers') or {}).get('translation_sensor_eid') if helpers else none -%}
+              {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
               {%- set hour_now = now().hour -%}
               {#-- 3. Render one tappable card per person --#}
               {%- for h in helpers -%}
@@ -196,7 +200,7 @@ views:
                 {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue > 0 -%}
                 {%- set fl_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
                 {%- set cu_risk = cu_open and cu_n > 0 -%}
-                {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' ⚠' if cu_risk else '') -%}
+                {%- set cu_txt = (cu_n | string) ~ ' ' ~ (ui.get('days', 'days') if cu_n != 1 else ui.get('day', 'day')) ~ (' ⚠' if cu_risk else '') -%}
                 {#-- Streak sits above the points so the chip row never wraps --#}
                 {%- set flame_html = ("<span style='display:inline-flex;align-items:center;gap:2px;font-size:10.5px;font-weight:800;line-height:1;color:" ~ fl_col ~ ";white-space:nowrap;'><ha-icon icon='mdi:fire' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ cu_txt ~ "</span>") if (cu_n > 0 or cu_broken) else '' -%}
                 {%- set html = "<div style='width:100%;text-align:left;position:relative;'>"
@@ -235,7 +239,7 @@ views:
     - type: grid
       cards:
         - type: heading
-          heading: This week
+          heading: << t.get('this_week_heading', 'This week') >>
           heading_style: title
           icon: mdi:podium
         - type: custom:auto-entities
@@ -260,6 +264,8 @@ views:
               {%- if pref_users | length > 0 -%}
                 {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
               {%- endif -%}
+              {%- set tsensor = ((helpers | first).attributes.get('dashboard_helpers') or {}).get('translation_sensor_eid') if helpers else none -%}
+              {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
               {%- set lb = namespace(rows=[], top=0) -%}
               {%- for h in helpers -%}
                 {%- set ha = h.attributes -%}
@@ -278,7 +284,7 @@ views:
                   {%- set crown = '&#128081;' if (loop.first and r.pts > 0) else '' -%}
                   {%- set rows_html.v = rows_html.v ~ "<div style='display:flex;align-items:center;gap:8px;margin-top:8px;'><span style='width:18px;font-size:14px;text-align:center;'>" ~ crown ~ "</span><span style='width:28px;height:28px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;'>" ~ (r.name[:1] | upper) ~ "</span><span style='width:64px;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</span><div style='flex:1;height:9px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='height:100%;width:" ~ (pct | string) ~ "%;border-radius:999px;background:" ~ ('var(--warning-color)' if (loop.first and r.pts > 0) else 'var(--primary-color)') ~ ";'></div></div><span style='width:40px;text-align:right;font-size:12px;font-weight:800;'>" ~ ('%g' | format(r.pts | round(1))) ~ "</span></div>" -%}
                 {%- endfor -%}
-                {%- set html = "<div style='width:100%;text-align:left;'><div style='display:flex;align-items:center;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'>Points earned</div></div>" ~ rows_html.v ~ "</div>" -%}
+                {%- set html = "<div style='width:100%;text-align:left;'><div style='display:flex;align-items:center;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'>" ~ ui.get('points_earned', 'Points earned') ~ "</div></div>" ~ rows_html.v ~ "</div>" -%}
                 {%- set bcol = 'var(--divider-color)' -%}
                 {%- set bg = 'var(--card-background-color)' -%}
                 {{
@@ -304,7 +310,7 @@ views:
                 }},
               {%- endif -%}
         - type: heading
-          heading: Goals
+          heading: << t.get('goals_heading', 'Goals') >>
           heading_style: title
           icon: mdi:flag-checkered
         - type: custom:auto-entities
@@ -329,6 +335,8 @@ views:
               {%- if pref_users | length > 0 -%}
                 {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
               {%- endif -%}
+              {%- set tsensor = ((helpers | first).attributes.get('dashboard_helpers') or {}).get('translation_sensor_eid') if helpers else none -%}
+              {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
               {%- set today = now().strftime('%Y-%m-%d') -%}
               {%- set ns = namespace(q={}) -%}
               {%- for h in helpers -%}
@@ -363,8 +371,8 @@ views:
                 {%- set acc2 = '#86efac' if q.alldone else '#ec4899' -%}
                 {%- set urgent = (not q.alldone) and q.left >= 0 and q.left <= pref_urgent_days -%}
                 {%- set tcol = 'var(--warning-color)' if urgent else 'var(--secondary-text-color)' -%}
-                {%- set ttxt = ('Ends today' if q.left == 0 else ('1 day left' if q.left == 1 else (q.left ~ ' days left'))) if (q.left < 999 and q.left >= 0) else 'no end' -%}
-                {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>no end</span>") -%}
+                {%- set ttxt = (ui.get('ends_today', 'Ends today') if q.left == 0 else (ui.get('one_day_left', '1 day left') if q.left == 1 else (q.left ~ ' ' ~ ui.get('days_left', 'days left')))) if (q.left < 999 and q.left >= 0) else ui.get('no_end', 'no end') -%}
+                {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>" ~ ui.get('no_end', 'no end') ~ "</span>") -%}
                 {#-- Race track: every person sits where their own progress is; ties sit side by side --#}
                 {%- set mk = namespace(v='', seen={}) -%}
                 {%- for pp in q.people -%}
@@ -397,7 +405,7 @@ views:
                   ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ fillw ~ "%;border-radius:4px;background:linear-gradient(90deg," ~ acc ~ "," ~ acc2 ~ ");'></div>"
                   ~ ticks.v ~ mk.v
                   ~ "<div style='position:absolute;right:-15px;top:-9px;font-size:12px;line-height:1;'>🏁</div></div></div>"
-                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:6px;'><span style='font-size:10px;font-weight:700;color:var(--secondary-text-color);'>" ~ ('✓ ' ~ done_n ~ ' of ' ~ (q.people | length) ~ ' done' if q.alldone else (done_n ~ ' of ' ~ (q.people | length) ~ ' done')) ~ "</span>" ~ clock ~ "</div>"
+                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:6px;'><span style='font-size:10px;font-weight:700;color:var(--secondary-text-color);'>" ~ (('✓ ' if q.alldone else '') ~ done_n ~ ' ' ~ ui.get('of', 'of') ~ ' ' ~ (q.people | length) ~ ' ' ~ ui.get('done', 'done')) ~ "</span>" ~ clock ~ "</div>"
                   ~ "</div></div>" -%}
                 {{
                   {
@@ -429,7 +437,7 @@ views:
     - type: grid
       cards:
         - type: heading
-          heading: Family Goals
+          heading: << t.get('family_goals_heading', 'Family Goals') >>
           heading_style: title
           icon: mdi:trophy
         - type: custom:auto-entities
@@ -475,19 +483,19 @@ views:
               {%- endfor -%}
               {%- for fe in fsort.top + fsort.rest -%}
                 {%- if states(fe) not in ['unknown', 'unavailable'] -%}
-                  {%- set fname = state_attr(fe, 'achievement_name') | default('Family Goal', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                  {%- set fname = state_attr(fe, 'achievement_name') | default(ui.get('family_goal', 'Family Goal'), true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                   {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                   {%- set ficon = state_attr(fe, 'icon') or 'mdi:trophy' -%}
                   {%- set ftype = (state_attr(fe, 'type') or '') | string | lower -%}
                   {#-- Day-streak goals count shared days, so they show a level track and no per-person rows --#}
                   {%- set fstreak = ftype in ['family_caught_up_days', 'family_active_days'] -%}
                   {%- set fgrid = fstreak or ftype == 'family_everyone_contributes' -%}
-                  {%- set funit = ' days' if fstreak else '' -%}
+                  {%- set funit = (' ' ~ ui.get('days', 'days')) if fstreak else '' -%}
                   {#-- Time left: only goals that run on the calendar day have a known end (midnight) --#}
                   {%- set secs_left = 86400 - (now().hour * 3600 + now().minute * 60 + now().second) -%}
                   {%- set hrs_left = (secs_left // 3600) | int -%}
                   {%- set mins_left = ((secs_left % 3600) // 60) | int -%}
-                  {%- set time_txt = ((hrs_left ~ 'h ' ~ mins_left ~ 'm left') if hrs_left > 0 else (mins_left ~ 'm left')) if ftype in ['family_caught_up_days', 'family_active_days', 'family_chores_in_day'] else '' -%}
+                  {%- set time_txt = (((hrs_left ~ ui.get('hours_short', 'h') ~ ' ' ~ mins_left ~ ui.get('minutes_short', 'm')) if hrs_left > 0 else (mins_left ~ ui.get('minutes_short', 'm'))) ~ ' ' ~ ui.get('left', 'left')) if ftype in ['family_caught_up_days', 'family_active_days', 'family_chores_in_day'] else '' -%}
                   {%- set time_col = 'var(--warning-color)' if hrs_left < 3 else 'var(--secondary-text-color)' -%}
                   {%- set time_html = ("<div style='display:inline-flex;align-items:center;gap:3px;margin-top:4px;font-size:10px;font-weight:800;color:" ~ time_col ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ time_txt ~ "</div>") if time_txt else '' -%}
                   {%- set flevels = (state_attr(fe, 'family_levels') or []) | map('float', 0) | list -%}
@@ -529,16 +537,16 @@ views:
                   {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
                   {%- set accent = 'var(--success-color)' if fdone else '#8b5cf6' -%}
                   {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
-                  {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ('STREAK RESET · LEVELS RESET' if streak_reset else 'NEW PERIOD · LEVELS RESET') ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
-                  {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
-                  {%- set sub = '🎉 All levels complete' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ (' day' if (funit and togo == 1) else funit) ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '')) -%}
-                  {%- set mult_html = ("<div style='font-size:11px;font-weight:700;color:var(--warning-color);line-height:1.35;'>🏆 Top contributor ×" ~ ('%g' | format(fmult)) ~ "</div>") if (fmult > 1 and not fdone) else '' -%}
+                  {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ((ui.get('streak_reset', 'Streak reset') if streak_reset else ui.get('new_period', 'New period')) ~ ' · ' ~ ui.get('levels_reset', 'Levels reset')) | upper ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
+                  {%- set lvl_txt = (ui.get('level', 'Level') ~ ' ' ~ (elevel + 1) ~ ' ' ~ ui.get('of', 'of') ~ ' ' ~ fcount) if (fcount > 1 and not fdone) else (('✓ ' ~ ui.get('all', 'All') ~ ' ' ~ fcount ~ ' ' ~ ui.get('levels', 'levels')) if (fdone and fcount > 1) else '') -%}
+                  {%- set sub = ('🎉 ' ~ ui.get('all_levels_complete', 'All levels complete')) if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ ((' ' ~ ui.get('day', 'day')) if (funit and togo == 1) else funit) ~ ' ' ~ ui.get('to_go', 'to go') ~ '</b>' ~ ((' · +' ~ freward ~ ' ⭐ ' ~ ui.get('each', 'each')) if freward > 0 else '')) -%}
+                  {%- set mult_html = ("<div style='font-size:11px;font-weight:700;color:var(--warning-color);line-height:1.35;'>🏆 " ~ ui.get('top_contributor', 'Top contributor') ~ " ×" ~ ('%g' | format(fmult)) ~ "</div>") if (fmult > 1 and not fdone) else '' -%}
                   {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
 
                   {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
                   {%- set frecord_day = state_attr(fe, 'family_record_day') or '' -%}
                   {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
-                  {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
+                  {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 " ~ ui.get('record', 'Record') ~ ": <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
 
                   {%- if fgrid -%}
                     {#-- Who is in: a check for everyone who has done their part, the count for the rest --#}
@@ -553,7 +561,7 @@ views:
                     {%- elif ftype == 'family_caught_up_days' -%}
                       {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
                       {%- for pname, ptxt in cstat.items() -%}
-                        {%- set p_ok = (ptxt | string).startswith('0 still') -%}
+                        {%- set p_ok = ((ptxt.open | int(1)) == 0 and not ptxt.overdue) if ptxt is mapping else ((ptxt | string).startswith('0 still') and 'overdue' not in (ptxt | string)) -%}
                         {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                         {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('var(--success-color)' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
                       {%- endfor -%}

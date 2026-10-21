@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
+from homeassistant.config_entries import OptionsFlow
 from homeassistant.helpers import selector
 import voluptuous as vol
 
@@ -19,6 +20,8 @@ from . import builders, const as fg
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigFlowResult
+
+    from ..coordinator import ChoreOpsDataCoordinator
 
 DOC_URL: str = base.DOC_URL_ACHIEVEMENTS_OVERVIEW
 
@@ -112,14 +115,21 @@ def _clean_goal_input(
     return data
 
 
-class FamilyGoalsOptionsMixin:
+class FamilyGoalsOptionsMixin(OptionsFlow):
     """Add / edit / delete steps for family goals."""
 
-    # Provided by the options flow handler this is mixed into.
-    context: dict[str, Any]
+    if TYPE_CHECKING:
+        # Provided by the options flow handler this is mixed into.
+        def _get_coordinator(self) -> ChoreOpsDataCoordinator: ...
+
+        def _mark_reload_needed(self) -> None: ...
+
+        async def async_step_init(
+            self, user_input: dict[str, Any] | None = None
+        ) -> ConfigFlowResult: ...
 
     def _goal_assignees(self) -> dict[str, str]:
-        coordinator = self._get_coordinator()  # type: ignore[attr-defined]
+        coordinator = self._get_coordinator()
         return {
             data[base.DATA_USER_NAME]: assignee_id
             for assignee_id, data in coordinator.assignees_data.items()
@@ -129,7 +139,7 @@ class FamilyGoalsOptionsMixin:
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Add a family goal."""
-        coordinator = self._get_coordinator()  # type: ignore[attr-defined]
+        coordinator = self._get_coordinator()
         errors: dict[str, str] = {}
         assignees_dict = self._goal_assignees()
 
@@ -141,17 +151,17 @@ class FamilyGoalsOptionsMixin:
                     coordinator.family_goal_manager.create_goal(
                         data, immediate_persist=True
                     )
-                    self._mark_reload_needed()  # type: ignore[attr-defined]
-                    return await self.async_step_init()  # type: ignore[attr-defined,no-any-return]
+                    self._mark_reload_needed()
+                    return await self.async_step_init()
                 except EntityValidationError as err:
                     errors[err.field] = err.translation_key
 
         schema = build_goal_schema(assignees_dict, coordinator.chores_data)
         if user_input:
-            schema = self.add_suggested_values_to_schema(  # type: ignore[attr-defined]
+            schema = self.add_suggested_values_to_schema(
                 schema, _clean_goal_input(user_input, assignees_dict)
             )
-        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+        return self.async_show_form(
             step_id=base.OPTIONS_FLOW_STEP_ADD_CHALLENGE,
             data_schema=schema,
             errors=errors,
@@ -162,13 +172,16 @@ class FamilyGoalsOptionsMixin:
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Edit a family goal. Its progress and streaks are kept."""
-        coordinator = self._get_coordinator()  # type: ignore[attr-defined]
+        coordinator = self._get_coordinator()
         errors: dict[str, str] = {}
         goals = coordinator.challenges_data
-        goal_id = cast("str | None", self.context.get(base.DATA_INTERNAL_ID))
+        goal_id = cast(
+            "str | None",
+            cast("dict[str, Any]", self.context).get(base.DATA_INTERNAL_ID),
+        )
         if not goal_id or goal_id not in goals:
             base.LOGGER.error("Edit Family Goal - Invalid Internal ID '%s'", goal_id)
-            return self.async_abort(reason="invalid_challenge")  # type: ignore[attr-defined,no-any-return]
+            return self.async_abort(reason="invalid_challenge")
 
         goal = goals[goal_id]
         assignees_dict = self._goal_assignees()
@@ -182,8 +195,8 @@ class FamilyGoalsOptionsMixin:
                     coordinator.family_goal_manager.update_goal(
                         goal_id, data, immediate_persist=True
                     )
-                    self._mark_reload_needed()  # type: ignore[attr-defined]
-                    return await self.async_step_init()  # type: ignore[attr-defined,no-any-return]
+                    self._mark_reload_needed()
+                    return await self.async_step_init()
                 except EntityValidationError as err:
                     errors[err.field] = err.translation_key
 
@@ -218,8 +231,8 @@ class FamilyGoalsOptionsMixin:
             suggested[fg.DATA_SELECTED_CHORE_ID] = base.SENTINEL_EMPTY
 
         schema = build_goal_schema(assignees_dict, coordinator.chores_data)
-        schema = self.add_suggested_values_to_schema(schema, suggested)  # type: ignore[attr-defined]
-        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+        schema = self.add_suggested_values_to_schema(schema, suggested)
+        return self.async_show_form(
             step_id=base.OPTIONS_FLOW_STEP_EDIT_CHALLENGE,
             data_schema=schema,
             errors=errors,
@@ -230,21 +243,21 @@ class FamilyGoalsOptionsMixin:
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Delete a family goal."""
-        coordinator = self._get_coordinator()  # type: ignore[attr-defined]
+        coordinator = self._get_coordinator()
         goals = coordinator.challenges_data
-        goal_id = self.context.get(base.DATA_INTERNAL_ID)
+        goal_id = cast("dict[str, Any]", self.context).get(base.DATA_INTERNAL_ID)
         if not goal_id or goal_id not in goals:
             base.LOGGER.error("Delete Family Goal - Invalid Internal ID '%s'", goal_id)
-            return self.async_abort(reason="invalid_challenge")  # type: ignore[attr-defined,no-any-return]
+            return self.async_abort(reason="invalid_challenge")
 
         goal_name = goals[goal_id][fg.DATA_NAME]
         if user_input is not None:
             coordinator.family_goal_manager.delete_goal(
                 str(goal_id), immediate_persist=True
             )
-            return await self.async_step_init()  # type: ignore[attr-defined,no-any-return]
+            return await self.async_step_init()
 
-        return self.async_show_form(  # type: ignore[attr-defined,no-any-return]
+        return self.async_show_form(
             step_id=base.OPTIONS_FLOW_STEP_DELETE_CHALLENGE,
             data_schema=vol.Schema({}),
             description_placeholders={"challenge_name": goal_name},

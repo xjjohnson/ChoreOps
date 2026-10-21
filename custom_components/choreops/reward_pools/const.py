@@ -29,6 +29,10 @@ TRANS_KEY_ERROR_REWARD_POOL_NOT_FULL: Final = (
 )
 TRANS_KEY_ERROR_REWARD_POOL_INVALID_AMOUNT: Final = "reward_pool_invalid_amount"
 
+# Reward form / service validation keys (options error and exceptions)
+TRANS_KEY_CFOF_REWARD_POOL_COST_ZERO: Final = "reward_pool_cost_zero"
+TRANS_KEY_CFOF_REWARD_POOL_CHIP_IN_TOO_HIGH: Final = "reward_pool_chip_in_too_high"
+
 # Services
 SERVICE_CONTRIBUTE_TO_REWARD_POOL: Final = "contribute_to_reward_pool"
 SERVICE_APPROVE_REWARD_POOL: Final = "approve_reward_pool"

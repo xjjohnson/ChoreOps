@@ -630,3 +630,106 @@ async def test_refund_single_contributor_leaves_the_rest_in_the_pool(
     # Refunding someone who has nothing in the pool is a no-op
     assert await pm.refund_pool(reward_id, zoe) == {}
     assert _pool(scenario_full, reward_id) == {max_: 10.0}
+
+
+def test_pool_validation_rules() -> None:
+    """A pooled reward needs a cost above 0 and a chip-in no bigger than the cost."""
+    from custom_components.choreops.data_builders import validate_reward_data
+    from custom_components.choreops.reward_pools.validation import (
+        validate_pool_settings,
+    )
+
+    pooled = {const.DATA_REWARD_NAME: "Pool", const.DATA_REWARD_POOLED: True}
+    assert validate_reward_data({**pooled, const.DATA_REWARD_COST: 0}) == {
+        const.CFOP_ERROR_REWARD_COST: rp.TRANS_KEY_CFOF_REWARD_POOL_COST_ZERO
+    }
+    assert validate_reward_data(
+        {**pooled, const.DATA_REWARD_COST: 50, const.DATA_REWARD_POOL_CHIP_IN: 60}
+    ) == {
+        const.CFOF_REWARDS_INPUT_POOL_CHIP_IN: (
+            rp.TRANS_KEY_CFOF_REWARD_POOL_CHIP_IN_TOO_HIGH
+        )
+    }
+    assert (
+        validate_reward_data(
+            {**pooled, const.DATA_REWARD_COST: 50, const.DATA_REWARD_POOL_CHIP_IN: 50}
+        )
+        == {}
+    )
+    # Normal rewards may still be free
+    assert validate_reward_data({const.DATA_REWARD_NAME: "Free", "cost": 0}) == {}
+
+    # A partial update falls back to the stored reward
+    stored = {const.DATA_REWARD_COST: 0, const.DATA_REWARD_POOLED: False}
+    assert validate_pool_settings({const.DATA_REWARD_POOLED: True}, stored) == {
+        const.CFOP_ERROR_REWARD_COST: rp.TRANS_KEY_CFOF_REWARD_POOL_COST_ZERO
+    }
+    stored = {const.DATA_REWARD_COST: 40, const.DATA_REWARD_POOLED: True}
+    assert validate_pool_settings({const.DATA_REWARD_POOL_CHIP_IN: 41}, stored) == {
+        const.CFOF_REWARDS_INPUT_POOL_CHIP_IN: (
+            rp.TRANS_KEY_CFOF_REWARD_POOL_CHIP_IN_TOO_HIGH
+        )
+    }
+
+
+async def test_services_refuse_free_pool_and_oversized_chip_in(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """create_reward / update_reward reject pool settings that can't work."""
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            const.DOMAIN,
+            const.SERVICE_CREATE_REWARD,
+            {"name": "Free Pool", "cost": 0, "pooled": True},
+            blocking=True,
+            return_response=True,
+        )
+    assert err.value.translation_key == rp.TRANS_KEY_CFOF_REWARD_POOL_COST_ZERO
+
+    reward_id = _make_pool(scenario_full)  # Pick Next Movie, cost 100
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            const.DOMAIN,
+            const.SERVICE_UPDATE_REWARD,
+            {"name": "Pick Next Movie", "pool_chip_in": 150},
+            blocking=True,
+            return_response=True,
+        )
+    assert err.value.translation_key == rp.TRANS_KEY_CFOF_REWARD_POOL_CHIP_IN_TOO_HIGH
+    assert scenario_full.coordinator.rewards_data[reward_id].get(
+        const.DATA_REWARD_POOL_CHIP_IN, 0
+    ) in (0, 0.0)
+
+
+async def test_back_to_back_contributions_to_two_pools_cannot_overspend(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Two quick taps on two different pools only take points that exist.
+
+    The pools have separate locks, so the second contribution must see the
+    first one's withdrawal; otherwise both pass the balance check and one pool
+    keeps points that never left the balance.
+    """
+    import asyncio
+
+    pm = scenario_full.coordinator.reward_pool_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    movie = _make_pool(scenario_full)
+    outing = _make_pool(scenario_full, "Special Outing")
+    _set_points(scenario_full, zoe, 30.0)
+
+    results = await asyncio.gather(
+        pm.contribute_to_pool(zoe, movie, 30.0),
+        pm.contribute_to_pool(zoe, outing, 30.0),
+        return_exceptions=True,
+    )
+    await hass.async_block_till_done()
+
+    assert results[0] == 30.0
+    assert isinstance(results[1], HomeAssistantError)
+    assert results[1].translation_key == const.TRANS_KEY_ERROR_INSUFFICIENT_POINTS
+    assert _points(scenario_full, zoe) == 0.0
+    assert _pool(scenario_full, movie) == {zoe: 30.0}
+    assert _pool(scenario_full, outing) == {}

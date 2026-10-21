@@ -103,6 +103,10 @@ async def test_create_dashboard_prepared_assets_match_release_applied_template_o
                 AsyncMock(return_value="0.0.1-beta.3"),
             ),
             patch(
+                "custom_components.choreops.helpers.dashboard_builder._async_dashboard_words",
+                AsyncMock(return_value={}),
+            ),
+            patch(
                 "custom_components.choreops.helpers.dashboard_builder.async_check_dashboard_exists",
                 AsyncMock(return_value=False),
             ),
@@ -219,6 +223,10 @@ async def test_update_dashboard_prepared_assets_match_release_applied_template_o
             patch(
                 "custom_components.choreops.helpers.dashboard_builder.async_get_local_dashboard_release_version",
                 AsyncMock(return_value="0.0.1-beta.3"),
+            ),
+            patch(
+                "custom_components.choreops.helpers.dashboard_builder._async_dashboard_words",
+                AsyncMock(return_value={}),
             ),
             patch(
                 "custom_components.choreops.helpers.dashboard_builder.fetch_dashboard_template",

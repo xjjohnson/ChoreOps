@@ -106,6 +106,12 @@
     "title": "🎁 {assignee_name}: Reward Request",
     "message": "{assignee_name} requested {reward_name} for {points} {points_label}"
   },
+  "family_goal_words": {
+    "level": "{name} - Level {level}",
+    "top_contributor": "{name} (Top contributor x{multiplier})",
+    "default_name": "Family Goal",
+    "migrated_name": "{name} (family goal)"
+  },
   "reward_pool_full_approver": {
     "title": "🎁 Family Pool Full: {reward_name}",
     "message": "The family has saved {points} {points_label} for {reward_name}. Approve the pool once it has been delivered."

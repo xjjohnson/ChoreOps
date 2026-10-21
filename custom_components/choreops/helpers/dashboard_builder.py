@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-import json
 import inspect
+import json
 from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any
@@ -64,6 +64,9 @@ if TYPE_CHECKING:
 
 # Template fetch timeout in seconds
 TEMPLATE_FETCH_TIMEOUT = 10
+
+# Template context key for build-time dashboard wording (<< t.get(...) >>)
+DASHBOARD_CONTEXT_KEY_WORDS = "t"
 
 
 def _register_dashboard_panel(
@@ -671,6 +674,9 @@ def render_dashboard_template(
         raise DashboardRenderError(f"Template composition failed: {err}") from err
 
     render_context = dict(context)
+    # Build-time dashboard wording (<< t.get('key', 'Default') >>), filled for
+    # the household's language by the dashboard generators
+    render_context.setdefault(DASHBOARD_CONTEXT_KEY_WORDS, {})
 
     if "<< user." in template_str and not isinstance(render_context.get("user"), dict):
         raise DashboardRenderError("Template requires 'user' context")
@@ -772,10 +778,12 @@ def _render_family_home_view(
     generated_at: str,
     root_button_card_templates: dict[str, Any],
     user_names: list[str] | None = None,
+    words: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Render the Family Home view (added first when Family Hub is used).
 
     user_names limits the cards to the people the dashboard was generated for.
+    words is the dashboard wording for the household's language.
     """
     context = build_admin_dashboard_context(
         integration_entry_id=integration_entry_id,
@@ -785,13 +793,13 @@ def _render_family_home_view(
         generated_at=generated_at,
     )
     context["home"] = {"user_names": json.dumps(list(user_names or []))}
+    context[DASHBOARD_CONTEXT_KEY_WORDS] = dict(words or {})
     rendered = render_dashboard_template(template_str, context)
     view, root_templates = _extract_rendered_template_view_and_root_templates(rendered)
     _merge_root_button_card_templates(root_button_card_templates, root_templates)
     view["path"] = FAMILY_HOME_VIEW_PATH
-    view.setdefault("title", "Home")
+    view.setdefault("title", (words or {}).get("home", "Home"))
     return view
-
 
 
 def _family_home_user_names(
@@ -1093,6 +1101,21 @@ async def async_dedupe_choreops_dashboards(
     return removed_by_path
 
 
+async def _async_dashboard_words(hass: HomeAssistant) -> dict[str, str]:
+    """Return dashboard wording for the household's language, English filling gaps.
+
+    Used for text fixed when the dashboard is generated (view titles and
+    section headings); everything else is translated at runtime per person.
+    """
+    from .translation_helpers import load_dashboard_translation
+
+    words = dict(await load_dashboard_translation(hass, "en"))
+    language = hass.config.language or "en"
+    if language != "en":
+        words.update(await load_dashboard_translation(hass, language))
+    return {str(key): str(value) for key, value in words.items()}
+
+
 # ==============================================================================
 # Dashboard Creation
 # ==============================================================================
@@ -1247,6 +1270,7 @@ async def create_choreops_dashboard(
     await _get_template(style)
     generated_at = dt_now_iso()
     local_release_version = await async_get_local_dashboard_release_version(hass)
+    words = await _async_dashboard_words(hass)
 
     # Build views for each assignee
     views: list[dict[str, Any]] = []
@@ -1306,6 +1330,7 @@ async def create_choreops_dashboard(
                 generated_at=generated_at,
                 root_button_card_templates=root_button_card_templates,
                 user_names=list(assignee_names),
+                words=words,
             ),
         )
 
@@ -1344,13 +1369,16 @@ async def create_choreops_dashboard(
             global_admin_template = await _get_admin_template(global_admin_template_id)
             rendered_admin_template = render_dashboard_template(
                 global_admin_template,
-                build_admin_dashboard_context(
-                    integration_entry_id=integration_entry_id,
-                    template_profile=global_admin_template_id,
-                    release_ref=pinned_release_tag,
-                    release_version=local_release_version,
-                    generated_at=generated_at,
-                ),
+                {
+                    **build_admin_dashboard_context(
+                        integration_entry_id=integration_entry_id,
+                        template_profile=global_admin_template_id,
+                        release_ref=pinned_release_tag,
+                        release_version=local_release_version,
+                        generated_at=generated_at,
+                    ),
+                    DASHBOARD_CONTEXT_KEY_WORDS: words,
+                },
             )
             global_admin_view, root_templates = (
                 _extract_rendered_template_view_and_root_templates(
@@ -1563,6 +1591,7 @@ async def update_choreops_dashboard_views(
     template_profile = normalize_template_id(template_profile, admin_template=False)
     generated_at = dt_now_iso()
     local_release_version = await async_get_local_dashboard_release_version(hass)
+    words = await _async_dashboard_words(hass)
 
     if LOVELACE_DATA not in hass.data:
         raise DashboardSaveError("Lovelace not initialized")
@@ -1700,6 +1729,7 @@ async def update_choreops_dashboard_views(
             generated_at=generated_at,
             root_button_card_templates=root_button_card_templates,
             user_names=_family_home_user_names(assignee_names, existing_views),
+            words=words,
         )
 
     for view in existing_views:
@@ -1756,13 +1786,16 @@ async def update_choreops_dashboard_views(
             global_admin_template = await _get_admin_template(global_admin_template_id)
             rendered_admin_template = render_dashboard_template(
                 global_admin_template,
-                build_admin_dashboard_context(
-                    integration_entry_id=integration_entry_id,
-                    template_profile=global_admin_template_id,
-                    release_ref=pinned_release_tag,
-                    release_version=local_release_version,
-                    generated_at=generated_at,
-                ),
+                {
+                    **build_admin_dashboard_context(
+                        integration_entry_id=integration_entry_id,
+                        template_profile=global_admin_template_id,
+                        release_ref=pinned_release_tag,
+                        release_version=local_release_version,
+                        generated_at=generated_at,
+                    ),
+                    DASHBOARD_CONTEXT_KEY_WORDS: words,
+                },
             )
             global_admin_view, root_templates = (
                 _extract_rendered_template_view_and_root_templates(

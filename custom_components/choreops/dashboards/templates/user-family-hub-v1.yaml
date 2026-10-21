@@ -121,7 +121,7 @@ views:
 
                       {%- set points_value = (states(points_sensor) | float(default=0)) if points_sensor else 0 -%}
                       {%- set points_earned_all_time_value = (state_attr(points_sensor, 'point_stat_points_earned_all_time') | float(default=0)) if points_sensor else 0 -%}
-                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or 'Points' -%}
+                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or ui.get('points', 'Points') -%}
                     {%- set points_icon = (state_attr(points_sensor, 'icon') if points_sensor else None) or 'mdi:star-circle' -%}
                     {%- set points_multiplier = (state_attr(points_sensor, 'points_multiplier') | float(default=1)) if points_sensor else 1 -%}
                     {%- set all_time_completed = (state_attr(all_time_sensor, 'chore_stat_approved_all_time') | int(default=0)) if all_time_sensor else 0 -%}
@@ -157,8 +157,8 @@ views:
                     {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue_now > 0 -%}
                     {%- set cu_col = 'var(--secondary-text-color)' if cu_broken else 'var(--warning-color)' -%}
                     {%- set cu_bits = [] -%}
-                    {%- if cu_broken -%}{%- set cu_bits = cu_bits + ['ended'] -%}{%- elif cu_open and cu_n > 0 -%}{%- set cu_bits = cu_bits + ['at risk'] -%}{%- endif -%}
-                    {%- if cu_best > 0 -%}{%- set cu_bits = cu_bits + ['best ' ~ cu_best] -%}{%- endif -%}
+                    {%- if cu_broken -%}{%- set cu_bits = cu_bits + [ui.get('streak_ended', 'Streak ended') | lower] -%}{%- elif cu_open and cu_n > 0 -%}{%- set cu_bits = cu_bits + [ui.get('at_risk', 'at risk')] -%}{%- endif -%}
+                    {%- if cu_best > 0 -%}{%- set cu_bits = cu_bits + [(ui.get('best', 'Best') | lower) ~ ' ' ~ cu_best] -%}{%- endif -%}
                     {%- set hour_now = now().hour -%}
                     {%- if hour_now < 12 -%}
                       {%- set greeting_text = ui.get('good_morning', ui.get('welcome', 'err-welcome')) -%}
@@ -279,7 +279,7 @@ views:
                       {%- set ach_pill = ("<div style='position:absolute;top:-4px;right:2px;padding:1px 6px;border-radius:999px;background:#d4a017;color:#fff;font-size:10px;font-weight:800;line-height:1.3;'>×" ~ ach.count ~ "</div>") if ach.count > 1 else '' -%}
                       {%- set ach_tiles.v = ach_tiles.v ~ "<div style='position:relative;width:64px;text-align:center;'><div style='width:48px;height:48px;margin:0 auto 3px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--secondary-background-color);border:3px solid #d4a017;box-shadow:0 0 0 3px rgba(246,211,101,0.3);'>" ~ ach_icon_html ~ "</div>" ~ ach_pill ~ "<div style='font-size:10.5px;font-weight:700;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;'>" ~ (ach.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ "</div></div>" -%}
                     {%- endfor -%}
-                    {%- set achievement_progress_section = ("<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('achievements', 'err-achievements') ~ "</div><div style='display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;'>" ~ ach_tiles.v ~ "</div>") if ach_tiles.v | length > 0 else '' -%}
+                    {%- set achievement_progress_section = ("<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('family_achievements', 'Family Achievements') ~ "</div><div style='display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;'>" ~ ach_tiles.v ~ "</div>") if ach_tiles.v | length > 0 else '' -%}
 
                     {%- set bonus_ns = namespace(rows_html='', count=0, total_points=0, total_applied=0) -%}
                     {%- for bonus in bonus_list | sort(attribute='applied', reverse=true) -%}
@@ -332,7 +332,7 @@ views:
                     {%- set tile_lbl_open = "<div style='margin-top:3px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);line-height:1.2;'>" -%}
                     {%- set tile_sub_open = "<div style='margin-top:2px;font-size:10px;color:var(--secondary-text-color);line-height:1.2;'>" -%}
                     {%- set due_tile = tile_open ~ "<div style='font-size:20px;font-weight:800;line-height:1.1;color:" ~ due_col ~ ";'>" ~ due_val ~ "</div>" ~ tile_lbl_open ~ due_lbl ~ "</div></div>" -%}
-                    {%- set streak_tile = tile_open ~ "<div style='text-align:center;line-height:1.1;'><span style='display:inline-flex;align-items:center;gap:3px;font-size:20px;font-weight:800;line-height:1.1;color:" ~ cu_col ~ ";'><ha-icon icon='mdi:fire' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ cu_col ~ ";display:block;flex:0 0 auto;'></ha-icon><span>" ~ cu_n ~ "</span></span></div>" ~ tile_lbl_open ~ "Day streak</div>" ~ (tile_sub_open ~ (cu_bits | join(' · ')) ~ "</div>" if cu_bits | length > 0 else '') ~ "</div>" -%}
+                    {%- set streak_tile = tile_open ~ "<div style='text-align:center;line-height:1.1;'><span style='display:inline-flex;align-items:center;gap:3px;font-size:20px;font-weight:800;line-height:1.1;color:" ~ cu_col ~ ";'><ha-icon icon='mdi:fire' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ cu_col ~ ";display:block;flex:0 0 auto;'></ha-icon><span>" ~ cu_n ~ "</span></span></div>" ~ tile_lbl_open ~ ui.get('day_streak', 'Day streak') ~ "</div>" ~ (tile_sub_open ~ (cu_bits | join(' · ')) ~ "</div>" if cu_bits | length > 0 else '') ~ "</div>" -%}
                     {%- set mult_tile = tile_open ~ "<div style='font-size:20px;font-weight:800;line-height:1.1;color:" ~ ('var(--warning-color)' if points_multiplier > 1 else 'var(--primary-text-color)') ~ ";'>x" ~ points_multiplier_text ~ "</div>" ~ tile_lbl_open ~ ui.get('multiplier', 'err-multiplier') ~ "</div></div>" -%}
                     {%- set done_tile = "<div style='margin:9px 10px 0;box-sizing:border-box;padding:9px 6px;border-radius:14px;background:var(--card-background-color);box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:baseline;justify-content:center;gap:8px;position:relative;'><span style='font-size:18px;font-weight:800;line-height:1.1;color:var(--primary-text-color);'>" ~ all_time_completed | string ~ "</span><span style='font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('chores_completed', 'err-chores_completed') ~ "</span></div>" -%}
                     {%- set avatar_initial = (safe_name[:1] | upper) if safe_name else '?' -%}
@@ -652,7 +652,7 @@ views:
                     {%- set translation_sensor = dashboard_helpers.get('translation_sensor_eid') -%}
                     {%- set ui = state_attr(translation_sensor, 'ui_translations') if translation_sensor else {} -%}
                     {%- set points_value = (states(points_sensor) | float(default=0)) if points_sensor else 0 -%}
-                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or 'Points' -%}
+                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or ui.get('points', 'Points') -%}
                     {%- set points_icon = (state_attr(points_sensor, 'icon') if points_sensor else None) or 'mdi:star-circle' -%}
                     {%- set points_multiplier = (state_attr(points_sensor, 'points_multiplier') | float(default=1)) if points_sensor else 1 -%}
                     {%- set highest_badge = ((states(highest_badge_entity) if highest_badge_entity else 'None') or 'None') -%}
@@ -711,9 +711,9 @@ views:
                     {%- set cu_open = (overdue_now + due_today_open) > 0 -%}
                     {%- set cu_broken = cu_n == 0 and cu_best > 0 and overdue_now > 0 -%}
                     {%- set cu_col = 'var(--secondary-text-color)' if (cu_open or cu_broken) else 'var(--warning-color)' -%}
-                    {%- set cu_txt = (cu_n | string) ~ (' days' if cu_n != 1 else ' day') ~ (' (at risk)' if (cu_open and cu_n > 0) else '') -%}
+                    {%- set cu_txt = (cu_n | string) ~ ' ' ~ (ui.get('days', 'days') if cu_n != 1 else ui.get('day', 'day')) ~ ((' (' ~ ui.get('at_risk', 'at risk') ~ ')') if (cu_open and cu_n > 0) else '') -%}
                     {%- set streak_chip = ("<span style='display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; color: " ~ cu_col ~ "; background: color-mix(in srgb, " ~ cu_col ~ " 14%, var(--card-background-color)); padding: 4px 12px; border-radius: 999px;'><ha-icon icon='mdi:fire' style='width: 16px; height: 16px; --mdc-icon-size: 16px; color: " ~ cu_col ~ "; display: block;'></ha-icon><span>" ~ cu_txt ~ "</span></span>") if (cu_n > 0 or cu_broken) else '' -%}
-                    {%- set streak_note = ("<span style='font-size: 11px; opacity: 0.65; white-space: nowrap;'>" ~ (('Streak ended. ') if cu_broken else '') ~ 'Best: ' ~ (cu_best | string) ~ (' days' if cu_best != 1 else ' day') ~ "</span>") if cu_best > 0 else '' -%}
+                    {%- set streak_note = ("<span style='font-size: 11px; opacity: 0.65; white-space: nowrap;'>" ~ ((ui.get('streak_ended', 'Streak ended') ~ '. ') if cu_broken else '') ~ ui.get('best', 'Best') ~ ': ' ~ (cu_best | string) ~ ' ' ~ (ui.get('days', 'days') if cu_best != 1 else ui.get('day', 'day')) ~ "</span>") if cu_best > 0 else '' -%}
                     {%- set name_safe = name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                     {%- set hour_now = now().hour -%}
                     {%- if hour_now < 12 -%}
@@ -1033,7 +1033,7 @@ views:
                     {%- set points_sensor = core_sensors.get('points_eid') -%}
                     {%- set translation_sensor = (state_attr(dashboard_helper, 'dashboard_helpers') or {}).get('translation_sensor_eid') -%}
                     {%- set ui = state_attr(translation_sensor, 'ui_translations') if translation_sensor else {} -%}
-                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or 'Points' -%}
+                    {%- set points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or ui.get('points', 'Points') -%}
                     {%- set points_icon = (state_attr(points_sensor, 'icon') if points_sensor else None) or 'mdi:star-circle' -%}
                     {%- set gamification_enabled = state_attr(dashboard_helper, 'gamification_enabled') | default(false, true) -%}
                     {%- set reward_list = state_attr(dashboard_helper, 'rewards') | default([], true) -%}
@@ -1732,7 +1732,7 @@ views:
                     {%- set ui = state_attr(translation_sensor, 'ui_translations') if translation_sensor else {} -%}
                     {%- set gamification_enabled = state_attr(dashboard_helper, 'gamification_enabled') | default(false, true) -%}
                     {%- set ns.points_earned_all_time = (state_attr(points_sensor, 'point_stat_points_earned_all_time') | float(default=0)) if points_sensor else 0 -%}
-                    {%- set ns.points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or 'Points' -%}
+                    {%- set ns.points_label = (state_attr(points_sensor, 'unit_of_measurement') if points_sensor else None) or ui.get('points', 'Points') -%}
                     {%- set points_icon = (state_attr(points_sensor, 'icon') if points_sensor else None) or 'mdi:star-circle' -%}
                     {%- set ui_control = state_attr(dashboard_helper, 'ui_control') | default({}, true) -%}
                     {%- set ui_control_key_root = 'gamification/cumulative' -%}
@@ -2643,7 +2643,7 @@ views:
                           {%- set summary = "<div style='display:flex;gap:8px;'>"
                               ~ "<div style='flex:1;padding:8px 4px;border-radius:12px;background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.45);text-align:center;'><div style='font-size:18px;font-weight:800;color:var(--success-color);'>" ~ earned_n ~ "</div><div style='font-size:10px;font-weight:800;letter-spacing:0.5px;color:var(--secondary-text-color);'>" ~ ui.get('earned', 'EARNED') | upper ~ "</div></div>"
                               ~ "<div style='flex:1;padding:8px 4px;border-radius:12px;background:color-mix(in srgb, var(--primary-color) 14%, transparent);border:1px solid var(--primary-color);text-align:center;'><div style='font-size:18px;font-weight:800;color:var(--primary-color);'>" ~ active_n ~ "</div><div style='font-size:10px;font-weight:800;letter-spacing:0.5px;color:var(--secondary-text-color);'>" ~ ui.get('in_progress', 'IN PROGRESS') | upper ~ "</div></div>"
-                              ~ "<div style='flex:1;padding:8px 4px;border-radius:12px;background:rgba(127,127,127,0.12);border:1px solid rgba(127,127,127,0.35);text-align:center;'><div style='font-size:18px;font-weight:800;color:var(--secondary-text-color);'>" ~ todo_n ~ "</div><div style='font-size:10px;font-weight:800;letter-spacing:0.5px;color:var(--secondary-text-color);'>NOT STARTED</div></div>"
+                              ~ "<div style='flex:1;padding:8px 4px;border-radius:12px;background:rgba(127,127,127,0.12);border:1px solid rgba(127,127,127,0.35);text-align:center;'><div style='font-size:18px;font-weight:800;color:var(--secondary-text-color);'>" ~ todo_n ~ "</div><div style='font-size:10px;font-weight:800;letter-spacing:0.5px;color:var(--secondary-text-color);'>" ~ ui.get('not_started', 'Not started') | upper ~ "</div></div>"
                               ~ "</div>" -%}
                           {{
                             {
@@ -2677,7 +2677,7 @@ views:
                           {#-- daily cards stack (ring above, text below) when their own column is narrow --#}
                           {%- set dstyle = "<style>@container (max-width:170px){.dc{flex-direction:column !important;align-items:center !important;text-align:center !important;gap:6px !important;}.dt{width:100% !important;margin-top:6px !important;}.dd{display:none !important;}.dx{justify-content:center !important;}}</style>" -%}
                           {%- for g in groups -%}
-                            {%- set glabel = ui.get('special_occasion', 'Special') if g == 'special' else ('Longer' if g == 'longer' else ui.get(g, g | replace('_', ' ') | title)) -%}
+                            {%- set glabel = ui.get('special_occasion', 'Special') if g == 'special' else (ui.get('longer', 'Longer') if g == 'longer' else ui.get(g, g | replace('_', ' ') | title)) -%}
                             {%- set gstat = namespace(total=0, done=0, keys=[], earned=[]) -%}
                             {%- for b in ns.badges -%}
                               {%- if b.group == g -%}
@@ -2754,7 +2754,7 @@ views:
                               {#-- how far along the goal is, as a count --#}
                               {%- set count_txt = '' -%}
                               {%- if b.threshold > 0 -%}
-                                {%- set count_txt = "<b style='color:var(--primary-text-color);'>" ~ ('%g' | format(b.current)) ~ " of " ~ ('%g' | format(b.threshold | round(2))) ~ "</b> " ~ b.unit -%}
+                                {%- set count_txt = "<b style='color:var(--primary-text-color);'>" ~ ('%g' | format(b.current)) ~ " " ~ ui.get('of', 'of') ~ " " ~ ('%g' | format(b.threshold | round(2))) ~ "</b> " ~ {'pts': ui.get('points_short', 'pts'), 'chores': ui.get('chores', 'chores') | lower, 'days': ui.get('days', 'days')}.get(b.unit, b.unit) -%}
                               {%- endif -%}
                               {#-- day-by-day strip: done / missed / today / still ahead --#}
                               {%- set day_strip = '' -%}
@@ -2793,7 +2793,7 @@ views:
                                     {%- endif -%}
                                       {%- set dcount.cells = dcount.cells ~ "<div style='text-align:center;'><div style='font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;margin-bottom:3px;'>" ~ (d_ts | timestamp_custom('%a')) ~ "</div><div style='height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";color:" ~ c_fg ~ ";'>" ~ c_mark ~ "</div></div>" -%}
                                   {%- endfor -%}
-                                  {%- set strip_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'>" ~ (count_txt ~ ' · ' if (not b.day_based and count_txt | length > 0) else '') ~ "<b style='color:var(--primary-text-color);'>" ~ dcount.done ~ (' of ' ~ n_days if b.day_based else '') ~ "</b> " ~ ('days done' if b.day_based else ('day active' if dcount.done == 1 else 'days active')) ~ "</div>" -%}
+                                  {%- set strip_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'>" ~ (count_txt ~ ' · ' if (not b.day_based and count_txt | length > 0) else '') ~ "<b style='color:var(--primary-text-color);'>" ~ dcount.done ~ ((' ' ~ ui.get('of', 'of') ~ ' ' ~ n_days) if b.day_based else '') ~ "</b> " ~ (ui.get('days_done', 'days done') if b.day_based else (ui.get('day_active', 'day active') if dcount.done == 1 else ui.get('days_active', 'days active'))) ~ "</div>" -%}
                                     {%- set day_strip = "<div style='margin-top:10px;display:grid;grid-template-columns:repeat(" ~ n_days ~ ",1fr);gap:6px;'>" ~ dcount.cells ~ "</div>" ~ strip_note -%}
                                 {%- endif -%}
                                 {%- if n_days > 7 -%}
@@ -2838,15 +2838,15 @@ views:
                                     {%- endif -%}
                                   {%- endfor -%}
                                   {%- set wkl = namespace(h='') -%}
-                                  {%- for letter in ['M', 'T', 'W', 'T', 'F', 'S', 'S'] -%}
+                                  {%- for letter in [ui.get('mon_short', 'Mon')[:1], ui.get('tue_short', 'Tue')[:1], ui.get('wed_short', 'Wed')[:1], ui.get('thu_short', 'Thu')[:1], ui.get('fri_short', 'Fri')[:1], ui.get('sat_short', 'Sat')[:1], ui.get('sun_short', 'Sun')[:1]] -%}
                                     {%- set wkl.h = wkl.h ~ "<div style='text-align:center;font-size:9px;font-weight:700;opacity:.55;'>" ~ letter ~ "</div>" -%}
                                   {%- endfor -%}
                                   {%- set wk_head = "<div style='margin-top:10px;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;'>" ~ wkl.h ~ "</div>" -%}
-                                  {%- set win_note = ("<div style='display:flex;justify-content:space-between;margin-top:8px;font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;letter-spacing:.4px;'><span>Last 4 weeks</span><span>cycle is " ~ n_days ~ " days</span></div>") if windowed else '' -%}
+                                  {%- set win_note = ("<div style='display:flex;justify-content:space-between;margin-top:8px;font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;letter-spacing:.4px;'><span>" ~ ui.get('last_4_weeks', 'Last 4 weeks') ~ "</span><span>" ~ ui.get('cycle_is', 'cycle is') ~ " " ~ n_days ~ " " ~ ui.get('days', 'days') ~ "</span></div>") if windowed else '' -%}
                                   {%- set watched_days = (([((today_ts - as_timestamp(b.tracked_since ~ 'T12:00:00')) / 86400) | round(0) | int, 0] | max) if b.tracked_since | length > 0 else 0) -%}
                                   {%- set past_done = b.days_done | select('lt', current_date) | select('ge', b.tracked_since) | list | length -%}
                                   {%- set missed_n = [watched_days - past_done, 0] | max -%}
-                                  {%- set cal_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'>" ~ (count_txt ~ ' · ' if count_txt | length > 0 else '') ~ (("<b style='color:var(--primary-text-color);'>" ~ missed_n ~ "</b> missed") if (b.day_based and missed_n > 0) else ("<b style='color:var(--primary-text-color);'>" ~ (b.days_done | length) ~ "</b> " ~ ('day active' if (b.days_done | length) == 1 else 'days active'))) ~ "</div>" -%}
+                                  {%- set cal_note = "<div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'>" ~ (count_txt ~ ' · ' if count_txt | length > 0 else '') ~ (("<b style='color:var(--primary-text-color);'>" ~ missed_n ~ "</b> " ~ (ui.get('missed', 'Missed') | lower)) if (b.day_based and missed_n > 0) else ("<b style='color:var(--primary-text-color);'>" ~ (b.days_done | length) ~ "</b> " ~ (ui.get('day_active', 'day active') if (b.days_done | length) == 1 else ui.get('days_active', 'days active')))) ~ "</div>" -%}
                                   {#-- pace: where the count should be by today if the work were spread evenly --#}
                                   {%- set pace_html = '' -%}
                                   {%- if b.threshold > 0 and b.current < b.threshold -%}
@@ -2868,9 +2868,9 @@ views:
                                     {%- endif -%}
                                     {%- set rem_txt = '%g' | format(remaining | round(2)) -%}
                                     {%- if b.unit == 'chores' and avail <= 14 -%}
-                                      {%- set need_txt = 'needs ' ~ rem_txt ~ ' · ' ~ ('%g' | format((remaining / avail) | round(1))) ~ ' per day' -%}
+                                      {%- set need_txt = ui.get('needs', 'needs') ~ ' ' ~ rem_txt ~ ' · ' ~ ('%g' | format((remaining / avail) | round(1))) ~ ' ' ~ ui.get('per_day', 'per day') -%}
                                     {%- else -%}
-                                      {%- set need_txt = 'needs ' ~ rem_txt ~ ' in ' ~ avail ~ (' day' if avail == 1 else ' days') -%}
+                                      {%- set need_txt = ui.get('needs', 'needs') ~ ' ' ~ rem_txt ~ ' ' ~ ui.get('in_time', 'in') ~ ' ' ~ avail ~ ' ' ~ (ui.get('day', 'day') if avail == 1 else ui.get('days', 'days')) -%}
                                     {%- endif -%}
                                     {%- set pace_html = "<div style='margin-top:8px;padding:6px 10px;border-radius:10px;background:var(--secondary-background-color);display:flex;justify-content:space-between;gap:8px;font-size:12px;'><span style='font-weight:800;color:" ~ pace_col ~ ";'>" ~ pace_label ~ "</span><span style='color:var(--secondary-text-color);'>" ~ need_txt ~ "</span></div>" -%}
                                   {%- endif -%}
@@ -2892,7 +2892,7 @@ views:
                                       {%- set sc.cells = sc.cells ~ "<span style='width:26px;height:26px;box-sizing:border-box;border-radius:50%;border:2px solid var(--divider-color);'></span>" -%}
                                     {%- endif -%}
                                   {%- endfor -%}
-                                  {%- set day_strip = "<div style='margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;'>" ~ sc.cells ~ "</div><div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'><b style='color:var(--primary-text-color);'>" ~ s_have ~ " of " ~ s_need ~ "</b> " ~ ('day in a row' if s_need == 1 else 'days in a row') ~ ((' · ' ~ (s_need - s_have) ~ ' more to earn') if s_have < s_need else '') ~ "</div>" -%}
+                                  {%- set day_strip = "<div style='margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;'>" ~ sc.cells ~ "</div><div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'><b style='color:var(--primary-text-color);'>" ~ s_have ~ " " ~ ui.get('of', 'of') ~ " " ~ s_need ~ "</b> " ~ (ui.get('day_in_a_row', 'day in a row') if s_need == 1 else ui.get('days_in_a_row', 'days in a row')) ~ ((' · ' ~ (s_need - s_have) ~ ' ' ~ ui.get('more_to_earn', 'more to earn')) if s_have < s_need else '') ~ "</div>" -%}
                                 {%- elif b.start | length == 0 and b.end | length == 0 -%}
                                   {#-- open-ended goal: the last 7 days as checkmarks and dots --#}
                                   {%- set today_ts = as_timestamp(current_date ~ 'T12:00:00') -%}
@@ -2921,7 +2921,7 @@ views:
                                     {%- endif -%}
                                     {%- set wk.cells = wk.cells ~ "<div style='text-align:center;'><div style='font-size:10px;font-weight:700;opacity:.6;text-transform:uppercase;margin-bottom:3px;'>" ~ (d_ts | timestamp_custom('%a')) ~ "</div><div style='height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:" ~ c_bg ~ ";border:" ~ c_bd ~ ";color:" ~ c_fg ~ ";'>" ~ c_mark ~ "</div></div>" -%}
                                   {%- endfor -%}
-                                  {%- set wk_note = ("<b style='color:var(--primary-text-color);'>" ~ b.current ~ "</b> day streak") if (b.streak and b.current > 0) else ("<b style='color:var(--primary-text-color);'>" ~ wk.done ~ "</b> of the last 7 days") -%}
+                                  {%- set wk_note = ("<b style='color:var(--primary-text-color);'>" ~ b.current ~ "</b> " ~ (ui.get('day_streak', 'Day streak') | lower)) if (b.streak and b.current > 0) else ("<b style='color:var(--primary-text-color);'>" ~ wk.done ~ "</b> " ~ ui.get('of_the_last_7_days', 'of the last 7 days')) -%}
                                   {%- set day_strip = "<div style='margin-top:10px;display:grid;grid-template-columns:repeat(7,1fr);gap:6px;'>" ~ wk.cells ~ "</div><div style='margin-top:8px;font-size:12px;color:var(--secondary-text-color);'>" ~ wk_note ~ ((' · ' ~ count_txt) if (count_txt | length > 0 and not b.streak) else '') ~ "</div>" -%}
                                 {%- elif count_txt | length > 0 -%}
                                   {#-- dated goal too long for a day strip: still show the count --#}
@@ -3215,19 +3215,19 @@ views:
                         {%- endfor -%}
                         {%- for fe in fsort.top + fsort.rest -%}
                           {%- if states(fe) not in ['unknown', 'unavailable'] -%}
-                            {%- set fname = state_attr(fe, 'achievement_name') | default('Family Goal', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                            {%- set fname = state_attr(fe, 'achievement_name') | default(ui.get('family_goal', 'Family Goal'), true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set ficon = state_attr(fe, 'icon') or 'mdi:trophy' -%}
                             {%- set ftype = (state_attr(fe, 'type') or '') | string | lower -%}
                             {#-- Day-streak goals count shared days, so they show a level track and no per-person rows --#}
                             {%- set fstreak = ftype in ['family_caught_up_days', 'family_active_days'] -%}
                             {%- set fgrid = fstreak or ftype == 'family_everyone_contributes' -%}
-                            {%- set funit = ' days' if fstreak else '' -%}
+                            {%- set funit = (' ' ~ ui.get('days', 'days')) if fstreak else '' -%}
                             {#-- Time left: only goals that run on the calendar day have a known end (midnight) --#}
                             {%- set secs_left = 86400 - (now().hour * 3600 + now().minute * 60 + now().second) -%}
                             {%- set hrs_left = (secs_left // 3600) | int -%}
                             {%- set mins_left = ((secs_left % 3600) // 60) | int -%}
-                            {%- set time_txt = ((hrs_left ~ 'h ' ~ mins_left ~ 'm left') if hrs_left > 0 else (mins_left ~ 'm left')) if ftype in ['family_caught_up_days', 'family_active_days', 'family_chores_in_day'] else '' -%}
+                            {%- set time_txt = (((hrs_left ~ ui.get('hours_short', 'h') ~ ' ' ~ mins_left ~ ui.get('minutes_short', 'm')) if hrs_left > 0 else (mins_left ~ ui.get('minutes_short', 'm'))) ~ ' ' ~ ui.get('left', 'left')) if ftype in ['family_caught_up_days', 'family_active_days', 'family_chores_in_day'] else '' -%}
                             {%- set time_col = 'var(--warning-color)' if hrs_left < 3 else 'var(--secondary-text-color)' -%}
                             {%- set time_html = ("<div style='display:inline-flex;align-items:center;gap:3px;margin-top:4px;font-size:10px;font-weight:800;color:" ~ time_col ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ time_txt ~ "</div>") if time_txt else '' -%}
                             {%- set flevels = (state_attr(fe, 'family_levels') or []) | map('float', 0) | list -%}
@@ -3269,16 +3269,16 @@ views:
                             {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
                             {%- set accent = 'var(--success-color)' if fdone else '#8b5cf6' -%}
                             {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
-                            {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ('STREAK RESET · LEVELS RESET' if streak_reset else 'NEW PERIOD · LEVELS RESET') ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
-                            {%- set lvl_txt = ('Level ' ~ (elevel + 1) ~ ' of ' ~ fcount) if (fcount > 1 and not fdone) else ('✓ All ' ~ fcount ~ ' levels' if (fdone and fcount > 1) else '') -%}
-                            {%- set sub = '🎉 All levels complete' if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ (' day' if (funit and togo == 1) else funit) ~ ' to go</b>' ~ (' · +' ~ freward ~ ' ⭐ each' if freward > 0 else '')) -%}
-                            {%- set mult_html = ("<div style='font-size:11px;font-weight:700;color:var(--warning-color);line-height:1.35;'>🏆 Top contributor ×" ~ ('%g' | format(fmult)) ~ "</div>") if (fmult > 1 and not fdone) else '' -%}
+                            {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ((ui.get('streak_reset', 'Streak reset') if streak_reset else ui.get('new_period', 'New period')) ~ ' · ' ~ ui.get('levels_reset', 'Levels reset')) | upper ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
+                            {%- set lvl_txt = (ui.get('level', 'Level') ~ ' ' ~ (elevel + 1) ~ ' ' ~ ui.get('of', 'of') ~ ' ' ~ fcount) if (fcount > 1 and not fdone) else (('✓ ' ~ ui.get('all', 'All') ~ ' ' ~ fcount ~ ' ' ~ ui.get('levels', 'levels')) if (fdone and fcount > 1) else '') -%}
+                            {%- set sub = ('🎉 ' ~ ui.get('all_levels_complete', 'All levels complete')) if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ ((' ' ~ ui.get('day', 'day')) if (funit and togo == 1) else funit) ~ ' ' ~ ui.get('to_go', 'to go') ~ '</b>' ~ ((' · +' ~ freward ~ ' ⭐ ' ~ ui.get('each', 'each')) if freward > 0 else '')) -%}
+                            {%- set mult_html = ("<div style='font-size:11px;font-weight:700;color:var(--warning-color);line-height:1.35;'>🏆 " ~ ui.get('top_contributor', 'Top contributor') ~ " ×" ~ ('%g' | format(fmult)) ~ "</div>") if (fmult > 1 and not fdone) else '' -%}
                             {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
 
                             {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
                             {%- set frecord_day = state_attr(fe, 'family_record_day') or '' -%}
                             {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
-                            {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 Record: <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
+                            {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 " ~ ui.get('record', 'Record') ~ ": <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
 
                             {%- if fgrid -%}
                               {#-- Who is in: a check for everyone who has done their part, the count for the rest --#}
@@ -3293,7 +3293,7 @@ views:
                               {%- elif ftype == 'family_caught_up_days' -%}
                                 {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
                                 {%- for pname, ptxt in cstat.items() -%}
-                                  {%- set p_ok = (ptxt | string).startswith('0 still') -%}
+                                  {%- set p_ok = ((ptxt.open | int(1)) == 0 and not ptxt.overdue) if ptxt is mapping else ((ptxt | string).startswith('0 still') and 'overdue' not in (ptxt | string)) -%}
                                   {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                                   {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('var(--success-color)' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
                                 {%- endfor -%}
@@ -3488,15 +3488,19 @@ views:
                       {%- if not header_collapsed -%}
                       {%- set rows = namespace(v='') -%}
                       {%- set tag_colors = {'chores': 'var(--success-color)', 'bonuses': 'var(--success-color)', 'penalties': 'var(--error-color)', 'rewards': 'var(--primary-color)', 'badges': 'var(--warning-color)', 'achievements': 'var(--warning-color)', 'challenges': 'var(--warning-color)', 'manual': 'var(--secondary-text-color)'} -%}
+                      {#-- point-source label keys in the dashboard translations --#}
+                      {%- set src_keys = {'chores': 'chore', 'rewards': 'reward', 'bonuses': 'bonus', 'penalties': 'penalty', 'badges': 'badge', 'achievements': 'achievement', 'challenges': 'challenge', 'manual': 'adjustment', 'other': 'activity'} -%}
                       {%- for it in items -%}
                         {%- set amt = it.get('amount', 0) | float(0) -%}
                         {%- set when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
                         {%- set days = (now().date() - when.date()).days if when else -1 -%}
-                        {%- set when_txt = ('' if when is none else (('Today ' ~ when.strftime('%-I:%M %p')) if days == 0 else (('Yesterday ' ~ when.strftime('%-I:%M %p')) if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
-                        {%- set raw_nm = ((it.get('item_name') or it.get('source_label') or 'Activity') | string) -%}
-                        {%- set level_txt = (raw_nm.split(' - Level ')[1].split(' ')[0]) if ' - Level ' in raw_nm else '' -%}
-                        {%- set nm = (raw_nm.split(' - Level ')[0]) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                        {%- set lbl = ((it.get('source_label') or '') | string | upper) ~ (' · LEVEL ' ~ level_txt if level_txt else '') -%}
+                        {%- set when_txt = ('' if when is none else ((ui.get('today', 'Today') ~ ' ' ~ when.strftime('%-I:%M %p')) if days == 0 else ((ui.get('yesterday', 'Yesterday') ~ ' ' ~ when.strftime('%-I:%M %p')) if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
+                        {%- set src_lbl = ui.get(src_keys.get(it.get('source', ''), ''), it.get('source_label') or '') | string -%}
+                        {%- set raw_nm = ((it.get('item_name') or src_lbl or ui.get('activity', 'Activity')) | string) -%}
+                        {%- set level_sep = ' - ' ~ ui.get('level', 'Level') ~ ' ' -%}
+                        {%- set level_txt = (raw_nm.split(level_sep)[1].split(' ')[0]) if level_sep in raw_nm else '' -%}
+                        {%- set nm = (raw_nm.split(level_sep)[0]) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set lbl = (src_lbl | upper) ~ ((' · ' ~ (ui.get('level', 'Level') | upper) ~ ' ' ~ level_txt) if level_txt else '') -%}
                         {%- set src = it.get('source', '') -%}
                         {%- set tcol = tag_colors.get(src, 'var(--secondary-text-color)') -%}
                         {%- set col = 'var(--success-color)' if amt >= 0 else 'var(--error-color)' -%}

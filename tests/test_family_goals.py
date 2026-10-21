@@ -379,7 +379,10 @@ async def test_caught_up_status_reads_real_chore_state(
     )
     status = gm.get_caught_up_status(goal_id)
     assert len(status) == 2
-    assert all("still to do today" in text for text in status.values())
+    for counts in status.values():
+        assert set(counts) == {"open", "done", "overdue"}
+        assert isinstance(counts["open"], int)
+        assert isinstance(counts["overdue"], bool)
     await gm.evaluate_assignee(zoe)  # must not raise
 
 
@@ -744,7 +747,7 @@ async def test_legacy_family_achievement_migrates_to_goal(
         const.DATA_ACHIEVEMENT_TYPE: "chore_total",
     }
 
-    assert coordinator.family_goal_manager.migrate_legacy_achievements() == 1
+    assert await coordinator.family_goal_manager.migrate_legacy_achievements() == 1
 
     assert "old1" not in coordinator.achievements_data
     assert "keep" in coordinator.achievements_data
@@ -757,7 +760,7 @@ async def test_legacy_family_achievement_migrates_to_goal(
     assert goal[fg.DATA_PROGRESS][zoe][fg.DATA_AWARDED] is True
     assert set(goal[fg.DATA_ASSIGNED_USER_IDS]) == {zoe, max_}
     # Running it again does nothing
-    assert coordinator.family_goal_manager.migrate_legacy_achievements() == 0
+    assert await coordinator.family_goal_manager.migrate_legacy_achievements() == 0
 
 
 async def test_goals_survive_a_restart(
@@ -787,3 +790,110 @@ async def test_goals_survive_a_restart(
         if "family_contributions" in state.attributes
     ]
     assert sensors
+
+
+async def test_points_goal_does_not_count_award_points(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Goal payouts, achievement points and badge points don't feed a points goal.
+
+    Otherwise a level's own payout would carry the goal toward the next level.
+    """
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = gm.create_goal(
+        {
+            fg.DATA_NAME: "Levelled points goal",
+            fg.DATA_ASSIGNED_USER_IDS: [zoe, max_],
+            fg.DATA_TYPE: fg.GOAL_TYPE_POINTS,
+            fg.DATA_TARGET_VALUE: 300.0,
+            fg.DATA_REWARD_POINTS: 50.0,
+            fg.DATA_LEVELS: "100:50, 300:50",
+        }
+    )
+
+    await _earn_points(scenario_full, zoe, 60.0)
+    await _earn_points(scenario_full, max_, 40.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    # Level 1 paid 50 to each person; the goal still only holds the 100 earned.
+    assert gm.get_level_info(goal_id)["level"] == 1
+    assert gm.get_total(goal_id) == pytest.approx(100.0)
+
+    for source in (const.POINTS_SOURCE_ACHIEVEMENTS, const.POINTS_SOURCE_BADGES):
+        await coordinator.economy_manager.deposit(
+            assignee_id=zoe, amount=500.0, source=source
+        )
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    assert gm.get_total(goal_id) == pytest.approx(100.0)
+    assert gm.get_level_info(goal_id)["level"] == 1
+
+    # Bonuses still count
+    await coordinator.economy_manager.deposit(
+        assignee_id=max_, amount=25.0, source=const.POINTS_SOURCE_BONUSES
+    )
+    assert gm.get_total(goal_id) == pytest.approx(125.0)
+
+
+async def test_payout_names_come_from_translations(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Level and top-contributor payout names use the translation file wording.
+
+    A language without the goal wording falls back to English.
+    """
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    max_info: Any = coordinator.assignees_data[max_]
+    max_info[const.DATA_USER_DASHBOARD_LANGUAGE] = "xx"
+    gm.create_goal(
+        {
+            fg.DATA_NAME: "Pizza Night",
+            fg.DATA_ASSIGNED_USER_IDS: [zoe, max_],
+            fg.DATA_TYPE: fg.GOAL_TYPE_POINTS,
+            fg.DATA_TARGET_VALUE: 300.0,
+            fg.DATA_REWARD_POINTS: 10.0,
+            fg.DATA_LEVELS: "100:10, 300:20",
+            fg.DATA_TOP_MULTIPLIER: 2.0,
+        }
+    )
+
+    await _earn_points(scenario_full, zoe, 70.0)
+    await _earn_points(scenario_full, max_, 30.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    def last_goal_entry(assignee_id: str) -> dict[str, Any]:
+        ledger: list[dict[str, Any]] = coordinator.assignees_data[assignee_id][
+            const.DATA_USER_LEDGER
+        ]
+        return next(
+            entry
+            for entry in reversed(ledger)
+            if entry[const.DATA_LEDGER_SOURCE] == const.POINTS_SOURCE_CHALLENGES
+        )
+
+    zoe_entry = last_goal_entry(zoe)
+    assert zoe_entry[const.DATA_LEDGER_ITEM_NAME] == (
+        "Pizza Night - Level 1 (Top contributor x2)"
+    )
+    assert zoe_entry[const.DATA_LEDGER_AMOUNT] == pytest.approx(20.0)
+    assert last_goal_entry(max_)[const.DATA_LEDGER_ITEM_NAME] == "Pizza Night - Level 1"
+
+
+def test_broken_goal_wording_falls_back_to_the_name() -> None:
+    """A translation with a bad placeholder never blocks a payout."""
+    from custom_components.choreops.family_goals.manager import _fill
+
+    words = {fg.GOAL_WORD_LEVEL: "{name} - Stufe {stufe}"}
+    assert _fill(words, fg.GOAL_WORD_LEVEL, name="Pizza", level=1) == "Pizza"
+    assert _fill({}, fg.GOAL_WORD_LEVEL, name="Pizza", level=1) == "Pizza"

@@ -16,7 +16,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.start import async_at_started
 
 from .. import const as base
-from ..helpers import entity_helpers as eh
+from ..helpers import entity_helpers as eh, translation_helpers as th
 from ..helpers.entity_helpers import remove_entities_by_item_id
 from ..managers.base_manager import BaseManager
 from ..utils.dt_utils import dt_today_iso
@@ -34,11 +34,31 @@ _DEBOUNCE_SECONDS: float = 2.0
 # Points that goals pay out must not trigger another evaluation of themselves.
 _OWN_POINT_SOURCES = {base.POINTS_SOURCE_CHALLENGES}
 
+# Award points never count toward a points goal: only chores, bonuses and
+# manual adds do.
+_AWARD_POINT_SOURCES = (
+    base.POINTS_SOURCE_CHALLENGES,
+    base.POINTS_SOURCE_ACHIEVEMENTS,
+    base.POINTS_SOURCE_BADGES,
+)
+
 _NO_CHORE = (
     base.SENTINEL_EMPTY,
     base.SENTINEL_NONE_TEXT,
     base.SENTINEL_NO_SELECTION,
 )
+
+
+def _fill(words: dict[str, str], key: str, **values: Any) -> str:
+    """Fill a goal wording template, falling back to the plain goal name.
+
+    A template that is missing or has a broken placeholder (a bad translation)
+    never stops a payout; the goal name alone is used instead.
+    """
+    try:
+        return words[key].format(**values)
+    except (KeyError, IndexError, ValueError):
+        return str(values.get("name", ""))
 
 
 class FamilyGoalManager(BaseManager):
@@ -60,7 +80,7 @@ class FamilyGoalManager(BaseManager):
 
     async def async_setup(self) -> None:
         """Move legacy family achievements over, then subscribe to events."""
-        self.migrate_legacy_achievements()
+        await self.migrate_legacy_achievements()
         for suffix in (
             base.SIGNAL_SUFFIX_STATS_UPDATED,
             base.SIGNAL_SUFFIX_CHORE_APPROVED,
@@ -81,7 +101,7 @@ class FamilyGoalManager(BaseManager):
             async_at_started(self.hass, lambda _hass: self._mark_all_pending())
         )
 
-    def migrate_legacy_achievements(self) -> int:
+    async def migrate_legacy_achievements(self) -> int:
         """Convert family achievements from earlier versions into goals.
 
         Earlier versions stored family goals as achievements. Each one is moved
@@ -101,6 +121,7 @@ class FamilyGoalManager(BaseManager):
         if not legacy:
             return 0
 
+        words = await self._goal_words(self.hass.config.language)
         taken = {
             str(goal.get(fg.DATA_NAME, "")).strip().lower()
             for goal in self.goals.values()
@@ -110,9 +131,11 @@ class FamilyGoalManager(BaseManager):
             source[fg.DATA_LABELS] = source.pop(
                 base.DATA_ACHIEVEMENT_LABELS, source.get(fg.DATA_LABELS, [])
             )
-            name = str(source.get(fg.DATA_NAME, "")).strip() or "Family Goal"
+            name = str(source.get(fg.DATA_NAME, "")).strip() or _fill(
+                words, fg.GOAL_WORD_DEFAULT_NAME
+            )
             if name.lower() in taken:
-                name = f"{name} (family goal)"
+                name = _fill(words, fg.GOAL_WORD_MIGRATED_NAME, name=name)
             source[fg.DATA_NAME] = name
             taken.add(name.lower())
 
@@ -315,7 +338,7 @@ class FamilyGoalManager(BaseManager):
 
         if goal_type == fg.GOAL_TYPE_POINTS:
             point_periods = assignee_data.get(base.DATA_USER_POINT_PERIODS, {})
-            return float(
+            earned = float(
                 self.coordinator.stats.get_period_total(
                     point_periods,
                     base.PERIOD_ALL_TIME,
@@ -325,6 +348,25 @@ class FamilyGoalManager(BaseManager):
                     },
                 )
             )
+            # Award points (goal payouts, achievements, badges) are not effort
+            # toward a goal, and a level's own payout must not carry the goal
+            # toward its next level.
+            all_time = cast(
+                "dict[str, Any]",
+                cast(
+                    "dict[str, Any]",
+                    point_periods.get(base.DATA_USER_POINT_PERIODS_ALL_TIME, {}),
+                ).get(base.PERIOD_ALL_TIME, {}),
+            )
+            by_source = cast(
+                "dict[str, Any]",
+                all_time.get(base.DATA_USER_POINT_PERIOD_BY_SOURCE, {}),
+            )
+            awarded = sum(
+                max(0.0, float(by_source.get(source, 0.0) or 0.0))
+                for source in _AWARD_POINT_SOURCES
+            )
+            return max(0.0, earned - awarded)
 
         if goal_type == fg.GOAL_TYPE_DAY:
             return float(self._approved_today(assignee_id))
@@ -536,7 +578,9 @@ class FamilyGoalManager(BaseManager):
         if assignee_info is None:
             return False
         today_iso = dt_today_iso()
-        streak = assignee_info.get(base.DATA_USER_CAUGHT_UP_STREAK) or {}
+        streak: dict[str, Any] = (
+            assignee_info.get(base.DATA_USER_CAUGHT_UP_STREAK) or {}
+        )
         count = int(streak.get("count", 0))
         best = int(streak.get("best", 0))
         last_day = str(streak.get("last_day", ""))
@@ -554,18 +598,19 @@ class FamilyGoalManager(BaseManager):
             last_day = today_iso
             changed = True
         if changed:
-            assignee_info[base.DATA_USER_CAUGHT_UP_STREAK] = {  # type: ignore[typeddict-unknown-key]
+            assignee_info[base.DATA_USER_CAUGHT_UP_STREAK] = {
                 "count": count,
                 "last_day": last_day,
                 "best": best,
             }
         return changed
 
-    def get_caught_up_status(self, goal_id: str) -> dict[str, str]:
-        """Return today's per-person caught-up progress as readable text.
+    def get_caught_up_status(self, goal_id: str) -> dict[str, dict[str, int | bool]]:
+        """Return today's per-person caught-up progress, keyed by display name.
 
-        For sensors, so a dashboard can show who is holding the day up (for
-        example "Lily: 2 still to do today, 1 done").
+        For sensors, so a dashboard can show who is holding the day up. Each
+        person gets ``open`` (still to do today), ``done`` (approved today) and
+        ``overdue``; the dashboard turns them into words in its own language.
         """
         goal = self.goals.get(goal_id)
         if not goal:
@@ -579,10 +624,11 @@ class FamilyGoalManager(BaseManager):
             for assignee_id in snapshots
         }
         return {
-            names[assignee_id]: (
-                f"{snap['open']} still to do today, {snap['done']} done"
-                + (", overdue" if snap["overdue"] else "")
-            )
+            names[assignee_id]: {
+                "open": int(snap["open"]),
+                "done": int(snap["done"]),
+                "overdue": bool(snap["overdue"]),
+            }
             for assignee_id, snap in snapshots.items()
         }
 
@@ -757,6 +803,17 @@ class FamilyGoalManager(BaseManager):
         levels = self._levels(goal)
         if not levels:
             return
+        # Wording is loaded up front: nothing below may await, so two
+        # evaluations can never interleave and pay the same level twice.
+        words = await self._words_by_assignee(goal)
+        # An edit during the await replaces the stored record; use the live one.
+        live_goal = self.goals.get(goal_id)
+        if live_goal is None:
+            return
+        goal = live_goal
+        levels = self._levels(goal)
+        if not levels:
+            return
 
         goal_type = goal.get(fg.DATA_TYPE)
         if goal_type == fg.GOAL_TYPE_DAY and self._restart_day_goal_if_new_day(goal):
@@ -778,6 +835,7 @@ class FamilyGoalManager(BaseManager):
         while reached < len(levels) and total >= levels[reached][0]:
             reached += 1
             is_final = reached == len(levels)
+            level_shown = reached if len(levels) > 1 else None
 
             # Top contributor(s) of the level just finished: the most added
             # since the level began. Ties share the bonus; nobody wins it with
@@ -809,11 +867,61 @@ class FamilyGoalManager(BaseManager):
                     assignee_id,
                     goal_id,
                     goal,
-                    level=reached if len(levels) > 1 else None,
+                    level=level_shown,
                     reward=reward,
-                    bonus_note=(f"(Top contributor x{multiplier:g})" if is_top else ""),
+                    name=self._payout_name(
+                        words.get(assignee_id, {}),
+                        goal,
+                        level_shown,
+                        multiplier if is_top else None,
+                    ),
                     is_final=is_final,
                 )
+
+    async def _goal_words(self, language: str | None) -> dict[str, str]:
+        """Return the goal wording for a language, filled in from English."""
+        english = await th.load_notification_translation(self.hass, "en")
+        words = dict(english.get(fg.TRANS_SECTION_GOAL_WORDS, {}))
+        if language and language != "en":
+            local = await th.load_notification_translation(self.hass, language)
+            words.update(local.get(fg.TRANS_SECTION_GOAL_WORDS, {}))
+        return {key: str(value) for key, value in words.items()}
+
+    async def _words_by_assignee(
+        self, goal: dict[str, Any]
+    ) -> dict[str, dict[str, str]]:
+        """Return each assigned person's goal wording, in their own language."""
+        words: dict[str, dict[str, str]] = {}
+        for assignee_id in self._assigned_ids(goal):
+            assignee_info: dict[str, Any] = cast(
+                "dict[str, Any]", self.coordinator.assignees_data.get(assignee_id, {})
+            )
+            language = str(
+                assignee_info.get(base.DATA_USER_DASHBOARD_LANGUAGE)
+                or self.hass.config.language
+            )
+            words[assignee_id] = await self._goal_words(language)
+        return words
+
+    @staticmethod
+    def _payout_name(
+        words: dict[str, str],
+        goal: dict[str, Any],
+        level: int | None,
+        top_multiplier: float | None,
+    ) -> str:
+        """Return the ledger/notification name of a payout."""
+        name = str(goal.get(fg.DATA_NAME, ""))
+        if level is not None:
+            name = _fill(words, fg.GOAL_WORD_LEVEL, name=name, level=level)
+        if top_multiplier is not None:
+            name = _fill(
+                words,
+                fg.GOAL_WORD_TOP_CONTRIBUTOR,
+                name=name,
+                multiplier=f"{top_multiplier:g}",
+            )
+        return name
 
     def _award(
         self,
@@ -823,19 +931,13 @@ class FamilyGoalManager(BaseManager):
         *,
         level: int | None,
         reward: float,
-        bonus_note: str,
+        name: str,
         is_final: bool,
     ) -> None:
         """Mark one person's award and pay it through the challenge signal."""
         entry = goal.setdefault(fg.DATA_PROGRESS, {}).setdefault(assignee_id, {})
         entry[fg.DATA_AWARDED] = is_final
         entry[fg.PROGRESS_CURRENT_VALUE] = goal.get(fg.DATA_TARGET_VALUE, 1)
-
-        name = str(goal.get(fg.DATA_NAME, ""))
-        if level is not None:
-            name = f"{name} - Level {level}"
-        if bonus_note:
-            name = f"{name} {bonus_note}"
 
         self.coordinator._persist_and_update()
 

@@ -57,6 +57,7 @@ Legacy Sensors Imported from sensor_legacy.py (13):
     13. AssigneeBonusAppliedSensor - Bonus application count (data in dashboard helper)
 """
 
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 import json
 from typing import Any, cast
@@ -3797,6 +3798,9 @@ class SystemDashboardTranslationSensor(ChoreOpsCoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = const.TRANS_KEY_SENSOR_DASHBOARD_TRANSLATION
+    # A static lookup table: keep it out of recorder history (it also passes
+    # the recorder's 16 KB attribute limit in longer languages)
+    _unrecorded_attributes = frozenset({"ui_translations"})
 
     def __init__(
         self,
@@ -4564,7 +4568,7 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         return "available"
 
     @staticmethod
-    def _build_caught_up_streak(assignee_info: dict[str, Any]) -> dict[str, Any]:
+    def _build_caught_up_streak(assignee_info: Mapping[str, Any]) -> dict[str, Any]:
         """Return the person's "All Caught Up" day streak for dashboards."""
         streak = assignee_info.get(const.DATA_USER_CAUGHT_UP_STREAK) or {}
         count = int(streak.get("count", 0))
@@ -4577,7 +4581,7 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
 
     @staticmethod
     def _build_recent_activity(
-        assignee_info: dict[str, Any],
+        assignee_info: Mapping[str, Any],
         limit: int = 5,
         names: dict[str, dict[str, str]] | None = None,
         only_source: str | None = None,
@@ -4649,7 +4653,7 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         return lookup
 
     @staticmethod
-    def _build_points_summary(assignee_info: dict[str, Any]) -> dict[str, float]:
+    def _build_points_summary(assignee_info: Mapping[str, Any]) -> dict[str, float]:
         """Return points earned today and over the last 7 days, plus balance.
 
         Args:

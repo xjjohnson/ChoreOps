@@ -687,7 +687,7 @@ views:
                                 'icon': reward_icon,
                                 'color': tile_color,
                                 'vertical': false,
-                                'state_content': (['state', 'pool_total'] if state_attr(reward_sensor_eid, 'pooled') else ['state']),
+                                'state_content': ['state'],
                                 'tap_action': (
                                   {
                                     'action': 'perform-action',

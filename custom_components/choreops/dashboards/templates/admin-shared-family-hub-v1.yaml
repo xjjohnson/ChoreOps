@@ -15,7 +15,7 @@
 <#-- ============================================= --#>
 
 views:
-- title: Parents
+- title: << t.get('parents', 'Parents') >>
   path: admin
   max_columns: 3
   sections:
@@ -669,12 +669,12 @@ views:
                       'show_state': False,
                       'icon': 'mdi:check-all',
                       'name': ui.get('approve_all', 'Approve all') ~ ' (' ~ (ns.all_ids | length) ~ ')',
-                      'label': (ns.total_chore_pending | string) ~ ' ' ~ ui.get('chores', 'Chores') | lower ~ ' · ' ~ (ns.total_reward_pending | string) ~ ' ' ~ ui.get('rewards', 'Rewards') | lower ~ ' · ' ~ (ns.pending_user_count | string) ~ ' ' ~ ui.get('people', 'people'),
+                      'label': (ns.total_chore_pending | string) ~ ' ' ~ ui.get('chores', 'Chores') | lower ~ ' · ' ~ (ns.total_reward_pending | string) ~ ' ' ~ ui.get('rewards', 'Rewards') | lower ~ ' · ' ~ (ns.pending_user_count | string) ~ ' ' ~ (ui.get('people', 'People') | lower),
                       'tap_action': {
                         'action': 'call-service',
                         'service': 'button.press',
                         'data': {'entity_id': ns.all_ids},
-                        'confirmation': {'text': ui.get('approve', 'Approve') ~ ' ' ~ (ns.all_ids | length) ~ ' pending item(s) for everyone?'}
+                        'confirmation': {'text': (ui.get('approve_all_confirm', 'Approve {count} pending item(s) for everyone?') | replace('{count}', (ns.all_ids | length) | string))}
                       },
                       'hold_action': {'action': 'none'},
                       'styles': {
@@ -725,6 +725,7 @@ views:
               << template_snippets.user_override_helper >>
 
               << template_snippets.admin_setup_shared >>
+              {%- set ui = shared_admin_ui -%}
 
               {%- set helpers = helper_sensor_entities -%}
               {%- set pref_bp_ui_control_key_root = 'admin-shared/bonuses-penalties' -%}
@@ -759,8 +760,8 @@ views:
                   'show_state': false,
                   'show_icon': true,
                   'icon': 'mdi:scale-balance',
-                  'name': 'Bonuses & Penalties',
-                  'label': (bp_names.b | length) ~ ' bonuses · ' ~ (bp_names.p | length) ~ ' penalties' if bp_collapsed else 'Tap a name to apply',
+                  'name': ui.get('bonuses_and_penalties', 'Bonuses & Penalties'),
+                  'label': ((bp_names.b | length) ~ ' ' ~ (ui.get('bonuses', 'Bonuses') | lower) ~ ' · ' ~ (bp_names.p | length) ~ ' ' ~ (ui.get('penalties', 'Penalties') | lower)) if bp_collapsed else ui.get('tap_a_name_to_apply', 'Tap a name to apply'),
                   'tap_action': ({
                     'action': 'call-service',
                     'service': 'choreops.manage_ui_control',
@@ -834,7 +835,7 @@ views:
                       'show_name': false,
                       'show_icon': false,
                       'tap_action': {'action': 'none'},
-                      'custom_fields': {'content': "<div style='text-align:left;font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:" ~ col ~ ";margin:8px 2px 0 2px;'>" ~ ('Bonuses' if good else 'Penalties') ~ "</div>"},
+                      'custom_fields': {'content': "<div style='text-align:left;font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:" ~ col ~ ";margin:8px 2px 0 2px;'>" ~ (ui.get('bonuses', 'Bonuses') if good else ui.get('penalties', 'Penalties')) ~ "</div>"},
                       'styles': {
                         'card': [{'background': 'transparent'}, {'box-shadow': 'none'}, {'border': 'none'}, {'padding': '0px'}, {'min-height': 'unset'}],
                         'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
@@ -845,7 +846,7 @@ views:
                   {%- for iname, q in ns.q.items() | sort(attribute='1.points', reverse=true) -%}
                     {%- set qname = q.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                     {%- set pts_txt = ('%g' | format(q.points)) -%}
-                    {%- set label = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:34px;height:34px;border-radius:11px;background:" ~ col ~ ";display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:19px;height:19px;--mdc-icon-size:19px;color:#fff;display:block;'></ha-icon></div><div style='min-width:0;'><div style='font-size:14px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ qname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'><b style='color:" ~ col ~ ";'>" ~ ('+' if good else '−') ~ pts_txt ~ "</b> ⭐ · tap a name to apply</div></div></div>" -%}
+                    {%- set label = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:34px;height:34px;border-radius:11px;background:" ~ col ~ ";display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:19px;height:19px;--mdc-icon-size:19px;color:#fff;display:block;'></ha-icon></div><div style='min-width:0;'><div style='font-size:14px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ qname ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'><b style='color:" ~ col ~ ";'>" ~ ('+' if good else '−') ~ pts_txt ~ "</b> ⭐ · " ~ (ui.get('tap_a_name_to_apply', 'Tap a name to apply') | lower) ~ "</div></div></div>" -%}
                     {%- set fields = namespace(d={'label': label}, areas='label', cols='1fr') -%}
                     {%- for pp in q.people -%}
                       {%- set key = 'p' ~ loop.index -%}
@@ -860,7 +861,7 @@ views:
                           'action': 'call-service',
                           'service': 'button.press',
                           'target': {'entity_id': pp.eid},
-                          'confirmation': {'text': (('Apply ' ~ q.name ~ ' to ' ~ pp.u ~ '?'))}
+                          'confirmation': {'text': (ui.get('apply_to_confirm', 'Apply {item} to {name}?') | replace('{item}', (q.name) | string) | replace('{name}', (pp.u) | string))}
                         },
                         'styles': {
                           'card': [
@@ -916,6 +917,7 @@ views:
               << template_snippets.user_override_helper >>
 
               << template_snippets.admin_setup_shared >>
+              {%- set ui = shared_admin_ui -%}
 
               {%- set pref_fg_ui_control_key_root = 'admin-shared/family-goals' -%}
               {%- set pref_fg_default_collapsed = true -%}
@@ -948,8 +950,8 @@ views:
                   'show_state': false,
                   'show_icon': true,
                   'icon': 'mdi:flag-checkered',
-                  'name': 'Family goals & achievements',
-                  'label': (fg.goals | length) ~ (' goal' if fg.goals | length == 1 else ' goals') if fg_collapsed else 'Reset a goal to start it over',
+                  'name': ui.get('family_goals_and_achievements', 'Family goals & achievements'),
+                  'label': ((fg.goals | length) ~ ' ' ~ ((ui.get('goal', 'Goal') if fg.goals | length == 1 else ui.get('goals', 'Goals')) | lower)) if fg_collapsed else ui.get('reset_a_goal', 'Reset a goal to start it over'),
                   'tap_action': ({
                     'action': 'call-service',
                     'service': 'choreops.manage_ui_control',
@@ -1018,7 +1020,7 @@ views:
                       'label': "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:34px;height:34px;border-radius:11px;background:var(--primary-color);display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ gicon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);white-space:normal;'>" ~ gsafe ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);'>" ~ gsub ~ "</div></div></div>",
                       'reset': {'card': {
                         'type': 'custom:button-card',
-                        'name': 'Reset',
+                        'name': ui.get('reset', 'Reset'),
                         'icon': 'mdi:restart',
                         'show_name': true,
                         'show_icon': true,
@@ -1029,7 +1031,7 @@ views:
                             'goal_name': gname,
                             'config_entry_id': fg_entry_id
                           },
-                          'confirmation': {'text': 'Reset ' ~ gname ~ '? Progress and awards start over from zero. Points already paid are not taken back.'}
+                          'confirmation': {'text': (ui.get('reset_goal_confirm', 'Reset {goal}? Progress and awards start over from zero. Points already paid are not taken back.') | replace('{goal}', (gname) | string))}
                         },
                         'styles': {
                           'card': [
@@ -1078,6 +1080,7 @@ views:
               << template_snippets.user_override_helper >>
 
               << template_snippets.admin_setup_shared >>
+              {%- set ui = shared_admin_ui -%}
 
               {%- set pref_rp_ui_control_key_root = 'admin-shared/reward-pools' -%}
               {%- set pref_rp_default_collapsed = true -%}
@@ -1101,7 +1104,7 @@ views:
                 {%- for rw in (h.attributes.get('rewards') or []) -%}
                   {%- set rw_eid = rw.get('eid') if rw is mapping else rw -%}
                   {%- if rw_eid not in ['', 'None', 'unknown', 'unavailable', none] and states(rw_eid) not in ['unknown', 'unavailable'] and state_attr(rw_eid, 'pooled') -%}
-                    {%- set rw_name = (rw.get('name') if rw is mapping else none) or state_attr(rw_eid, 'reward_name') or 'Family reward' -%}
+                    {%- set rw_name = (rw.get('name') if rw is mapping else none) or state_attr(rw_eid, 'reward_name') or ui.get('family_reward', 'Family reward') -%}
                     {%- if rw_name not in rp.pools -%}
                       {%- set rp.pools = rp.pools | combine({rw_name: rw_eid}) -%}
                     {%- endif -%}
@@ -1123,8 +1126,8 @@ views:
                   'show_state': false,
                   'show_icon': true,
                   'icon': 'mdi:gift-outline',
-                  'name': 'Reward pools',
-                  'label': ((rp.pools | length) ~ (' pool' if rp.pools | length == 1 else ' pools') ~ ((' · ' ~ rp_ready.n ~ ' ready') if rp_ready.n > 0 else '')) if rp_collapsed else 'Approve, refund or fix contributions',
+                  'name': ui.get('reward_pools', 'Reward pools'),
+                  'label': ((rp.pools | length) ~ ' ' ~ ((ui.get('pool', 'Pool') if rp.pools | length == 1 else ui.get('pools', 'Pools')) | lower) ~ ((' · ' ~ rp_ready.n ~ ' ' ~ (ui.get('ready', 'Ready') | lower)) if rp_ready.n > 0 else '')) if rp_collapsed else ui.get('reward_pools_hint', 'Approve, refund or fix contributions'),
                   'tap_action': ({
                     'action': 'call-service',
                     'service': 'choreops.manage_ui_control',
@@ -1186,8 +1189,8 @@ views:
                 {%- set pcol = 'var(--success-color)' if pfull else pref_rp_accent -%}
                 {%- set picon = state_attr(peid, 'icon') or 'mdi:gift-outline' -%}
                 {%- set psafe = pname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                {%- set head_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:36px;height:36px;border-radius:11px;background:" ~ pcol ~ ";display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ picon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);'>" ~ psafe ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'>" ~ (('Full · waiting for you') if pfull else (('%g' | format(premain | round(2))) ~ ' to go' if ptotal > 0 else 'Nobody has chipped in')) ~ "</div></div><span style='font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:0.5px;background:color-mix(in srgb, " ~ pcol ~ " 25%, transparent);color:" ~ pcol ~ ";'>" ~ ('READY' if pfull else 'FILLING') ~ "</span></div>" -%}
-                {%- set bar_html = "<div style='height:10px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin-top:2px;'><div style='height:100%;width:" ~ (ppct if ppct < 100 else 100) ~ "%;background:" ~ pcol ~ ";border-radius:999px;'></div></div><div style='display:flex;justify-content:space-between;font-size:11px;color:var(--secondary-text-color);margin-top:4px;'><span>" ~ ('%g' | format(ptotal | round(2))) ~ " of " ~ ('%g' | format(ptarget | round(2))) ~ " points</span><span>" ~ ppct ~ "%</span></div>" -%}
+                {%- set head_html = "<div style='display:flex;align-items:center;gap:10px;text-align:left;'><div style='width:36px;height:36px;border-radius:11px;background:" ~ pcol ~ ";display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='" ~ picon ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);'>" ~ psafe ~ "</div><div style='font-size:11px;color:var(--secondary-text-color);'>" ~ ((ui.get('full', 'Full') ~ ' · ' ~ ui.get('waiting_for_you', 'waiting for you')) if pfull else ((('%g' | format(premain | round(2))) ~ ' ' ~ ui.get('to_go', 'to go')) if ptotal > 0 else ui.get('nobody_chipped_in', 'Nobody has chipped in'))) ~ "</div></div><span style='font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:0.5px;background:color-mix(in srgb, " ~ pcol ~ " 25%, transparent);color:" ~ pcol ~ ";'>" ~ ((ui.get('ready', 'Ready') if pfull else ui.get('filling', 'Filling')) | upper) ~ "</span></div>" -%}
+                {%- set bar_html = "<div style='height:10px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin-top:2px;'><div style='height:100%;width:" ~ (ppct if ppct < 100 else 100) ~ "%;background:" ~ pcol ~ ";border-radius:999px;'></div></div><div style='display:flex;justify-content:space-between;font-size:11px;color:var(--secondary-text-color);margin-top:4px;'><span>" ~ ('%g' | format(ptotal | round(2))) ~ " " ~ ui.get('of', 'of') ~ " " ~ ('%g' | format(ptarget | round(2))) ~ " " ~ (ui.get('points', 'Points') | lower) ~ "</span><span>" ~ ppct ~ "%</span></div>" -%}
                 {%- set chip_cards = namespace(c=[]) -%}
                 {%- for cname, camt in pcontrib.items() -%}
                   {%- if camt | float(0) > 0 -%}
@@ -1200,7 +1203,7 @@ views:
                         'action': 'call-service',
                         'service': 'choreops.refund_reward_pool',
                         'data': {'config_entry_id': rp_entry_id, 'reward_name': pname, 'user_name': cname},
-                        'confirmation': {'text': 'Refund ' ~ cname ~ '? Give ' ~ cname ~ ' their ' ~ ('%g' | format(camt | float(0) | round(2))) ~ ' points back from ' ~ pname ~ '. Everyone else keeps their points in the pool.'}
+                        'confirmation': {'text': (ui.get('refund_one_confirm', 'Refund {name}? Give {name} their {points} points back from {pool}. Everyone else keeps their points in the pool.') | replace('{name}', (cname) | string) | replace('{points}', ('%g' | format(camt | float(0) | round(2))) | string) | replace('{pool}', (pname) | string))}
                       },
                       'styles': {
                         'card': [{'padding': '6px 10px'}, {'border-radius': '999px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'min-height': 'unset'}, {'width': 'auto'}],
@@ -1212,14 +1215,14 @@ views:
                 {%- set act_cards = [
                   {
                     'type': 'custom:button-card',
-                    'name': '✔ Approve · delivered',
+                    'name': '✔ ' ~ ui.get('approve', 'Approve') ~ ' · ' ~ ui.get('delivered', 'delivered'),
                     'show_name': true,
                     'show_icon': false,
                     'tap_action': ({
                       'action': 'call-service',
                       'service': 'choreops.approve_reward_pool',
                       'data': {'config_entry_id': rp_entry_id, 'reward_name': pname},
-                      'confirmation': {'text': 'Mark ' ~ pname ~ ' as delivered? The pool is emptied so the family can save up again.'}
+                      'confirmation': {'text': (ui.get('pool_delivered_confirm', 'Mark {pool} as delivered? The pool is emptied so the family can save up again.') | replace('{pool}', (pname) | string))}
                     }) if pfull else {'action': 'none'},
                     'styles': {
                       'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, ({'background': 'var(--success-color)'}) if pfull else {'background': 'transparent'}, {'border': '1px solid var(--success-color)'} if pfull else {'border': '1px dashed var(--divider-color)'}],
@@ -1228,14 +1231,14 @@ views:
                   },
                   {
                     'type': 'custom:button-card',
-                    'name': '↩ Refund all',
+                    'name': '↩ ' ~ ui.get('refund_all', 'Refund all'),
                     'show_name': true,
                     'show_icon': false,
                     'tap_action': ({
                       'action': 'call-service',
                       'service': 'choreops.refund_reward_pool',
                       'data': {'config_entry_id': rp_entry_id, 'reward_name': pname},
-                      'confirmation': {'text': 'Cancel ' ~ pname ~ ' and give everyone their points back?'}
+                      'confirmation': {'text': (ui.get('pool_cancel_confirm', 'Cancel {pool} and give everyone their points back?') | replace('{pool}', (pname) | string))}
                     }) if ptotal > 0 else {'action': 'none'},
                     'styles': {
                       'card': [{'padding': '9px'}, {'border-radius': '12px'}, {'box-shadow': 'none'}, {'background': 'color-mix(in srgb, var(--error-color) 12%, transparent)'} if ptotal > 0 else {'background': 'transparent'}, {'border': '1.5px solid var(--error-color)'} if ptotal > 0 else {'border': '1px dashed var(--divider-color)'}],
@@ -1672,6 +1675,7 @@ views:
               {%- set pref_points_reasons_remove = pref_points_reasons_remove if (pref_points_reasons_remove is iterable and pref_points_reasons_remove is not string and pref_points_reasons_remove | length > 0) else ['Adjustment'] -%}
 
               << template_snippets.admin_setup_shared >>
+              {%- set ui = shared_admin_ui -%}
 
               {%- set qa_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
               {%- set qa_sa = ui_root.shared_admin if ui_root.shared_admin is mapping else {} -%}
@@ -1713,32 +1717,32 @@ views:
                   {%- set qa_specs.items = [
                     {
                       'icon': 'mdi:play-circle-outline' if qa_paused else 'mdi:pause-circle-outline',
-                      'name': 'Resume chores' if qa_paused else 'Pause chores',
-                      'label': ('Paused' ~ ((' · back ' ~ (as_timestamp(qa_paused_until) | timestamp_custom('%a %I:%M %p', true))) if qa_paused_until not in ['', none, 'None', 'unknown', 'unavailable'] else '')) if qa_paused else 'Stops overdue stats',
+                      'name': ui.get('resume_chores', 'Resume chores') if qa_paused else ui.get('pause_chores', 'Pause chores'),
+                      'label': (ui.get('paused', 'Paused') ~ ((' · ' ~ ui.get('back', 'back') ~ ' ' ~ (as_timestamp(qa_paused_until) | timestamp_custom('%a %I:%M %p', true))) if qa_paused_until not in ['', none, 'None', 'unknown', 'unavailable'] else '')) if qa_paused else ui.get('stops_overdue_stats', 'Stops overdue stats'),
                       'color': 'var(--warning-color)' if qa_paused else 'var(--primary-color)',
                       'tint': qa_paused,
-                      'tap': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'paused': not qa_paused}, 'confirmation': {'text': ('Resume chores for ' ~ selected_user_name ~ '?') if qa_paused else ('Pause chores for ' ~ selected_user_name ~ '?')}}
+                      'tap': {'action': 'call-service', 'service': 'choreops.pause_user_chores', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'paused': not qa_paused}, 'confirmation': {'text': (ui.get('resume_chores_confirm', 'Resume chores for {name}?') | replace('{name}', (selected_user_name) | string)) if qa_paused else (ui.get('pause_chores_confirm', 'Pause chores for {name}?') | replace('{name}', (selected_user_name) | string))}}
                     },
                     {
                       'icon': 'mdi:restore-alert',
-                      'name': 'Reset overdue',
-                      'label': (qa_overdue | length | string) ~ ' overdue' if qa_overdue | length > 0 else 'Nothing overdue',
+                      'name': ui.get('reset_overdue', 'Reset overdue'),
+                      'label': ((qa_overdue | length | string) ~ ' ' ~ (ui.get('overdue', 'Overdue') | lower)) if qa_overdue | length > 0 else ui.get('nothing_overdue', 'Nothing overdue'),
                       'color': 'var(--warning-color)',
                       'tint': qa_overdue | length > 0,
                       'badge': (qa_overdue | length | string) if qa_overdue | length > 0 else '',
-                      'tap': {'action': 'multi-actions', 'actions': qa_reset_actions.a, 'confirmation': {'text': 'Reset ' ~ (qa_overdue | length) ~ ' overdue chore(s) for ' ~ selected_user_name ~ ' back to pending?'}} if qa_overdue | length > 0 else {'action': 'none'}
+                      'tap': {'action': 'multi-actions', 'actions': qa_reset_actions.a, 'confirmation': {'text': (ui.get('reset_overdue_confirm', 'Reset {count} overdue chore(s) for {name} back to pending?') | replace('{count}', (qa_overdue | length) | string) | replace('{name}', (selected_user_name) | string))}} if qa_overdue | length > 0 else {'action': 'none'}
                     },
                     {
                       'icon': 'mdi:calendar-arrow-right',
-                      'name': 'Shift dates',
-                      'label': 'Move due dates forward',
+                      'name': ui.get('shift_dates', 'Shift dates'),
+                      'label': ui.get('move_due_dates_forward', 'Move due dates forward'),
                       'color': 'var(--primary-color)',
-                      'tap': {'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': qa_entry_id, 'after': now().isoformat(), 'user_names': [selected_user_name]}, 'confirmation': {'text': 'Move ' ~ selected_user_name ~ '\'s due dates forward to after now?'}}
+                      'tap': {'action': 'call-service', 'service': 'choreops.reschedule_chores_after', 'data': {'config_entry_id': qa_entry_id, 'after': now().isoformat(), 'user_names': [selected_user_name]}, 'confirmation': {'text': (ui.get('shift_dates_confirm', "Move {name}'s due dates forward to after now?") | replace('{name}', (selected_user_name) | string))}}
                     },
                     {
                       'icon': 'mdi:skip-next-circle-outline',
-                      'name': 'Skip next due',
-                      'label': 'Hide list' if qa_open.get('skip-open', false) else 'Pick a chore to skip',
+                      'name': ui.get('skip_next_due', 'Skip next due'),
+                      'label': ui.get('hide_list', 'Hide list') if qa_open.get('skip-open', false) else ui.get('pick_a_chore_to_skip', 'Pick a chore to skip'),
                       'color': 'var(--primary-color)',
                       'tint': qa_open.get('skip-open', false),
                       'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/skip-open', 'value': not (qa_open.get('skip-open', false) | bool(false))}}
@@ -1746,8 +1750,8 @@ views:
                   ] -%}
                   {%- set qa_specs.items = qa_specs.items + [{
                     'icon': 'mdi:format-list-bulleted',
-                    'name': 'All chores',
-                    'label': 'Hide list' if (qa_open.get('allchores-open', false) | bool(false)) else 'Pause or shift all',
+                    'name': ui.get('all_chores_action', 'All chores'),
+                    'label': ui.get('hide_list', 'Hide list') if (qa_open.get('allchores-open', false) | bool(false)) else ui.get('pause_or_shift_all', 'Pause or shift all'),
                     'color': 'var(--primary-color)',
                     'tint': (qa_open.get('allchores-open', false) | bool(false)),
                     'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/allchores-open', 'value': not (qa_open.get('allchores-open', false) | bool(false))}}
@@ -1756,28 +1760,28 @@ views:
                   {%- set qa_specs.items = [
                     {
                       'icon': 'mdi:chart-box-outline',
-                      'name': 'Activity report',
-                      'label': 'Posts to the bell' if qa_user_ok else 'Pick a person first',
+                      'name': ui.get('activity_report', 'Activity report'),
+                      'label': ui.get('posts_to_the_bell', 'Posts to the bell') if qa_user_ok else ui.get('pick_a_person_first', 'Pick a person first'),
                       'color': 'var(--primary-color)',
-                      'tap': {'action': 'call-service', 'service': 'choreops.generate_activity_report', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'report_title': 'Activity report: ' ~ selected_user_name, 'notify_service': 'persistent_notification.create'}, 'confirmation': {'text': 'Post the last 7 days of activity for ' ~ selected_user_name ~ ' to the Home Assistant notifications bell?'}} if qa_user_ok else {'action': 'none'}
+                      'tap': {'action': 'call-service', 'service': 'choreops.generate_activity_report', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'report_title': ui.get('activity_report', 'Activity report') ~ ': ' ~ selected_user_name, 'notify_service': 'persistent_notification.create'}, 'confirmation': {'text': (ui.get('activity_report_confirm', 'Post the last 7 days of activity for {name} to the Home Assistant notifications bell?') | replace('{name}', (selected_user_name) | string))}} if qa_user_ok else {'action': 'none'}
                     }
                   ] -%}
                 {%- elif qa_tab == 'system' -%}
                   {%- set qa_specs.items = [] -%}
                   {%- if qa_user_ok and qa_gam -%}
                     {%- set qa_specs.items = qa_specs.items + [
-                      {'group': 'fix', 'icon': 'mdi:medal-outline', 'name': 'Remove badge', 'label': 'Hide list' if (qa_open.get('badge-open', false) | bool(false)) else 'Take back an award', 'color': 'var(--warning-color)', 'tint': (qa_open.get('badge-open', false) | bool(false)),
+                      {'group': 'fix', 'icon': 'mdi:medal-outline', 'name': ui.get('remove_badge', 'Remove badge'), 'label': ui.get('hide_list', 'Hide list') if (qa_open.get('badge-open', false) | bool(false)) else ui.get('take_back_an_award', 'Take back an award'), 'color': 'var(--warning-color)', 'tint': (qa_open.get('badge-open', false) | bool(false)),
                        'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/badge-open', 'value': not (qa_open.get('badge-open', false) | bool(false))}}},
-                      {'group': 'fix', 'icon': 'mdi:wrench-outline', 'name': 'Repair streak', 'label': 'Hide list' if (qa_open.get('repair-open', false) | bool(false)) else 'Fix a broken streak', 'color': 'var(--warning-color)', 'tint': (qa_open.get('repair-open', false) | bool(false)),
+                      {'group': 'fix', 'icon': 'mdi:wrench-outline', 'name': ui.get('repair_streak', 'Repair streak'), 'label': ui.get('hide_list', 'Hide list') if (qa_open.get('repair-open', false) | bool(false)) else ui.get('fix_a_broken_streak', 'Fix a broken streak'), 'color': 'var(--warning-color)', 'tint': (qa_open.get('repair-open', false) | bool(false)),
                        'tap': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': qa_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/repair-open', 'value': not (qa_open.get('repair-open', false) | bool(false))}}}
                     ] -%}
                   {%- endif -%}
                   {%- set qa_specs.items = qa_specs.items + [
-                    {'group': 'family', 'icon': 'mdi:restore', 'name': 'Reset all to pending', 'label': 'Clears claims & approvals', 'color': 'var(--error-color)', 'tint': true,
-                     'tap': {'action': 'call-service', 'service': 'choreops.reset_chores_to_pending_state', 'data': {'config_entry_id': qa_entry_id}, 'confirmation': {'text': 'Reset EVERY chore for EVERYONE to pending? This clears all claims and approvals.'}}},
-                    {'group': 'family', 'icon': 'mdi:cog-outline', 'name': 'Integration settings', 'label': 'Open ChoreOps config', 'color': 'var(--primary-color)', 'tap': {'action': 'url', 'url_path': '/config/integrations/integration/choreops'}},
-                    {'group': 'family', 'icon': 'mdi:book-open-page-variant-outline', 'name': 'Documentation', 'label': 'Wiki & guides', 'color': 'var(--primary-color)', 'tap': {'action': 'url', 'url_path': 'https://github.com/ccpk1/ChoreOps/wiki'}},
-                    {'group': 'family', 'icon': 'mdi:heart-outline', 'name': 'Support', 'label': 'Fund the project', 'color': 'var(--primary-color)', 'tap': {'action': 'url', 'url_path': 'https://github.com/sponsors/ccpk1'}}
+                    {'group': 'family', 'icon': 'mdi:restore', 'name': ui.get('reset_all_to_pending', 'Reset all to pending'), 'label': ui.get('clears_claims_and_approvals', 'Clears claims & approvals'), 'color': 'var(--error-color)', 'tint': true,
+                     'tap': {'action': 'call-service', 'service': 'choreops.reset_chores_to_pending_state', 'data': {'config_entry_id': qa_entry_id}, 'confirmation': {'text': (ui.get('reset_all_to_pending_confirm', 'Reset EVERY chore for EVERYONE to pending? This clears all claims and approvals.'))}}},
+                    {'group': 'family', 'icon': 'mdi:cog-outline', 'name': ui.get('integration_settings', 'Integration settings'), 'label': ui.get('open_choreops_config', 'Open ChoreOps config'), 'color': 'var(--primary-color)', 'tap': {'action': 'url', 'url_path': '/config/integrations/integration/choreops'}},
+                    {'group': 'family', 'icon': 'mdi:book-open-page-variant-outline', 'name': ui.get('documentation', 'Documentation'), 'label': ui.get('wiki_and_guides', 'Wiki & guides'), 'color': 'var(--primary-color)', 'tap': {'action': 'url', 'url_path': 'https://github.com/ccpk1/ChoreOps/wiki'}},
+                    {'group': 'family', 'icon': 'mdi:heart-outline', 'name': ui.get('support', 'Support'), 'label': ui.get('fund_the_project', 'Fund the project'), 'color': 'var(--primary-color)', 'tap': {'action': 'url', 'url_path': 'https://github.com/sponsors/ccpk1'}}
                   ] -%}
                 {%- endif -%}
 
@@ -1791,19 +1795,19 @@ views:
                   {%- set ep_eid = ep_core.get('points_eid') if ep_core is mapping else none -%}
                   {%- set ep_raw = states(ep_eid) | float(default=0) if ep_eid else 0 -%}
                   {%- set ep_bal = (ep_raw | round(0) | int) | string if ep_raw == (ep_raw | round(0)) else (ep_raw | round(1)) | string -%}
-                  {%- set ep_unit = ((state_attr(ep_eid, 'unit_of_measurement') if ep_eid else none) or 'Points') | string | replace('&', '&amp;') | replace('<', '&lt;') -%}
+                  {%- set ep_unit = ((state_attr(ep_eid, 'unit_of_measurement') if ep_eid else none) or ui.get('points', 'Points')) | string | replace('&', '&amp;') | replace('<', '&lt;') -%}
                   {%- set ep_mult = (state_attr(ep_eid, 'points_multiplier') | float(default=1)) if ep_eid else 1 -%}
                   {%- set ep_mult_txt = ('%.2f' | format(ep_mult)) | regex_replace('\.?0+$', '') -%}
                   {%- set ep_week = state_attr(ep_eid, 'point_stat_points_net_week') if ep_eid else none -%}
                   {%- set ep_day = state_attr(ep_eid, 'point_stat_avg_per_day_week') if ep_eid else none -%}
                   {%- set ep_chip_style = 'border-radius:14px;padding:4px 10px;font-size:11px;font-weight:600;white-space:nowrap;' -%}
-                  {%- set ep_chips = "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--primary-color) 14%, transparent);'>x" ~ ep_mult_txt ~ (' Active' if ep_mult > 1 else '') ~ "</span>" -%}
+                  {%- set ep_chips = "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--primary-color) 14%, transparent);'>x" ~ ep_mult_txt ~ ((' ' ~ ui.get('active', 'Active')) if ep_mult > 1 else '') ~ "</span>" -%}
                   {%- if ep_week not in [none, '', 'None', 'unknown', 'unavailable'] -%}
                     {%- set ep_week_n = ep_week | float(default=0) -%}
-                    {%- set ep_chips = ep_chips ~ "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--success-color) 12%, transparent);'>" ~ ('+' if ep_week_n >= 0 else '') ~ ('%g' | format(ep_week_n | round(1))) ~ " This Week</span>" -%}
+                    {%- set ep_chips = ep_chips ~ "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--success-color) 12%, transparent);'>" ~ ('+' if ep_week_n >= 0 else '') ~ ('%g' | format(ep_week_n | round(1))) ~ " " ~ ui.get('this_week', 'This Week') ~ "</span>" -%}
                   {%- endif -%}
                   {%- if ep_day not in [none, '', 'None', 'unknown', 'unavailable'] -%}
-                    {%- set ep_chips = ep_chips ~ "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--warning-color) 12%, transparent);'>" ~ ('%g' | format((ep_day | float(default=0)) | round(1))) ~ " Points/Day</span>" -%}
+                    {%- set ep_chips = ep_chips ~ "<span style='" ~ ep_chip_style ~ "background:color-mix(in srgb, var(--warning-color) 12%, transparent);'>" ~ ('%g' | format((ep_day | float(default=0)) | round(1))) ~ " " ~ ui.get('points_per_day', 'Points / Day') ~ "</span>" -%}
                   {%- endif -%}
                   {{-
                     {
@@ -1815,7 +1819,7 @@ views:
                       'tap_action': {'action': 'none'},
                       'hold_action': {'action': 'none'},
                       'custom_fields': {
-                        'content': "<div style='display:flex;align-items:flex-end;justify-content:space-between;gap:10px;text-align:left;'><div><div style='font-size:10.5px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;opacity:0.6;'>Available · " ~ (selected_user_name | e) ~ "</div><div style='font-size:34px;font-weight:800;line-height:1.1;'>" ~ ep_bal ~ "</div><div style='font-size:12px;opacity:0.65;'>" ~ ep_unit ~ "</div></div><div style='display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:55%;'>" ~ ep_chips ~ "</div></div>"
+                        'content': "<div style='display:flex;align-items:flex-end;justify-content:space-between;gap:10px;text-align:left;'><div><div style='font-size:10.5px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;opacity:0.6;'>" ~ ui.get('available', 'Available') ~ " · " ~ (selected_user_name | e) ~ "</div><div style='font-size:34px;font-weight:800;line-height:1.1;'>" ~ ep_bal ~ "</div><div style='font-size:12px;opacity:0.65;'>" ~ ep_unit ~ "</div></div><div style='display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:55%;'>" ~ ep_chips ~ "</div></div>"
                       },
                       'styles': {
                         'card': [
@@ -1831,7 +1835,7 @@ views:
                     }
                   }},
                   {%- set ep_seg = namespace(c=[]) -%}
-                  {%- for ek, el, ei in [('bonuses', 'Bonuses', 'mdi:gift-outline'), ('penalties', 'Penalties', 'mdi:alert-octagon-outline'), ('points', 'Points', 'mdi:plus-minus-variant'), ('achievements', 'Achievements', 'mdi:trophy-award')] -%}
+                  {%- for ek, el, ei in [('bonuses', ui.get('bonuses', 'Bonuses'), 'mdi:gift-outline'), ('penalties', ui.get('penalties', 'Penalties'), 'mdi:alert-octagon-outline'), ('points', ui.get('points', 'Points'), 'mdi:plus-minus-variant'), ('achievements', ui.get('achievements', 'Achievements'), 'mdi:trophy-award')] -%}
                     {%- set ep_on = ek == ep_tab -%}
                     {%- set ep_seg.c = ep_seg.c + [{
                       'type': 'custom:button-card',
@@ -1879,13 +1883,13 @@ views:
                         'entity': it.get('eid'),
                         'icon': (state_attr(it.get('eid'), 'icon') or ('mdi:gift-outline' if ep_good else 'mdi:alert-octagon-outline')) | string,
                         'name': (it.get('name') or '') | string,
-                        'label': ('+' if ep_good else '−') ~ ('%g' | format(ep_pts)) ~ ' · applied ' ~ ('%g' | format(ep_n)) ~ '×',
+                        'label': ('+' if ep_good else '−') ~ ('%g' | format(ep_pts)) ~ ' · ' ~ (ui.get('applied', 'Applied') | lower) ~ ' ' ~ ('%g' | format(ep_n)) ~ '×',
                         'show_name': true,
                         'show_icon': true,
                         'show_label': true,
                         'show_state': false,
                         'custom_fields': {'act': "<div style='width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:" ~ ep_col ~ ";border:1.5px solid " ~ ep_col ~ ";background:color-mix(in srgb, " ~ ep_col ~ " 15%, transparent);'>" ~ ('+' if ep_good else '−') ~ "</div>"},
-                        'tap_action': {'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': it.get('eid')}, 'confirmation': {'text': ('Give ' if ep_good else 'Apply ') ~ (it.get('name') or '') ~ (' to ' if ep_good else ' to ') ~ selected_user_name ~ '?'}},
+                        'tap_action': {'action': 'call-service', 'service': 'button.press', 'target': {'entity_id': it.get('eid')}, 'confirmation': {'text': ((ui.get('give_to_confirm', 'Give {item} to {name}?') | replace('{item}', (it.get('name') or '') | string) | replace('{name}', (selected_user_name) | string)) if ep_good else (ui.get('apply_to_confirm', 'Apply {item} to {name}?') | replace('{item}', (it.get('name') or '') | string) | replace('{name}', (selected_user_name) | string)))}},
                         'hold_action': {'action': 'none'},
                         'styles': {
                           'card': [
@@ -1916,7 +1920,7 @@ views:
                         'show_icon': false,
                         'show_label': false,
                         'show_state': false,
-                        'name': 'No ' ~ ep_tab ~ ' set up yet',
+                        'name': (ui.get('none_set_up_yet', 'No {items} set up yet') | replace('{items}', (ui.get(ep_tab, ep_tab) | lower) | string)),
                         'tap_action': {'action': 'none'},
                         'styles': {
                           'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': '1px dashed var(--divider-color)'}, {'background': 'transparent'}],
@@ -1944,7 +1948,7 @@ views:
                       {%- set ach_n = ((ach_attrs.get('awarded_to') or {}).get(selected_user_name, 0)) | int(default=0) -%}
                       {%- set ach_icon = (ach_attrs.get('icon') or 'mdi:trophy') | string -%}
                       {%- set ach_name_safe = ach_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                      {%- set ach_label = (('+' ~ ('%g' | format(ach_pts)) ~ ' pts') if ach_pts > 0 else 'no points') ~ ' · given ' ~ ach_n ~ '×' -%}
+                      {%- set ach_label = (('+' ~ ('%g' | format(ach_pts)) ~ ' ' ~ ui.get('points_short', 'pts')) if ach_pts > 0 else ui.get('no_points', 'no points')) ~ ' · ' ~ ui.get('given', 'given') ~ ' ' ~ ach_n ~ '×' -%}
                       {%- set ach_icon_html = ("<ha-icon icon='" ~ ach_icon ~ "' style='--mdc-icon-size:24px;width:24px;height:24px;color:#d4a017;display:block;'></ha-icon>") if ach_icon[:4] == 'mdi:' else "<span style='font-size:22px;line-height:1;'>🏆</span>" -%}
                       {%- set ach_html = "<div style='display:flex;align-items:center;gap:12px;text-align:left;'><div style='flex:0 0 auto;width:44px;height:44px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--secondary-background-color);border:3px solid #d4a017;box-shadow:0 0 0 3px rgba(246,211,101,0.3);'>" ~ ach_icon_html ~ "</div><div style='min-width:0;'><div style='font-size:13px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ ach_name_safe ~ "</div><div style='font-size:11px;opacity:0.75;color:var(--primary-text-color);'>" ~ ach_label ~ "</div></div></div>" -%}
                       {%- set ep_rows.c = ep_rows.c + [{
@@ -1957,7 +1961,7 @@ views:
                         'name': ach_name,
                         'label': ach_label,
                         'custom_fields': {'content': ach_html},
-                        'tap_action': {'action': 'call-service', 'service': 'choreops.award_achievement', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'achievement_name': ach_name}, 'confirmation': {'text': 'Give ' ~ ach_name ~ ' to ' ~ selected_user_name ~ '?'}},
+                        'tap_action': {'action': 'call-service', 'service': 'choreops.award_achievement', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'achievement_name': ach_name}, 'confirmation': {'text': (ui.get('give_to_confirm', 'Give {item} to {name}?') | replace('{item}', (ach_name) | string) | replace('{name}', (selected_user_name) | string))}},
                         'hold_action': {'action': 'none'},
                         'styles': {
                           'card': [
@@ -1984,7 +1988,7 @@ views:
                         'show_icon': false,
                         'show_label': false,
                         'show_state': false,
-                        'name': 'No achievements set up yet (Settings → ChoreOps → Configure → Manage Achievement)',
+                        'name': ui.get('no_achievements_set_up', 'No achievements set up yet (Settings → ChoreOps → Configure → Manage Achievement)'),
                         'tap_action': {'action': 'none'},
                         'styles': {
                           'card': [{'padding': '14px'}, {'border-radius': '14px'}, {'box-shadow': 'none'}, {'border': '1px dashed var(--divider-color)'}, {'background': 'transparent'}],
@@ -2069,7 +2073,7 @@ views:
                     {{-
                       {
                         'type': 'custom:button-card', 'show_name': true, 'show_icon': false,
-                        'name': 'Reason · shows in Points history' ~ ('' if pt_reason else ' (none picked: saved as Adjustment)'),
+                        'name': ui.get('reason_shows_in_history', 'Reason · shows in Points history') ~ ('' if pt_reason else (' (' ~ ui.get('none_picked_saved_as', 'none picked: saved as') ~ ' ' ~ ui.get('adjustment', 'Adjustment') ~ ')')),
                         'tap_action': {'action': 'none'}, 'hold_action': {'action': 'none'},
                         'styles': {
                           'card': [{'padding': '2px 4px'}, {'box-shadow': 'none'}, {'border': 'none'}, {'background': 'transparent'}],
@@ -2081,18 +2085,18 @@ views:
                       {'type': 'grid', 'columns': 2, 'square': false, 'cards': pt_reasons.c}
                     }},
                     {%- set pt_ready = pt_amount != 0 -%}
-                    {%- set pt_verb = ('Add ' ~ pt_amount ~ ' to ' ~ selected_user_name) if pt_amount > 0 else ('Remove ' ~ (pt_amount | abs) ~ ' from ' ~ selected_user_name) -%}
+                    {%- set pt_verb = (ui.get('add_points_to', 'Add {amount} to {name}') | replace('{amount}', (pt_amount) | string) | replace('{name}', (selected_user_name) | string)) if pt_amount > 0 else (ui.get('remove_points_from', 'Remove {amount} from {name}') | replace('{amount}', (pt_amount | abs) | string) | replace('{name}', (selected_user_name) | string)) -%}
                     {{-
                       {
                         'type': 'custom:button-card',
-                        'name': ('Apply ' ~ pt_amount_txt) if pt_ready else 'Pick an amount above',
+                        'name': (ui.get('apply', 'Apply') ~ ' ' ~ pt_amount_txt) if pt_ready else ui.get('pick_an_amount_above', 'Pick an amount above'),
                         'label': (selected_user_name ~ ': ' ~ ep_bal ~ ' → ' ~ pt_after_txt) if pt_ready else '',
                         'show_name': true, 'show_icon': false, 'show_label': pt_ready,
                         'tap_action': ({
                           'action': 'call-service',
                           'service': 'choreops.manual_adjust_points',
-                          'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'amount': pt_amount, 'reason': pt_reason if pt_reason else 'Adjustment'},
-                          'confirmation': {'text': pt_verb ~ '? (' ~ (pt_reason if pt_reason else 'Adjustment') ~ ')'}
+                          'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'amount': pt_amount, 'reason': pt_reason if pt_reason else ui.get('adjustment', 'Adjustment')},
+                          'confirmation': {'text': pt_verb ~ '? (' ~ (pt_reason if pt_reason else ui.get('adjustment', 'Adjustment')) ~ ')'}
                         } if pt_ready else {'action': 'none'}),
                         'hold_action': {'action': 'none'},
                         'styles': {
@@ -2110,16 +2114,16 @@ views:
                         {%- set it_amt = it.get('amount', 0) | float(0) -%}
                         {%- set it_when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
                         {%- set it_days = (now().date() - it_when.date()).days if it_when else -1 -%}
-                        {%- set it_when_txt = '' if it_when is none else (('Today ' ~ it_when.strftime('%-I:%M %p')) if it_days == 0 else (('Yesterday ' ~ it_when.strftime('%-I:%M %p')) if it_days == 1 else (it_when.strftime('%a %-I:%M %p') if it_days < 7 else it_when.strftime('%b %-d')))) -%}
+                        {%- set it_when_txt = '' if it_when is none else ((ui.get('today', 'Today') ~ ' ' ~ it_when.strftime('%-I:%M %p')) if it_days == 0 else ((ui.get('yesterday', 'Yesterday') ~ ' ' ~ it_when.strftime('%-I:%M %p')) if it_days == 1 else (it_when.strftime('%a %-I:%M %p') if it_days < 7 else it_when.strftime('%b %-d')))) -%}
                         {%- set it_col = 'var(--success-color)' if it_amt >= 0 else 'var(--error-color)' -%}
-                        {%- set it_name = ((it.get('item_name') or 'Adjustment') | string) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set it_name = ((it.get('item_name') or ui.get('adjustment', 'Adjustment')) | string) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                         {%- set pt_rows.v = pt_rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><ha-icon icon='" ~ ('mdi:plus-circle-outline' if it_amt >= 0 else 'mdi:minus-circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;color:" ~ it_col ~ ";flex:none;'></ha-icon><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ it_name ~ "</div><div style='font-size:11px;opacity:.65;'>" ~ it_when_txt ~ "</div></div><div style='font-size:13px;font-weight:800;color:" ~ it_col ~ ";white-space:nowrap;'>" ~ (('+' if it_amt > 0 else '') ~ ('%g' | format(it_amt | round(2)))) ~ "</div></div>" -%}
                       {%- endfor -%}
                       {{-
                         {
                           'type': 'custom:button-card', 'show_name': false, 'show_icon': false,
                           'tap_action': {'action': 'none'}, 'hold_action': {'action': 'none'},
-                          'custom_fields': {'content': "<div style='width:100%;text-align:left;'><div style='font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;opacity:.65;margin-bottom:2px;'>Recent manual changes · " ~ (selected_user_name | e) ~ "</div>" ~ pt_rows.v ~ "</div>"},
+                          'custom_fields': {'content': "<div style='width:100%;text-align:left;'><div style='font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;opacity:.65;margin-bottom:2px;'>" ~ ui.get('recent_manual_changes', 'Recent manual changes') ~ " · " ~ (selected_user_name | e) ~ "</div>" ~ pt_rows.v ~ "</div>"},
                           'styles': {
                             'card': [{'padding': '12px 14px'}, {'border-radius': '16px'}, {'box-shadow': 'none'}, {'border': '1px solid var(--divider-color)'}, {'background-color': 'var(--card-background-color)'}],
                             'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
@@ -2133,9 +2137,9 @@ views:
 
                 {%- if qa_specs.items | length > 0 -%}
                   {%- set qa_group_defs = [
-                    ('main', ('QUICK ACTIONS' if qa_tab == 'chores' else 'REPORTS') ~ ' · ' ~ (selected_user_name | upper)),
-                    ('fix', 'FIX-IT TOOLS · ' ~ (selected_user_name | upper)),
-                    ('family', 'FAMILY-WIDE · AFFECTS EVERYONE')
+                    ('main', ((ui.get('quick_actions', 'Quick actions') if qa_tab == 'chores' else ui.get('reports', 'Reports')) | upper) ~ ' · ' ~ (selected_user_name | upper)),
+                    ('fix', (ui.get('fix_it_tools', 'Fix-it tools') | upper) ~ ' · ' ~ (selected_user_name | upper)),
+                    ('family', (ui.get('family_wide', 'Family-wide') ~ ' · ' ~ ui.get('affects_everyone', 'Affects everyone')) | upper)
                   ] -%}
                   {%- for gkey, glabel in qa_group_defs -%}
                     {%- set qa_cards = namespace(c=[]) -%}
@@ -2207,19 +2211,19 @@ views:
                 {#-- Inline pick-lists --#}
                 {%- set qa_pick = namespace(c=[], title='') -%}
                 {%- if qa_tab == 'chores' and (qa_open.get('skip-open', false) | bool(false)) -%}
-                  {%- set qa_pick.title = 'PICK A CHORE TO SKIP' -%}
+                  {%- set qa_pick.title = ui.get('pick_a_chore_to_skip', 'Pick a chore to skip') | upper -%}
                   {%- for ch in qa_chores.items -%}
-                    {%- set qa_pick.c = qa_pick.c + [{'name': ch.name, 'sub': '', 'color': 'var(--divider-color)', 'tap': {'action': 'call-service', 'service': 'choreops.skip_chore_due_date', 'data': {'config_entry_id': qa_entry_id, 'chore_name': ch.name, 'user_name': selected_user_name}, 'confirmation': {'text': 'Skip the next due date for ' ~ ch.name ~ '?'}}}] -%}
+                    {%- set qa_pick.c = qa_pick.c + [{'name': ch.name, 'sub': '', 'color': 'var(--divider-color)', 'tap': {'action': 'call-service', 'service': 'choreops.skip_chore_due_date', 'data': {'config_entry_id': qa_entry_id, 'chore_name': ch.name, 'user_name': selected_user_name}, 'confirmation': {'text': (ui.get('skip_next_due_confirm', 'Skip the next due date for {chore}?') | replace('{chore}', (ch.name) | string))}}}] -%}
                   {%- endfor -%}
                 {%- elif qa_tab == 'system' and qa_user_ok and (qa_open.get('badge-open', false) | bool(false)) -%}
-                  {%- set qa_pick.title = 'REMOVE A BADGE · ' ~ (selected_user_name | upper) -%}
+                  {%- set qa_pick.title = (ui.get('remove_a_badge', 'Remove a badge') | upper) ~ ' · ' ~ (selected_user_name | upper) -%}
                   {%- for bd in qa_badges if bd is mapping and bd.get('earned', false) -%}
-                    {%- set qa_pick.c = qa_pick.c + [{'name': bd.get('name'), 'sub': '', 'color': 'var(--warning-color)', 'tap': {'action': 'call-service', 'service': 'choreops.remove_awarded_badges', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'badge_name': bd.get('name')}, 'confirmation': {'text': 'Take back ' ~ bd.get('name') ~ ' from ' ~ selected_user_name ~ '?'}}}] -%}
+                    {%- set qa_pick.c = qa_pick.c + [{'name': bd.get('name'), 'sub': '', 'color': 'var(--warning-color)', 'tap': {'action': 'call-service', 'service': 'choreops.remove_awarded_badges', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'badge_name': bd.get('name')}, 'confirmation': {'text': (ui.get('remove_badge_confirm', 'Take back {badge} from {name}?') | replace('{badge}', (bd.get('name')) | string) | replace('{name}', (selected_user_name) | string))}}}] -%}
                   {%- endfor -%}
                 {%- elif qa_tab == 'system' and qa_user_ok and (qa_open.get('repair-open', false) | bool(false)) -%}
-                  {%- set qa_pick.title = 'REPAIR A STREAK · ' ~ (selected_user_name | upper) -%}
+                  {%- set qa_pick.title = (ui.get('repair_a_streak', 'Repair a streak') | upper) ~ ' · ' ~ (selected_user_name | upper) -%}
                   {%- for bd in qa_badges if bd is mapping -%}
-                    {%- set qa_pick.c = qa_pick.c + [{'name': bd.get('name'), 'sub': '', 'color': 'var(--warning-color)', 'tap': {'action': 'call-service', 'service': 'choreops.repair_badge_streak', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'badge_name': bd.get('name')}, 'confirmation': {'text': 'Restore the streak for ' ~ bd.get('name') ~ ' (' ~ selected_user_name ~ ') to its recent best?'}}}] -%}
+                    {%- set qa_pick.c = qa_pick.c + [{'name': bd.get('name'), 'sub': '', 'color': 'var(--warning-color)', 'tap': {'action': 'call-service', 'service': 'choreops.repair_badge_streak', 'data': {'config_entry_id': qa_entry_id, 'user_name': selected_user_name, 'badge_name': bd.get('name')}, 'confirmation': {'text': (ui.get('repair_streak_confirm', 'Restore the streak for {badge} ({name}) to its recent best?') | replace('{badge}', (bd.get('name')) | string) | replace('{name}', (selected_user_name) | string))}}}] -%}
                   {%- endfor -%}
                 {%- endif -%}
                 {%- if qa_pick.c | length > 0 -%}
@@ -4089,7 +4093,7 @@ views:
                   'show_label': False,
                   'show_state': False,
                   'show_icon': True,
-                  'name': 'Change chore',
+                  'name': ui.get('change_chore', 'Change chore'),
                   'tap_action': {'action': 'call-service', 'service': 'select.select_option', 'data': {'entity_id': chore_select_entity, 'option': 'None'}},
                   'styles': {
                     'card': [
@@ -4241,7 +4245,7 @@ views:
                         'show_state': False,
                         'icon': 'mdi:clipboard-search-outline',
                         'name': selected_chore_display,
-                        'label': (('Not assigned to ' ~ (selected_user_name | e) ~ '. Tap Assign to add it.') if selected_chore_is_unassigned else ('Could not load details for this chore.')),
+                        'label': ((ui.get('chore_not_assigned_hint', 'Not assigned to {name}. Tap Assign to add it.') | replace('{name}', (selected_user_name | e) | string)) if selected_chore_is_unassigned else ui.get('chore_details_unavailable', 'Could not load details for this chore.')),
                         'tap_action': {'action': 'more-info'},
                         'custom_fields': {
                           'action': {
@@ -4424,7 +4428,7 @@ views:
                         'show_state': False,
                         'show_icon': True,
                         'icon': 'mdi:chevron-up' if cp_all else 'mdi:chevron-down',
-                        'name': 'Show fewer' if cp_all else ('Show all ' ~ (cp_opts | length)),
+                        'name': ui.get('show_fewer', 'Show fewer') if cp_all else (ui.get('show_all', 'Show all') ~ ' ' ~ (cp_opts | length)),
                         'tap_action': {'action': 'call-service', 'service': 'choreops.manage_ui_control', 'data': {'config_entry_id': integration_entry_id, 'ui_control_target': 'shared_admin', 'ui_control_action': 'update', 'key': 'admin-shared/quick-actions/picker-all', 'value': not cp_all}},
                         'styles': {
                           'card': [

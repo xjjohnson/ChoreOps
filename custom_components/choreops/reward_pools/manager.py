@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.exceptions import HomeAssistantError
 
 from .. import const
+from ..engines.economy_engine import InsufficientFundsError
 from ..managers.base_manager import BaseManager
 from ..utils.math_utils import round_points
 from . import const as rp
@@ -40,7 +41,6 @@ class RewardPoolManager(BaseManager):
 
     async def async_setup(self) -> None:
         """Subscribe to the signals that move points or notify people."""
-        self.listen(rp.SIGNAL_SUFFIX_REWARD_POOL_CONTRIBUTED, self._on_contributed)
         self.listen(rp.SIGNAL_SUFFIX_REWARD_POOL_REFUNDED, self._on_refunded)
         self.listen(rp.SIGNAL_SUFFIX_REWARD_POOL_FILLED, self._on_filled)
         self.listen(rp.SIGNAL_SUFFIX_REWARD_POOL_APPROVED, self._on_approved)
@@ -55,13 +55,13 @@ class RewardPoolManager(BaseManager):
 
     def _grant(self, **kwargs: Any) -> None:
         """Record the reward as delivered to a contributor."""
-        self.coordinator.reward_manager._grant_to_assignee(**kwargs)  # noqa: SLF001
+        self.coordinator.reward_manager._grant_to_assignee(**kwargs)
 
     # =========================================================================
     # Public API: Family Pool
     # =========================================================================
     # A pooled reward's cost is a shared target. Assigned users pay points
-    # into the pool (deducted immediately via REWARD_POOL_CONTRIBUTED); once
+    # into the pool (deducted immediately, before the pool records it); once
     # it is full an approver confirms delivery, which empties the pool so the
     # family can save up again. Refunds return exactly what each person paid.
 
@@ -186,16 +186,32 @@ class RewardPoolManager(BaseManager):
                 translation_domain=const.DOMAIN,
                 translation_key=rp.TRANS_KEY_ERROR_REWARD_POOL_INVALID_AMOUNT,
             )
+        insufficient = HomeAssistantError(
+            translation_domain=const.DOMAIN,
+            translation_key=const.TRANS_KEY_ERROR_INSUFFICIENT_POINTS,
+            translation_placeholders={
+                "assignee": assignee_name,
+                "current": str(balance),
+                "required": str(amount),
+            },
+        )
         if balance < amount:
-            raise HomeAssistantError(
-                translation_domain=const.DOMAIN,
-                translation_key=const.TRANS_KEY_ERROR_INSUFFICIENT_POINTS,
-                translation_placeholders={
-                    "assignee": assignee_name,
-                    "current": str(balance),
-                    "required": str(amount),
-                },
+            raise insufficient
+
+        # Take the points before recording the contribution, so the pool never
+        # holds points that didn't leave a balance (for example two quick taps
+        # on two different pools, which use different locks)
+        try:
+            await self.coordinator.economy_manager.withdraw(
+                assignee_id=assignee_id,
+                amount=amount,
+                source=const.POINTS_SOURCE_REWARDS,
+                reference_id=reward_id,
+                item_name=reward_name,
+                allow_negative=False,
             )
+        except InsufficientFundsError as err:
+            raise insufficient from err
 
         contributions = self.get_pool_contributions(reward_info)
         contributions[assignee_id] = round_points(
@@ -207,7 +223,7 @@ class RewardPoolManager(BaseManager):
         # Persist → Emit (per DEVELOPMENT_STANDARDS.md § 5.3)
         self.coordinator._persist_and_update()
 
-        # EconomyManager withdraws the points from the contributor's balance
+        # Informational: the points were already withdrawn above
         self.emit(
             rp.SIGNAL_SUFFIX_REWARD_POOL_CONTRIBUTED,
             user_id=assignee_id,
@@ -401,20 +417,6 @@ class RewardPoolManager(BaseManager):
     # =========================================================================
     # Signal handlers (points and notifications)
     # =========================================================================
-
-    async def _on_contributed(self, payload: dict[str, Any]) -> None:
-        """Withdraw the points a person just paid into a pool."""
-        assignee_id = payload.get("user_id")
-        amount = payload.get("amount", 0.0)
-        if amount > 0 and assignee_id:
-            await self.coordinator.economy_manager.withdraw(
-                assignee_id=assignee_id,
-                amount=amount,
-                source=const.POINTS_SOURCE_REWARDS,
-                reference_id=payload.get("reward_id"),
-                item_name=payload.get("reward_name"),
-                allow_negative=False,  # The balance was checked before paying in
-            )
 
     async def _on_refunded(self, payload: dict[str, Any]) -> None:
         """Return each contributor's points.
