@@ -80,7 +80,7 @@ def test_admin_template_renders_without_parse_errors() -> None:
 
     assert isinstance(rendered.get("views"), list)
     assert len(rendered["views"]) == 1
-    assert rendered["views"][0]["title"] == "OpsCenter"
+    assert rendered["views"][0]["title"] == "Parents"
     assert rendered["views"][0]["path"] == "admin"
     assert isinstance(rendered["views"][0].get("sections"), list)
 
@@ -2041,7 +2041,7 @@ def test_family_home_summary_leaderboard_and_streak_cards() -> None:
     assert len(summary) == 2
     assert "2 overdue" in summary[0]["custom_fields"]["content"]
     assert summary[0]["tap_action"]["navigation_path"].endswith("family-hub-dad")
-    assert "OpsCenter" in summary[1]["custom_fields"]["content"]
+    assert "Parents" in summary[1]["custom_fields"]["content"]
     assert summary[1]["tap_action"]["navigation_path"].endswith("admin")
 
     board = _render_home_card("WEEKLY LEADERBOARD", states)
