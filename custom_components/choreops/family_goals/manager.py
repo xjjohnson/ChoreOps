@@ -81,6 +81,7 @@ class FamilyGoalManager(BaseManager):
     async def async_setup(self) -> None:
         """Move legacy family achievements over, then subscribe to events."""
         await self.migrate_legacy_achievements()
+        self.migrate_points_basis()
         for suffix in (
             base.SIGNAL_SUFFIX_STATS_UPDATED,
             base.SIGNAL_SUFFIX_CHORE_APPROVED,
@@ -249,6 +250,7 @@ class FamilyGoalManager(BaseManager):
     ) -> str:
         """Create a goal and return its internal ID."""
         goal = dict(builders.build_goal(user_input))
+        goal[fg.DATA_POINTS_BASIS] = fg.POINTS_BASIS_NO_AWARDS
         if internal_id:
             goal[fg.DATA_ID] = internal_id
         goal_id = str(goal[fg.DATA_ID])
@@ -351,22 +353,7 @@ class FamilyGoalManager(BaseManager):
             # Award points (goal payouts, achievements, badges) are not effort
             # toward a goal, and a level's own payout must not carry the goal
             # toward its next level.
-            all_time = cast(
-                "dict[str, Any]",
-                cast(
-                    "dict[str, Any]",
-                    point_periods.get(base.DATA_USER_POINT_PERIODS_ALL_TIME, {}),
-                ).get(base.PERIOD_ALL_TIME, {}),
-            )
-            by_source = cast(
-                "dict[str, Any]",
-                all_time.get(base.DATA_USER_POINT_PERIOD_BY_SOURCE, {}),
-            )
-            awarded = sum(
-                max(0.0, float(by_source.get(source, 0.0) or 0.0))
-                for source in _AWARD_POINT_SOURCES
-            )
-            return max(0.0, earned - awarded)
+            return max(0.0, earned - self._award_points(assignee_data))
 
         if goal_type == fg.GOAL_TYPE_DAY:
             return float(self._approved_today(assignee_id))
@@ -390,6 +377,109 @@ class FamilyGoalManager(BaseManager):
             "dict[str, Any]", all_time_container.get(base.PERIOD_ALL_TIME, {})
         )
         return float(bucket.get(base.DATA_USER_CHORE_DATA_PERIOD_APPROVED, 0))
+
+    @staticmethod
+    def _award_points(assignee_data: Any) -> float:
+        """Return a person's all-time points from awards (goals, achievements, badges)."""
+        point_periods = assignee_data.get(base.DATA_USER_POINT_PERIODS, {})
+        all_time = cast(
+            "dict[str, Any]",
+            cast(
+                "dict[str, Any]",
+                point_periods.get(base.DATA_USER_POINT_PERIODS_ALL_TIME, {}),
+            ).get(base.PERIOD_ALL_TIME, {}),
+        )
+        by_source = cast(
+            "dict[str, Any]",
+            all_time.get(base.DATA_USER_POINT_PERIOD_BY_SOURCE, {}),
+        )
+        return sum(
+            max(0.0, float(by_source.get(source, 0.0) or 0.0))
+            for source in _AWARD_POINT_SOURCES
+        )
+
+    @staticmethod
+    def _award_points_since_last_payout(assignee_data: Any, goal_id: str) -> float:
+        """Return award points a person got since this goal's latest payout to them.
+
+        The latest payout marks when the current level began. Read from the
+        point ledger, which only keeps recent history: when the payout has
+        aged out, 0 is returned.
+        """
+        ledger = assignee_data.get(base.DATA_USER_LEDGER, [])
+        if not isinstance(ledger, list):
+            return 0.0
+        start = None
+        for index in range(len(ledger) - 1, -1, -1):
+            entry = ledger[index]
+            if (
+                isinstance(entry, dict)
+                and entry.get(base.DATA_LEDGER_SOURCE) == base.POINTS_SOURCE_CHALLENGES
+                and entry.get(base.DATA_LEDGER_REFERENCE_ID) == goal_id
+            ):
+                start = index
+                break
+        if start is None:
+            return 0.0
+        return sum(
+            max(0.0, float(entry.get(base.DATA_LEDGER_AMOUNT, 0.0) or 0.0))
+            for entry in ledger[start:]
+            if isinstance(entry, dict)
+            and entry.get(base.DATA_LEDGER_SOURCE) in _AWARD_POINT_SOURCES
+        )
+
+    def migrate_points_basis(self) -> int:
+        """Convert points goals saved before award points were left out.
+
+        Their level-start and restart snapshots still include award points, so
+        every share read as 0 until a person out-earned all their past awards.
+        Each snapshot is shifted by the award points that existed when it was
+        taken: shares carry on from where they were, minus any awards since the
+        level began (found in the point ledger; when that history is gone,
+        shares carry on unchanged). Runs once per goal.
+
+        Returns:
+            The number of goals converted.
+        """
+        converted = 0
+        for goal_id, goal in self.goals.items():
+            if not isinstance(goal, dict):
+                continue
+            if goal.get(fg.DATA_POINTS_BASIS) == fg.POINTS_BASIS_NO_AWARDS:
+                continue
+            goal[fg.DATA_POINTS_BASIS] = fg.POINTS_BASIS_NO_AWARDS
+            converted += 1
+            if goal.get(fg.DATA_TYPE) != fg.GOAL_TYPE_POINTS:
+                continue
+            level_start = dict(goal.get(fg.DATA_LEVEL_START, {}) or {})
+            baseline = dict(goal.get(fg.DATA_BASELINE, {}) or {})
+            for assignee_id, assignee_data in self.coordinator.assignees_data.items():
+                awarded_now = self._award_points(assignee_data)
+                # Restart baselines: the restart time is unknown, so the shift
+                # keeps the progress since the restart as it was.
+                old_base = float(baseline.get(assignee_id, 0.0))
+                new_base = max(0.0, old_base - awarded_now)
+                if assignee_id in baseline:
+                    baseline[assignee_id] = new_base
+                if assignee_id in level_start:
+                    # Points earned when the level began, minus the awards held then.
+                    awarded_then = awarded_now - self._award_points_since_last_payout(
+                        assignee_data, str(goal_id)
+                    )
+                    earned_then = float(level_start[assignee_id]) + old_base
+                    level_start[assignee_id] = max(
+                        0.0, earned_then - max(0.0, awarded_then) - new_base
+                    )
+            goal[fg.DATA_LEVEL_START] = level_start
+            if baseline:
+                goal[fg.DATA_BASELINE] = baseline
+            base.LOGGER.info(
+                "Family goal '%s' converted to points without awards",
+                goal.get(fg.DATA_NAME, goal_id),
+            )
+        if converted:
+            self.coordinator._persist()
+        return converted
 
     def _contribution(self, assignee_id: str, goal: dict[str, Any]) -> float:
         """Return one person's contribution since the goal was last restarted."""
