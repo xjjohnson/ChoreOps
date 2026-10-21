@@ -3293,7 +3293,7 @@ views:
                               {%- elif ftype == 'family_caught_up_days' -%}
                                 {%- set cstat = state_attr(fe, 'family_caught_up_today') or {} -%}
                                 {%- for pname, ptxt in cstat.items() -%}
-                                  {%- set p_ok = (ptxt | string).startswith('0 still') -%}
+                                  {%- set p_ok = ((ptxt.open | int(1)) == 0) if ptxt is mapping else (ptxt | string).startswith('0 still') -%}
                                   {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                                   {%- set cchips.v = cchips.v ~ "<div style='display:flex;align-items:center;gap:4px;padding:2px 8px 2px 3px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:11px;font-weight:700;color:var(--primary-text-color);'><span style='width:20px;height:20px;border-radius:50%;background:" ~ ('var(--success-color)' if p_ok else 'var(--divider-color)') ~ ";display:flex;align-items:center;justify-content:center;color:#fff;'><ha-icon icon='" ~ ('mdi:check-bold' if p_ok else 'mdi:close') ~ "' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon></span>" ~ pname_safe ~ "</div>" -%}
                                 {%- endfor -%}

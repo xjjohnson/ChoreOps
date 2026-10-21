@@ -126,3 +126,12 @@ ATTR_RECORD_TOP: Final = "family_record_top"
 SERVICE_RESET_FAMILY_GOAL: Final = "reset_family_goal"
 SERVICE_FIELD_GOAL_NAME: Final = "goal_name"
 ERROR_ACTION_RESET_FAMILY_GOAL: Final = "reset_family_goal"
+
+# ---------------------------------------------------------------------------
+# Wording (translations_custom/<lang>_notifications.json, "family_goal_words")
+# ---------------------------------------------------------------------------
+TRANS_SECTION_GOAL_WORDS: Final = "family_goal_words"
+GOAL_WORD_LEVEL: Final = "level"  # {name}, {level}
+GOAL_WORD_TOP_CONTRIBUTOR: Final = "top_contributor"  # {name}, {multiplier}
+GOAL_WORD_DEFAULT_NAME: Final = "default_name"
+GOAL_WORD_MIGRATED_NAME: Final = "migrated_name"  # {name}

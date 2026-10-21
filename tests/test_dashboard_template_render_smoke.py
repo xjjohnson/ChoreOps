@@ -2939,3 +2939,95 @@ def test_family_hub_missed_days_start_at_the_tracking_day() -> None:
     # Oct 16 and Oct 18 passed with nothing recorded; Oct 17 was done.
     assert output.count("✗") == 2
     assert "2</b> missed" in output
+
+
+def _caught_up_goal_state(today: dict[str, object]) -> _MockState:
+    return _MockState(
+        entity_id="sensor.family_caught_up",
+        state="3",
+        attributes={
+            "achievement_name": "All Caught Up",
+            "type": "family_caught_up_days",
+            "target_value": 7,
+            "family_total": 3,
+            "family_contributions": {},
+            "family_levels": [7],
+            "family_level_rewards": [10],
+            "family_level": 0,
+            "family_caught_up_today": today,
+        },
+        name="All Caught Up",
+    )
+
+
+def _caught_up_chip_icons(output: str) -> dict[str, str]:
+    """Return each person's chip icon (check or close) from rendered HTML."""
+    import re
+
+    return dict(
+        (name, icon)
+        for icon, name in re.findall(
+            r"icon=\\?'mdi:(check-bold|close)\\?'[^<]*></ha-icon></span>([^<]+)</div>",
+            output,
+        )
+    )
+
+
+def test_family_hub_caught_up_chips_read_counts() -> None:
+    """Caught-up chips use the sensor's numbers: a check once nothing is left."""
+    tpl = _hub_card_template("family_caught_up_today")
+    today = {
+        "Lily": {"open": 0, "done": 2, "overdue": False},
+        "Dad": {"open": 2, "done": 1, "overdue": False},
+    }
+    output = _render_hub_card(
+        tpl, {}, {"sensor.family_caught_up": _caught_up_goal_state(today)}
+    )
+    assert _caught_up_chip_icons(output) == {"Lily": "check-bold", "Dad": "close"}
+
+    # Sensors from before the update still sent sentences; those keep working.
+    legacy = {"Lily": "0 still to do today, 2 done", "Dad": "2 still to do today, 1 done"}
+    output = _render_hub_card(
+        tpl, {}, {"sensor.family_caught_up": _caught_up_goal_state(legacy)}
+    )
+    assert _caught_up_chip_icons(output) == {"Lily": "check-bold", "Dad": "close"}
+
+
+def test_family_home_caught_up_chips_read_counts() -> None:
+    """The Home tab's goal card reads the same caught-up numbers."""
+    states = _home_states()
+    states["sensor.family_caught_up"] = _caught_up_goal_state(
+        {
+            "Lily": {"open": 0, "done": 2, "overdue": False},
+            "Dad": {"open": 1, "done": 0, "overdue": True},
+        }
+    )
+    view = builder._render_family_home_view(
+        _read_template("user-family-home-v1.yaml"),
+        integration_entry_id="entry-123",
+        release_ref="0.0.1-beta.3",
+        release_version=None,
+        generated_at="2026-10-19T00:00:00+00:00",
+        root_button_card_templates={},
+        user_names=["Dad", "Lily"],
+    )
+    tpl = next(
+        c["filter"]["template"]
+        for sec in view["sections"]
+        for c in sec["cards"]
+        if c["type"] == "custom:auto-entities"
+        and "family_caught_up_today" in c["filter"]["template"]
+    )
+    env, integration_entities, states_fn, state_attr = _build_runtime_template_env(
+        states
+    )
+    env.add_extension("jinja2.ext.loopcontrols")
+    env.globals["now"] = lambda: __import__("datetime").datetime(2026, 10, 19, 12, 0)
+    # Rendered as raw text: the card holds HTML that only Home Assistant's
+    # Python-literal parsing (not YAML) accepts.
+    output = env.from_string(tpl).render(
+        integration_entities=integration_entities,
+        states=states_fn,
+        state_attr=state_attr,
+    )
+    assert _caught_up_chip_icons(output) == {"Lily": "check-bold", "Dad": "close"}
