@@ -3798,6 +3798,9 @@ class SystemDashboardTranslationSensor(ChoreOpsCoordinatorEntity, SensorEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = const.TRANS_KEY_SENSOR_DASHBOARD_TRANSLATION
+    # A static lookup table: keep it out of recorder history (it also passes
+    # the recorder's 16 KB attribute limit in longer languages)
+    _unrecorded_attributes = frozenset({"ui_translations"})
 
     def __init__(
         self,

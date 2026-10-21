@@ -2973,26 +2973,29 @@ def _caught_up_chip_icons(output: str) -> dict[str, str]:
 
 
 def test_family_hub_caught_up_chips_read_counts() -> None:
-    """Caught-up chips use the sensor's numbers: a check once nothing is left."""
+    """Caught-up chips follow "All Caught Up": nothing due today, nothing overdue."""
     tpl = _hub_card_template("family_caught_up_today")
+    expected = {"Lily": "check-bold", "Dad": "close", "Max": "close"}
     today = {
         "Lily": {"open": 0, "done": 2, "overdue": False},
         "Dad": {"open": 2, "done": 1, "overdue": False},
+        "Max": {"open": 0, "done": 0, "overdue": True},
     }
     output = _render_hub_card(
         tpl, {}, {"sensor.family_caught_up": _caught_up_goal_state(today)}
     )
-    assert _caught_up_chip_icons(output) == {"Lily": "check-bold", "Dad": "close"}
+    assert _caught_up_chip_icons(output) == expected
 
     # Sensors from before the update still sent sentences; those keep working.
     legacy = {
         "Lily": "0 still to do today, 2 done",
         "Dad": "2 still to do today, 1 done",
+        "Max": "0 still to do today, 0 done, overdue",
     }
     output = _render_hub_card(
         tpl, {}, {"sensor.family_caught_up": _caught_up_goal_state(legacy)}
     )
-    assert _caught_up_chip_icons(output) == {"Lily": "check-bold", "Dad": "close"}
+    assert _caught_up_chip_icons(output) == expected
 
 
 def test_family_home_caught_up_chips_read_counts() -> None:
@@ -3033,3 +3036,90 @@ def test_family_home_caught_up_chips_read_counts() -> None:
         state_attr=state_attr,
     )
     assert _caught_up_chip_icons(output) == {"Lily": "check-bold", "Dad": "close"}
+
+
+def test_family_hub_goal_card_uses_dashboard_translations() -> None:
+    """Goal card wording comes from the person's dashboard translations."""
+    tpl = _hub_card_template("family_caught_up_today")
+    goal = _caught_up_goal_state({"Lily": {"open": 0, "done": 1, "overdue": False}})
+    goal.attributes.update(
+        {"family_levels": [3, 7, 14], "family_level": 1, "family_next_target": 7}
+    )
+    german = {
+        "level": "Stufe",
+        "of": "von",
+        "to_go": "fehlen noch",
+        "days": "Tage",
+        "left": "übrig",
+    }
+    output = _render_hub_card(
+        tpl,
+        {"dashboard_helpers": {"translation_sensor_eid": "sensor.lily_translations"}},
+        {
+            "sensor.family_caught_up": goal,
+            "sensor.lily_translations": _MockState(
+                entity_id="sensor.lily_translations",
+                state="de",
+                attributes={"ui_translations": german},
+                name="Lily translations",
+            ),
+        },
+    )
+    assert "4 Tage fehlen noch" in output
+    assert "/ 7 Tage" in output
+    assert "übrig" in output
+    assert " to go" not in output
+    assert " left" not in output
+
+
+def test_family_views_use_build_time_wording() -> None:
+    """View titles and section headings use the household's dashboard wording."""
+    words = {
+        "home": "Startseite",
+        "family": "Familie",
+        "this_week_heading": "Diese Woche",
+        "goals_heading": "Ziele",
+        "family_goals_heading": "Familienziele",
+        "parents": "Eltern",
+    }
+    view = builder._render_family_home_view(
+        _read_template("user-family-home-v1.yaml"),
+        integration_entry_id="entry-123",
+        release_ref="0.0.1-beta.3",
+        release_version=None,
+        generated_at="2026-10-19T00:00:00+00:00",
+        root_button_card_templates={},
+        user_names=["Dad", "Lily"],
+        words=words,
+    )
+    assert view["title"] == "Startseite"
+    headings = [
+        card["heading"]
+        for sec in view["sections"]
+        for card in sec["cards"]
+        if card["type"] == "heading"
+    ]
+    assert headings == ["Familie", "Diese Woche", "Ziele", "Familienziele"]
+
+    admin = builder.render_dashboard_template(
+        _read_template("admin-shared-family-hub-v1.yaml"),
+        {
+            **dh.build_admin_dashboard_context(
+                integration_entry_id="entry-123",
+                template_profile="admin-shared-family-hub-v1",
+            ),
+            "t": words,
+        },
+    )
+    assert admin["views"][0]["title"] == "Eltern"
+
+    # Without wording (older callers), the English defaults stay
+    plain = builder._render_family_home_view(
+        _read_template("user-family-home-v1.yaml"),
+        integration_entry_id="entry-123",
+        release_ref=None,
+        release_version=None,
+        generated_at="2026-10-19T00:00:00+00:00",
+        root_button_card_templates={},
+    )
+    assert plain["title"] == "Home"
