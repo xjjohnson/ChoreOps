@@ -700,3 +700,36 @@ async def test_services_refuse_free_pool_and_oversized_chip_in(
     assert scenario_full.coordinator.rewards_data[reward_id].get(
         const.DATA_REWARD_POOL_CHIP_IN, 0
     ) in (0, 0.0)
+
+
+async def test_back_to_back_contributions_to_two_pools_cannot_overspend(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Two quick taps on two different pools only take points that exist.
+
+    The pools have separate locks, so the second contribution must see the
+    first one's withdrawal; otherwise both pass the balance check and one pool
+    keeps points that never left the balance.
+    """
+    import asyncio
+
+    pm = scenario_full.coordinator.reward_pool_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    movie = _make_pool(scenario_full)
+    outing = _make_pool(scenario_full, "Special Outing")
+    _set_points(scenario_full, zoe, 30.0)
+
+    results = await asyncio.gather(
+        pm.contribute_to_pool(zoe, movie, 30.0),
+        pm.contribute_to_pool(zoe, outing, 30.0),
+        return_exceptions=True,
+    )
+    await hass.async_block_till_done()
+
+    assert results[0] == 30.0
+    assert isinstance(results[1], HomeAssistantError)
+    assert results[1].translation_key == const.TRANS_KEY_ERROR_INSUFFICIENT_POINTS
+    assert _points(scenario_full, zoe) == 0.0
+    assert _pool(scenario_full, movie) == {zoe: 30.0}
+    assert _pool(scenario_full, outing) == {}
