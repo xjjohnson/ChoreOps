@@ -633,6 +633,57 @@ async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
     assert gm.get_day_record(goal_id)["family_record"] == 6
 
 
+async def test_resetting_one_day_goal_does_not_pay_todays_levels_again(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A mid-day reset counts from the reset on; tomorrow counts in full."""
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_DAY,
+        target=6.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+    goal = coordinator.challenges_data[goal_id]
+    goal[fg.DATA_LEVELS] = "2, 4, 6"
+    today = {zoe: 3, max_: 3}
+    gm._approved_today = lambda assignee_id: today[assignee_id]
+
+    def balance(a: str) -> float:
+        return float(coordinator.assignees_data[a][const.DATA_USER_POINTS])
+
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert goal[fg.DATA_LEVEL] == 3
+    paid = balance(zoe)
+
+    gm.reset_goal(goal_id)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_total(goal_id) == 0
+    assert goal[fg.DATA_LEVEL] == 0
+    assert balance(zoe) == pytest.approx(paid)
+
+    today[max_] = 5
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_level_contributions(goal_id) == {zoe: 0.0, max_: 2.0}
+    assert goal[fg.DATA_LEVEL] == 1
+
+    # The next day counts every chore again.
+    goal[fg.DATA_STARTED] = "2000-01-01"
+    goal[fg.DATA_STREAK_LAST_DAY] = "2000-01-01"
+    today.update({zoe: 1, max_: 2})
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_total(goal_id) == 3
+
+
 async def test_active_streak_needs_everyone_every_day(
     hass: HomeAssistant,
     scenario_full: SetupResult,

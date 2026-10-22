@@ -553,10 +553,13 @@ class FamilyGoalManager(BaseManager):
     def _contribution(self, assignee_id: str, goal: dict[str, Any]) -> float:
         """Return one person's contribution since the goal was last restarted."""
         raw = self._raw_contribution(assignee_id, goal)
-        if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_DAY:
-            # Already scoped to today; a restart baseline would zero tomorrow.
-            return raw
         baseline = goal.get(fg.DATA_BASELINE, {})
+        if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_DAY and (
+            str(goal.get(fg.DATA_STARTED, "")) != dt_today_iso()
+        ):
+            # Already scoped to today; a restart baseline only counts on the
+            # day it was taken, so tomorrow starts from zero.
+            return raw
         return max(0.0, raw - float(baseline.get(assignee_id, 0.0)))
 
     def _lower_snapshots(self, goal: dict[str, Any]) -> bool:
@@ -570,8 +573,7 @@ class FamilyGoalManager(BaseManager):
         Returns:
             True when a snapshot changed.
         """
-        goal_type = goal.get(fg.DATA_TYPE)
-        if goal_type in fg.STREAK_GOAL_TYPES or goal_type == fg.GOAL_TYPE_DAY:
+        if goal.get(fg.DATA_TYPE) in fg.STREAK_GOAL_TYPES:
             return False
         changed = False
         baseline = goal.get(fg.DATA_BASELINE)
@@ -954,7 +956,9 @@ class FamilyGoalManager(BaseManager):
         """Restart a goal from zero.
 
         Points and chores goals remember each person's current all-time total
-        as a baseline, so only future activity counts. The streak goals clear
+        as a baseline, so only future activity counts (for the one-day goal,
+        only for the rest of today, so levels already paid today are not paid
+        again). The streak goals clear
         their streak (today is not counted, tomorrow is day one). Everyone's
         award is cleared so the goal can be earned again; reward points already
         paid out are untouched.
