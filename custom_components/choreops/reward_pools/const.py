@@ -82,3 +82,5 @@ ATTR_REWARD_POOL_MAX_SHARE: Final = "pool_max_share"  # Points, 0 = no limit
 ATTR_REWARD_POOL_MY_SHARE_LEFT: Final = "pool_my_share_left"  # None = no limit
 ATTR_REWARD_POOL_MATCH_RATIO: Final = "pool_match_ratio"
 ATTR_REWARD_POOL_MATCH_NAMES: Final = "pool_match_names"
+# True when a match is set but none of its parents has points left to pay it
+ATTR_REWARD_POOL_MATCH_OUT: Final = "pool_match_out"

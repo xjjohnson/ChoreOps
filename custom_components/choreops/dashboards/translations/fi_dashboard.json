@@ -493,5 +493,12 @@
   "family_achievements": "Perheen saavutukset",
   "home": "Koti",
   "family": "Perhe",
-  "this_week_heading": "Tällä viikolla"
+  "this_week_heading": "Tällä viikolla",
+  "pace": "tahti",
+  "finished": "Päättynyt",
+  "counting_stopped": "laskenta pysähtyi",
+  "share_full": "Osuutesi on täynnä",
+  "share_left": "{left}/{max} jäljellä",
+  "out_of_points": "ei pisteitä",
+  "pool_closed": "säästöpossu suljettu"
 }

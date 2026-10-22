@@ -1027,6 +1027,7 @@ class FamilyGoalManager(BaseManager):
             fg.ATTR_DAYS_LEFT: None,
             fg.ATTR_PACE: "",
             fg.ATTR_FINISHED: False,
+            fg.ATTR_PACE_EXPECTED: None,
         }
         if not goal:
             return empty
@@ -1071,6 +1072,7 @@ class FamilyGoalManager(BaseManager):
         span = (deadline - started).days + 1
         # Half of today counts as gone: on day one nobody is already behind
         expected = target * ((today - started).days + 0.5) / span
+        result[fg.ATTR_PACE_EXPECTED] = round(expected, 1)
         ratio = total / expected if expected > 0 else 1.0
         if total >= target or ratio >= 1.1:
             result[fg.ATTR_PACE] = fg.PACE_AHEAD

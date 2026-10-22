@@ -493,5 +493,12 @@
   "family_achievements": "Family Achievements",
   "home": "Home",
   "family": "Family",
-  "this_week_heading": "This week"
+  "this_week_heading": "This week",
+  "pace": "pace",
+  "finished": "Finished",
+  "counting_stopped": "counting stopped",
+  "share_full": "Your share is full",
+  "share_left": "{left} of your {max} left",
+  "out_of_points": "out of points",
+  "pool_closed": "pool closed"
 }

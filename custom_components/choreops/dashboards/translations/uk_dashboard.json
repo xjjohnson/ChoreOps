@@ -493,5 +493,12 @@
   "family_achievements": "Сімейні досягнення",
   "home": "Головна",
   "family": "Сім'я",
-  "this_week_heading": "Цього тижня"
+  "this_week_heading": "Цього тижня",
+  "pace": "темп",
+  "finished": "Завершено",
+  "counting_stopped": "підрахунок зупинено",
+  "share_full": "Твоя частка заповнена",
+  "share_left": "Залишилось {left} з {max}",
+  "out_of_points": "немає балів",
+  "pool_closed": "скарбничку закрито"
 }

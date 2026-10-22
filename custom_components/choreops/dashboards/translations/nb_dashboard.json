@@ -493,5 +493,12 @@
   "family_achievements": "Familieprestasjoner",
   "home": "Hjem",
   "family": "Familie",
-  "this_week_heading": "Denne uken"
+  "this_week_heading": "Denne uken",
+  "pace": "tempo",
+  "finished": "Ferdig",
+  "counting_stopped": "tellingen er stoppet",
+  "share_full": "Din andel er full",
+  "share_left": "{left} av dine {max} igjen",
+  "out_of_points": "ingen poeng",
+  "pool_closed": "sparegris stengt"
 }

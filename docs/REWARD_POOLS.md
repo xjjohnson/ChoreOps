@@ -123,3 +123,4 @@ It also has these attributes:
 | `pool_my_share_left` | What this person may still pay in (empty = no limit) |
 | `pool_match_ratio` | Parent match points per point paid in (0 = off) |
 | `pool_match_names` | The parents paying the match |
+| `pool_match_out` | A match is set but none of its parents has points left |

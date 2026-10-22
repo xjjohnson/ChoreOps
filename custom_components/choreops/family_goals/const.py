@@ -168,6 +168,7 @@ ATTR_END_DATE: Final = "family_end_date"  # Finish date or end of the repeat per
 ATTR_DAYS_LEFT: Final = "family_days_left"  # Including today; None without an end
 ATTR_PACE: Final = "family_pace"  # ahead / on_track / behind / "" (no pace)
 ATTR_FINISHED: Final = "family_finished"  # Past the finish date: progress frozen
+ATTR_PACE_EXPECTED: Final = "family_pace_expected"  # Even-pace total by now
 PACE_AHEAD: Final = "ahead"
 PACE_ON_TRACK: Final = "on_track"
 PACE_BEHIND: Final = "behind"

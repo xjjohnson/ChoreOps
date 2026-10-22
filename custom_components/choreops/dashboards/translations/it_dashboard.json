@@ -493,5 +493,12 @@
   "family_achievements": "Traguardi di famiglia",
   "home": "Home",
   "family": "Famiglia",
-  "this_week_heading": "Questa settimana"
+  "this_week_heading": "Questa settimana",
+  "pace": "ritmo",
+  "finished": "Terminato",
+  "counting_stopped": "conteggio fermato",
+  "share_full": "La tua quota è completa",
+  "share_left": "Ti restano {left} su {max}",
+  "out_of_points": "senza punti",
+  "pool_closed": "salvadanaio chiuso"
 }
