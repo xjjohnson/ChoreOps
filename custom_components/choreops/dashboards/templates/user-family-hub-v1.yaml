@@ -359,7 +359,7 @@ views:
 
                     {#-- hero: greeting, level and total earned, then status tiles --#}
                     {%- set highest_badge_safe = highest_badge_display | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                    {%- set level_chip = ("<div style='margin-top:5px;display:inline-flex;align-items:center;gap:5px;max-width:100%;box-sizing:border-box;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.2);font-size:12px;font-weight:800;'>" ~ (("<span style='width:18px;height:18px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='width:18px;height:18px;--mdc-icon-size:18px;color:" ~ rank_chip.color ~ ";display:block;'></ha-icon></span>") if rank_chip.color else ("<ha-icon icon='" ~ highest_badge_icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#ffd54f;display:block;flex:0 0 auto;'></ha-icon>")) ~ "<span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ highest_badge_safe ~ "</span></div>") if highest_badge_display != ui.get('none', 'err-none') else '' -%}
+                    {%- set level_chip = ("<div style='margin-top:5px;display:inline-flex;align-items:center;gap:5px;max-width:100%;box-sizing:border-box;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.2);font-size:12px;font-weight:800;'>" ~ (("<span style='width:18px;height:18px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='--ha-icon-display:block;margin:0;width:18px;height:18px;--mdc-icon-size:18px;color:" ~ rank_chip.color ~ ";display:block;'></ha-icon></span>") if rank_chip.color else ("<ha-icon icon='" ~ highest_badge_icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#ffd54f;display:block;flex:0 0 auto;'></ha-icon>")) ~ "<span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ highest_badge_safe ~ "</span></div>") if highest_badge_display != ui.get('none', 'err-none') else '' -%}
                     {%- set tile_open = "<div style='min-width:0;box-sizing:border-box;padding:12px 6px;border-radius:14px;background:var(--card-background-color);box-shadow:0 2px 8px rgba(0,0,0,.12);text-align:center;'>" -%}
                     {%- set tile_lbl_open = "<div style='margin-top:3px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);line-height:1.2;'>" -%}
                     {%- set tile_sub_open = "<div style='margin-top:2px;font-size:10px;color:var(--secondary-text-color);line-height:1.2;'>" -%}
@@ -2324,7 +2324,7 @@ views:
                                 ~ "<div style='height:34px;display:flex;align-items:center;justify-content:center;'>"
                                 ~ ("<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid color-mix(in srgb, " ~ rcol ~ " " ~ ('55%, #fff' if nrole == 'current' else '70%, #000') ~ ");background:" ~ (rcol if nrole == 'current' else '#fff') ~ ";" ~ (("box-shadow:0 0 0 3px color-mix(in srgb, " ~ rcol ~ " 35%, transparent);") if nrole == 'current' else '') ~ "display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.45' if nrole in ['future', 'next_higher'] else '1') ~ ";'>"
                                   if rcol else "<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid " ~ ncol ~ ";background:" ~ ("color-mix(in srgb, " ~ ncol ~ " 20%, var(--card-background-color))" if nrole == 'current' else "var(--card-background-color)") ~ ";display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.6' if nrole == 'future' else '1') ~ ";'>")
-                                ~ "<ha-icon icon='" ~ badge.icon ~ "' style='margin:0;width:" ~ nicon ~ "px;height:" ~ nicon ~ "px;--mdc-icon-size:" ~ nicon ~ "px;color:" ~ (('#fff' if nrole == 'current' else rcol) if rcol else ncol) ~ ";display:block;'></ha-icon></div></div>"
+                                ~ "<ha-icon icon='" ~ badge.icon ~ "' style='--ha-icon-display:block;margin:0;width:" ~ nicon ~ "px;height:" ~ nicon ~ "px;--mdc-icon-size:" ~ nicon ~ "px;color:" ~ (('#fff' if nrole == 'current' else rcol) if rcol else ncol) ~ ";display:block;'></ha-icon></div></div>"
                                 ~ "<div style='max-width:100%;margin-top:4px;font-size:11px;font-weight:800;color:" ~ ('var(--primary-text-color)' if nrole == 'current' else 'var(--secondary-text-color)') ~ ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ nname ~ "</div>"
                                 ~ "<div style='font-size:10px;color:var(--secondary-text-color);opacity:0.8;'>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div></div>" -%}
                           {%- endfor -%}
@@ -2465,7 +2465,7 @@ views:
                                 {#-- Button-card keeps custom fields on one line, so the current rank puts its note on a second line --#}
                                 {%- set sub_html = ("<div>" ~ prog_label ~ " <b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b></div><div>" ~ prog_note ~ "</div>") if is_current else ("<b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b> &nbsp;&bull;&nbsp; " ~ prog_note) -%}
                               {%- endif -%}
-                              {%- set tile = "<div style='flex:0 0 auto;width:" ~ ('36px' if is_current else '30px') ~ ";height:" ~ ('36px' if is_current else '30px') ~ ";border-radius:12px;background:" ~ (rcol if rcol else 'color-mix(in srgb, ' ~ accent ~ ' 22%, transparent)') ~ ";display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('22' if is_current else '18') ~ "px;height:" ~ ('22' if is_current else '18') ~ "px;--mdc-icon-size:" ~ ('22' if is_current else '18') ~ "px;color:" ~ ('#fff' if rcol else accent) ~ ";display:block;'></ha-icon></div>" -%}
+                              {%- set tile = "<div style='flex:0 0 auto;width:" ~ ('36px' if is_current else '30px') ~ ";height:" ~ ('36px' if is_current else '30px') ~ ";border-radius:12px;background:" ~ (rcol if rcol else 'color-mix(in srgb, ' ~ accent ~ ' 22%, transparent)') ~ ";display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='--ha-icon-display:block;margin:0;width:" ~ ('22' if is_current else '18') ~ "px;height:" ~ ('22' if is_current else '18') ~ "px;--mdc-icon-size:" ~ ('22' if is_current else '18') ~ "px;color:" ~ ('#fff' if rcol else accent) ~ ";display:block;'></ha-icon></div>" -%}
                               {%- set chip = "<span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:" ~ accent ~ ";color:#fff;'>" ~ chip_label ~ "</span>" -%}
                               {%- set cost_pill = "<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div>" -%}
                               {%- set pill_row = ("<div style='margin-top:3px;text-align:left;white-space:normal;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
@@ -2481,7 +2481,7 @@ views:
                               {%- set slim_col = 'var(--success-color)' if badge.role == 'earned' else 'var(--secondary-text-color)' -%}
                               {%- set slim_right = ('✓ ' ~ ui.get('earned', 'Earned') ~ ((' ' ~ last_earned) if last_earned | length > 0 else '')) if badge.role == 'earned' else ('🔒 ' ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ ' ' ~ ns.points_label) -%}
                               {%- set slim_bg = ('background:color-mix(in srgb, ' ~ rcol ~ ' 18%, var(--card-background-color));border:1px solid color-mix(in srgb, ' ~ rcol ~ ' 45%, transparent);border-left:4px solid ' ~ rcol ~ ';') if rcol else 'background:var(--card-background-color);border:1px solid var(--divider-color);' -%}
-                              {%- set slim_icon = ("<div style='flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='margin:0;width:22px;height:22px;--mdc-icon-size:22px;color:" ~ rcol ~ ";display:block;'></ha-icon></div>") if rcol else ("<ha-icon icon='" ~ badge.icon ~ "' style='flex:0 0 auto;margin:0;width:20px;height:20px;--mdc-icon-size:20px;color:" ~ slim_col ~ ";display:block;'></ha-icon>") -%}
+                              {%- set slim_icon = ("<div style='flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='--ha-icon-display:block;margin:0;width:22px;height:22px;--mdc-icon-size:22px;color:" ~ rcol ~ ";display:block;'></ha-icon></div>") if rcol else ("<ha-icon icon='" ~ badge.icon ~ "' style='--ha-icon-display:block;flex:0 0 auto;margin:0;width:20px;height:20px;--mdc-icon-size:20px;color:" ~ slim_col ~ ";display:block;'></ha-icon>") -%}
                               {%- set row_html = "<div style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:5px 10px;border-radius:12px;" ~ slim_bg ~ "opacity:" ~ ('1' if badge.role == 'earned' else '0.85') ~ ";text-align:left;'>"
                                   ~ slim_icon
                                   ~ "<span style='min-width:0;font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>"
@@ -2493,10 +2493,12 @@ views:
                             {%- elif is_target -%}
                               {%- set rows.nxt = rows.nxt + [item] -%}
                             {%- elif badge.role == 'earned' -%}
-                              {%- if in_window -%}
-                                {%- set rows.earned = rows.earned + [item] -%}
-                              {%- else -%}
+                              {#-- Earned ranks outside the window are counted, and listed too while "Show all ranks" is on --#}
+                              {%- if not in_window -%}
                                 {%- set rows.earned_hidden = rows.earned_hidden + 1 -%}
+                              {%- endif -%}
+                              {%- if in_window or show_all_ranks -%}
+                                {%- set rows.earned = rows.earned + [item] -%}
                               {%- endif -%}
                             {%- else -%}
                               {#-- Locked ranks outside the window are counted, and listed too while "Show all ranks" is on --#}
@@ -2522,7 +2524,7 @@ views:
                           {%- endif -%}
                           {%- if effective_show_next_lower_badge -%}
                             {%- for it in (rows.earned | reverse | list) -%}
-                              {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html ~ (("<div style='" ~ note_style ~ "'>+" ~ rows.earned_hidden ~ ' ' ~ ui.get('earned_below', 'earned below') ~ "</div>") if loop.last and rows.earned_hidden > 0 else ''), 'head': ("<div style='" ~ head_style ~ "'>" ~ ui.get('earned', 'Earned') ~ "</div>") if loop.first else ''}] -%}
+                              {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html ~ (("<div style='" ~ note_style ~ "'>+" ~ rows.earned_hidden ~ ' ' ~ ui.get('earned_below', 'earned below') ~ "</div>") if loop.last and rows.earned_hidden > 0 and not show_all_ranks else ''), 'head': ("<div style='" ~ head_style ~ "'>" ~ ui.get('earned', 'Earned') ~ "</div>") if loop.first else ''}] -%}
                             {%- endfor -%}
                           {%- endif -%}
                           {%- if effective_show_next_higher_badge -%}
@@ -2545,9 +2547,10 @@ views:
                             }},
                           {%- endfor -%}
                           {#-- Show all ranks / Show fewer: remembered per person in ui_control --#}
-                          {%- if effective_show_next_higher_badge and rows.locked_hidden > 0 -%}
+                          {%- set hidden_ranks = (rows.locked_hidden if effective_show_next_higher_badge else 0) + (rows.earned_hidden if effective_show_next_lower_badge else 0) -%}
+                          {%- if hidden_ranks > 0 -%}
                             {%- set can_toggle = integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] -%}
-                            {%- set toggle_txt = (ui.get('show_fewer', 'Show fewer') ~ ' &#9652;') if show_all_ranks else (ui.get('show_all_ranks', 'Show all ranks') ~ ' &middot; ' ~ rows.locked_hidden ~ ' ' ~ ui.get('more', 'more') ~ ' &#9662;') -%}
+                            {%- set toggle_txt = (ui.get('show_fewer', 'Show fewer') ~ ' &#9652;') if show_all_ranks else (ui.get('show_all_ranks', 'Show all ranks') ~ ' &middot; ' ~ hidden_ranks ~ ' ' ~ ui.get('more', 'more') ~ ' &#9662;') -%}
                             {{
                               {
                                 'type': 'custom:button-card',

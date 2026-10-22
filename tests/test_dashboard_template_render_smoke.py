@@ -3605,9 +3605,13 @@ _RANKS = [
 ]
 
 
-def _ranks_card(*, show_all: bool = False, count: int = len(_RANKS)) -> str:
-    """Render the Ranks card for Lily at Bronze 1 with 1565 points earned."""
+def _ranks_card(
+    *, show_all: bool = False, count: int = len(_RANKS), current: int = 1
+) -> str:
+    """Render the Ranks card for Lily at Bronze 1 (or _RANKS[current])."""
     ranks = _RANKS[:count]
+    cur_key, nxt_key = ranks[current][0], ranks[current + 1][0]
+    low_key = ranks[current - 1][0]
     helper = {
         "dashboard_helpers": {"translation_sensor_eid": "sensor.lily_ui"},
         "core_sensors": {
@@ -3646,12 +3650,12 @@ def _ranks_card(*, show_all: bool = False, count: int = len(_RANKS)) -> str:
         ),
         "sensor.lily_rank": _MockState(
             entity_id="sensor.lily_rank",
-            state="Bronze 1",
+            state=ranks[current][1],
             attributes={
-                "current_badge_eid": "sensor.lily_bronze_1",
-                "highest_earned_badge_eid": "sensor.lily_bronze_1",
-                "next_higher_badge_eid": "sensor.lily_bronze_2",
-                "next_lower_badge_eid": "sensor.lily_beginner",
+                "current_badge_eid": f"sensor.lily_{cur_key}",
+                "highest_earned_badge_eid": f"sensor.lily_{cur_key}",
+                "next_higher_badge_eid": f"sensor.lily_{nxt_key}",
+                "next_lower_badge_eid": f"sensor.lily_{low_key}",
                 "points_to_next_badge": 435,
             },
             name="rank",
@@ -3807,3 +3811,27 @@ def test_family_hub_badges_same_day_put_the_higher_rank_left() -> None:
     order = ["Silver 1", "Bronze 3", "Bronze 2", "Bronze 1", "Beginner", "Old Badge"]
     positions = [output.index(f">{name}</div>") for name in order]
     assert positions == sorted(positions)
+
+
+def test_family_hub_show_all_ranks_also_lists_hidden_earned_ranks() -> None:
+    """Show all ranks opens the Earned list too and counts its hidden ranks."""
+    closed = _ranks_card(current=7)  # Gold 1: window is Silver 2 .. Gold 3
+    rows = closed[closed.index("to go</b>") :]
+    assert "+5 earned below" in rows
+    assert "Show all ranks" in rows and "7 more" in rows  # 5 earned + 2 locked
+    assert "Bronze 1" not in rows
+
+    opened = _ranks_card(current=7, show_all=True)
+    rows = opened[opened.index("to go</b>") :]
+    assert "earned below" not in rows
+    for name in ("Beginner", "Bronze 1", "Silver 1", "Legend"):
+        assert name in rows
+    assert "Show fewer" in rows
+
+
+def test_family_hub_rank_icons_skip_the_inline_baseline() -> None:
+    """Rank icons render their svg as a block so it sits centered in its circle."""
+    output = _ranks_card()
+    icons = re.findall(r"<ha-icon icon='mdi:medal' style='([^']*)'", output)
+    assert icons
+    assert all("--ha-icon-display:block" in style for style in icons)
