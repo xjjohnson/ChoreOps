@@ -493,5 +493,12 @@
   "family_achievements": "Realizări de familie",
   "home": "Acasă",
   "family": "Familie",
-  "this_week_heading": "Săptămâna aceasta"
+  "this_week_heading": "Săptămâna aceasta",
+  "pace": "ritm",
+  "finished": "Încheiat",
+  "counting_stopped": "numărătoarea s-a oprit",
+  "share_full": "Partea ta este completă",
+  "share_left": "Mai ai {left} din {max}",
+  "out_of_points": "fără puncte",
+  "pool_closed": "pușculiță închisă"
 }

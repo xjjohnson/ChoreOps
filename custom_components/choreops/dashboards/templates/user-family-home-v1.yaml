@@ -552,6 +552,20 @@ views:
                   {%- set lvl_txt = (ui.get('level', 'Level') ~ ' ' ~ (elevel + 1) ~ ' ' ~ ui.get('of', 'of') ~ ' ' ~ fcount) if (fcount > 1 and not fdone) else (('✓ ' ~ ui.get('all', 'All') ~ ' ' ~ fcount ~ ' ' ~ ui.get('levels', 'levels')) if (fdone and fcount > 1) else '') -%}
                   {%- set sub = ('🎉 ' ~ ui.get('all_levels_complete', 'All levels complete')) if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ ((' ' ~ ui.get('day', 'day')) if (funit and togo == 1) else funit) ~ ' ' ~ ui.get('to_go', 'to go') ~ '</b>' ~ ((' · +' ~ freward ~ ' ⭐ ' ~ ui.get('each', 'each')) if freward > 0 else '')) -%}
                   {%- set mult_html = ("<div style='font-size:11px;font-weight:700;color:var(--warning-color);line-height:1.35;'>🏆 " ~ ui.get('top_contributor', 'Top contributor') ~ " ×" ~ ('%g' | format(fmult)) ~ "</div>") if (fmult > 1 and not fdone) else '' -%}
+                  {#-- Finish date or repeat: pace and days left; a dashed line on the bar marks where an even pace would be now --#}
+                  {%- set fdays = state_attr(fe, 'family_days_left') -%}
+                  {%- set fpace = (state_attr(fe, 'family_pace') or '') | string -%}
+                  {%- set ffin = state_attr(fe, 'family_finished') | default(false, true) -%}
+                  {%- set fend = (state_attr(fe, 'family_end_date') or '') | string -%}
+                  {%- set pace_col = {'ahead': 'var(--success-color)', 'on_track': 'var(--primary-color)', 'behind': 'var(--warning-color)'}.get(fpace, '') -%}
+                  {%- set pace_word = {'ahead': ui.get('ahead_of_pace', 'Ahead of pace'), 'on_track': ui.get('on_track', 'On track'), 'behind': ui.get('behind_pace', 'Behind pace')}.get(fpace, '') -%}
+                  {%- set days_txt = '' if (fdays is none or ffin) else (ui.get('ends_today', 'Ends today') if (fdays | int(0)) <= 1 else ((fdays | int(0)) ~ ' ' ~ ui.get('days_left', 'days left'))) -%}
+                  {%- set pace_bits = ((["<b style='color:" ~ pace_col ~ ";'>" ~ pace_word ~ "</b>"]) if pace_word else []) + ([days_txt] if days_txt else []) -%}
+                  {%- set pace_txt = ("<b>" ~ ui.get('finished', 'Finished') ~ ' ' ~ fend ~ "</b> · " ~ ui.get('counting_stopped', 'counting stopped')) if ffin else (pace_bits | join(' · ')) -%}
+                  {%- set pace_html = ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ pace_txt ~ "</div>") if pace_txt else '' -%}
+                  {%- set fexp = state_attr(fe, 'family_pace_expected') -%}
+                  {%- set tick_pct = (([[(fexp | float(0)) - fprev, 0] | max, wspan] | min) / wspan * 100) | round(1) if (pace_word and fexp is not none and not fdone) else none -%}
+                  {%- set tick_html = ("<div style='position:absolute;top:0;bottom:0;left:" ~ tick_pct ~ "%;border-left:2px dashed " ~ pace_col ~ ";opacity:0.9;'></div><div style='position:absolute;bottom:2px;left:calc(" ~ tick_pct ~ "% + 4px);font-size:9px;font-weight:800;color:" ~ pace_col ~ ";'>" ~ ui.get('pace', 'pace') ~ "</div>") if tick_pct is not none else '' -%}
                   {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
 
                   {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
@@ -598,7 +612,7 @@ views:
                     {%- set tinset = 'calc(100% / ' ~ (wcnt * 2) ~ ')' -%}
                     {%- set fui_v = "<div style='text-align:left;padding:14px 10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                       ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
-                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div></div>"
+                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div>" ~ pace_html ~ "</div>"
                       ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
                       ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:var(--success-color);'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
                       ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
@@ -622,9 +636,9 @@ views:
                     {%- endfor -%}
                     {%- set fui_v = "<div style='text-align:left;padding:10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                       ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
-                      ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
+                      ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>" ~ tick_html
                       ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
-                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div>" ~ mult_html ~ "</div>"
+                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div>" ~ pace_html ~ mult_html ~ "</div>"
                       ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
                       ~ rec_html ~ "<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div></div>" -%}
                   {%- endif -%}

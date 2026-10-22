@@ -493,5 +493,12 @@
   "family_achievements": "Familieresultater",
   "home": "Hjem",
   "family": "Familie",
-  "this_week_heading": "Denne uge"
+  "this_week_heading": "Denne uge",
+  "pace": "tempo",
+  "finished": "Afsluttet",
+  "counting_stopped": "optælling stoppet",
+  "share_full": "Din andel er fuld",
+  "share_left": "{left} af dine {max} tilbage",
+  "out_of_points": "ingen point",
+  "pool_closed": "sparebøsse lukket"
 }

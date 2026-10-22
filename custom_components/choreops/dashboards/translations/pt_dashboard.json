@@ -493,5 +493,12 @@
   "family_achievements": "Conquistas da família",
   "home": "Início",
   "family": "Família",
-  "this_week_heading": "Esta semana"
+  "this_week_heading": "Esta semana",
+  "pace": "ritmo",
+  "finished": "Terminado",
+  "counting_stopped": "contagem parada",
+  "share_full": "A tua parte está completa",
+  "share_left": "Faltam {left} de {max}",
+  "out_of_points": "sem pontos",
+  "pool_closed": "mealheiro fechado"
 }

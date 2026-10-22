@@ -493,5 +493,12 @@
   "family_achievements": "Assoliments familiars",
   "home": "Inici",
   "family": "Família",
-  "this_week_heading": "Aquesta setmana"
+  "this_week_heading": "Aquesta setmana",
+  "pace": "ritme",
+  "finished": "Acabat",
+  "counting_stopped": "el recompte s'ha aturat",
+  "share_full": "La teva part està completa",
+  "share_left": "Et queden {left} de {max}",
+  "out_of_points": "sense punts",
+  "pool_closed": "guardiola tancada"
 }

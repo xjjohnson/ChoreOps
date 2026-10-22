@@ -493,5 +493,12 @@
   "family_achievements": "Osiągnięcia rodzinne",
   "home": "Start",
   "family": "Rodzina",
-  "this_week_heading": "W tym tygodniu"
+  "this_week_heading": "W tym tygodniu",
+  "pace": "tempo",
+  "finished": "Zakończono",
+  "counting_stopped": "liczenie wstrzymane",
+  "share_full": "Twój udział jest pełny",
+  "share_left": "Zostało {left} z {max}",
+  "out_of_points": "brak punktów",
+  "pool_closed": "skarbonka zamknięta"
 }

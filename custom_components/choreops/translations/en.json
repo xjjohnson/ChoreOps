@@ -4955,6 +4955,9 @@
           "pool_match_names": {
             "name": "Match Paid By"
           },
+          "pool_match_out": {
+            "name": "Match Parents Out of Points"
+          },
           "last_claimed": {
             "name": "Last Claimed"
           },

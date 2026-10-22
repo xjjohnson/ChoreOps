@@ -493,5 +493,12 @@
   "family_achievements": "Familienerfolge",
   "home": "Start",
   "family": "Familie",
-  "this_week_heading": "Diese Woche"
+  "this_week_heading": "Diese Woche",
+  "pace": "Tempo",
+  "finished": "Beendet",
+  "counting_stopped": "Zählung gestoppt",
+  "share_full": "Dein Anteil ist voll",
+  "share_left": "{left} von deinen {max} übrig",
+  "out_of_points": "keine Punkte",
+  "pool_closed": "Sparschwein geschlossen"
 }

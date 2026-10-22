@@ -1112,6 +1112,7 @@ async def test_pace_compares_total_with_an_even_pace(
             assert schedule[fg.ATTR_PACE] == pace
         with patch.object(gm, "get_total", return_value=60.0):
             assert gm.get_schedule(goal_id)[fg.ATTR_PACE] == fg.PACE_AHEAD
+            assert gm.get_schedule(goal_id)[fg.ATTR_PACE_EXPECTED] == 45.0
         assert gm.get_schedule(goal_id)[fg.ATTR_DAYS_LEFT] == 6
 
     # No deadline, no pace

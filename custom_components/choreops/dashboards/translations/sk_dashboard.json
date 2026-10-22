@@ -493,5 +493,12 @@
   "family_achievements": "Rodinné úspechy",
   "home": "Domov",
   "family": "Rodina",
-  "this_week_heading": "Tento týždeň"
+  "this_week_heading": "Tento týždeň",
+  "pace": "tempo",
+  "finished": "Skončené",
+  "counting_stopped": "počítanie zastavené",
+  "share_full": "Tvoj podiel je plný",
+  "share_left": "Zostáva {left} z {max}",
+  "out_of_points": "bez bodov",
+  "pool_closed": "pokladnička zatvorená"
 }

@@ -493,5 +493,12 @@
   "family_achievements": "Succès familiaux",
   "home": "Accueil",
   "family": "Famille",
-  "this_week_heading": "Cette semaine"
+  "this_week_heading": "Cette semaine",
+  "pace": "rythme",
+  "finished": "Terminé",
+  "counting_stopped": "le décompte est arrêté",
+  "share_full": "Ta part est complète",
+  "share_left": "Il te reste {left} sur {max}",
+  "out_of_points": "plus de points",
+  "pool_closed": "cagnotte fermée"
 }

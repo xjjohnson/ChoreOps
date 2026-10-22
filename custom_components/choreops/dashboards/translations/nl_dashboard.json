@@ -493,5 +493,12 @@
   "family_achievements": "Gezinsprestaties",
   "home": "Start",
   "family": "Gezin",
-  "this_week_heading": "Deze week"
+  "this_week_heading": "Deze week",
+  "pace": "tempo",
+  "finished": "Afgelopen",
+  "counting_stopped": "telling gestopt",
+  "share_full": "Jouw deel is vol",
+  "share_left": "Nog {left} van je {max}",
+  "out_of_points": "geen punten",
+  "pool_closed": "spaarpot gesloten"
 }

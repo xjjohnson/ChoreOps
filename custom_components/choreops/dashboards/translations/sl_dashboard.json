@@ -493,5 +493,12 @@
   "family_achievements": "Družinski dosežki",
   "home": "Domov",
   "family": "Družina",
-  "this_week_heading": "Ta teden"
+  "this_week_heading": "Ta teden",
+  "pace": "tempo",
+  "finished": "Končano",
+  "counting_stopped": "štetje ustavljeno",
+  "share_full": "Tvoj delež je poln",
+  "share_left": "Še {left} od {max}",
+  "out_of_points": "brez točk",
+  "pool_closed": "hranilnik zaprt"
 }

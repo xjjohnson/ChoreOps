@@ -493,5 +493,12 @@
   "family_achievements": "家庭成就",
   "home": "首页",
   "family": "家庭",
-  "this_week_heading": "本周"
+  "this_week_heading": "本周",
+  "pace": "进度线",
+  "finished": "已结束",
+  "counting_stopped": "停止计数",
+  "share_full": "你的份额已满",
+  "share_left": "你的 {max} 还剩 {left}",
+  "out_of_points": "积分不足",
+  "pool_closed": "储蓄罐已关闭"
 }

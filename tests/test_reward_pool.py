@@ -943,3 +943,7 @@ async def test_match_is_split_between_parents_and_covered_when_one_runs_out(
     reward = coordinator.rewards_data[reward_id]
     names = pm.sensor_attributes(reward, zoe)[rp.ATTR_REWARD_POOL_MATCH_NAMES]
     assert names == ["Max!", "Lila"]
+    assert not pm.sensor_attributes(reward, zoe)[rp.ATTR_REWARD_POOL_MATCH_OUT]
+    _set_points(scenario_full, mom, 0.0)
+    _set_points(scenario_full, dad, 0.0)
+    assert pm.sensor_attributes(reward, zoe)[rp.ATTR_REWARD_POOL_MATCH_OUT]

@@ -663,6 +663,16 @@ class RewardPoolManager(BaseManager):
             for parent_id in reward_info.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
             if match_ratio > 0
         ]
+        match_out = bool(match_names) and not any(
+            float(
+                self.coordinator.assignees_data.get(parent_id, {}).get(
+                    const.DATA_USER_POINTS, 0
+                )
+                or 0
+            )
+            > 0
+            for parent_id in reward_info.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
+        )
         attrs.update(
             {
                 rp.ATTR_REWARD_POOL_TOTAL: total,
@@ -683,6 +693,7 @@ class RewardPoolManager(BaseManager):
                 ),
                 rp.ATTR_REWARD_POOL_MATCH_RATIO: match_ratio,
                 rp.ATTR_REWARD_POOL_MATCH_NAMES: match_names,
+                rp.ATTR_REWARD_POOL_MATCH_OUT: match_out,
                 rp.ATTR_REWARD_POOL_CONTRIBUTIONS: {
                     get_assignee_name_by_id(self.coordinator, user_id)
                     or user_id: amount

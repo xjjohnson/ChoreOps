@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 import jinja2
+import pytest
 import yaml
 
 from custom_components.choreops import const
@@ -3211,3 +3212,165 @@ def test_family_home_race_track_moves_with_todays_chores() -> None:
     )
     assert chips == ["✓", "L", "M", "D"]
     assert "of 4" not in output
+
+
+# ---------------------------------------------------------------------------
+# Family goal pace line and pool setting chips
+# ---------------------------------------------------------------------------
+
+
+def _family_goal_card_html(template: str, **attrs: object) -> str:
+    """Render the Home or Hub family goal card for one points goal."""
+    import ast
+    import datetime as _dt
+
+    goal = _MockState(
+        entity_id="sensor.fam_goal",
+        state="62",
+        attributes={
+            "purpose": "purpose_family_goal",
+            "achievement_name": "Movie Night Fund",
+            "type": "family_points_total",
+            "target_value": 500,
+            "family_total": 310,
+            "family_contributions": {"Lily": 200, "Dad": 110},
+            "family_level_contributions": {"Lily": 200, "Dad": 110},
+            "family_levels": [500],
+            "family_level_rewards": [25],
+            "family_level": 0,
+            "family_next_target": 500,
+            "family_next_reward": 25,
+            "family_top_multiplier": 1,
+            **attrs,
+        },
+        name="Movie Night Fund",
+    )
+    if template == "home":
+        view = builder._render_family_home_view(
+            _read_template("user-family-home-v1.yaml"),
+            integration_entry_id="entry-123",
+            release_ref=None,
+            release_version=None,
+            generated_at="2026-10-21T00:00:00+00:00",
+            root_button_card_templates={},
+            user_names=["Lily", "Dad"],
+        )
+        tpl = next(
+            c["filter"]["template"]
+            for sec in view["sections"]
+            for c in sec["cards"]
+            if c["type"] == "custom:auto-entities"
+            and "family_total" in c["filter"]["template"]
+        )
+        env, integration_entities, states, state_attr = _build_runtime_template_env(
+            {"sensor.fam_goal": goal}
+        )
+        env.add_extension("jinja2.ext.loopcontrols")
+        env.globals["now"] = lambda: _dt.datetime(2026, 10, 21, 12, 0)
+        out = env.from_string(tpl).render(
+            integration_entities=integration_entities,
+            states=states,
+            state_attr=state_attr,
+        )
+        return str(ast.literal_eval(f"[{out}]")[0]["custom_fields"]["content"])
+    return _render_hub_card(
+        _hub_card_template("family_total"), {}, {"sensor.fam_goal": goal}
+    )
+
+
+@pytest.mark.parametrize("template", ["home", "hub"])
+def test_family_goal_card_shows_pace_line_and_days_left(template: str) -> None:
+    """Pace word, days left and a dashed pace line at the even-pace total."""
+    html = _family_goal_card_html(
+        template,
+        family_pace="behind",
+        family_days_left=11,
+        family_end_date="2026-10-31",
+        family_finished=False,
+        family_pace_expected=330.0,
+    )
+    assert "Behind pace</b> · 11 days left" in html
+    assert "left:66.0%;border-left:2px dashed var(--warning-color)" in html
+
+    html = _family_goal_card_html(template, family_days_left=1, family_pace="ahead")
+    assert "Ahead of pace</b> · Ends today" in html
+    assert "border-left:2px dashed" not in html  # no even-pace total sent
+
+    html = _family_goal_card_html(
+        template,
+        family_finished=True,
+        family_end_date="2026-10-31",
+        family_days_left=0,
+    )
+    assert "Finished 2026-10-31</b> · counting stopped" in html
+    assert "border-left:2px dashed" not in html
+
+    # Goals without a finish date or repeat look as before
+    plain = _family_goal_card_html(template)
+    assert "days left" not in plain
+    assert "pace" not in plain.replace("space", "")
+
+
+def _pool_row(**attrs: object) -> str:
+    state = str(attrs.pop("state", "available"))
+    reward = _MockState(
+        entity_id="sensor.lego",
+        state=state,
+        attributes={
+            "pooled": True,
+            "pool_total": 120,
+            "pool_my_contribution": 40,
+            **attrs,
+        },
+        name="Lego Castle",
+    )
+    return _render_hub_card(
+        _hub_card_template("pool_my_contribution"),
+        {"rewards": [{"name": "Lego Castle", "eid": "sensor.lego", "cost": 300}]},
+        {"sensor.lego": reward},
+    )
+
+
+def test_pool_row_shows_share_and_match_chips() -> None:
+    """Share left / share full and the match parents appear as chips."""
+    html = _pool_row(
+        pool_max_share=120,
+        pool_my_share_left=80,
+        pool_match_ratio=1,
+        pool_match_names=["Mom", "Dad"],
+        pool_match_out=False,
+    )
+    assert "80 of your 120 left" in html
+    assert "Mom + Dad ×1" in html
+    assert "out of points" not in html
+
+    html = _pool_row(
+        pool_max_share=120,
+        pool_my_share_left=0,
+        pool_match_ratio=0.5,
+        pool_match_names=["Mom"],
+        pool_match_out=True,
+    )
+    assert "Your share is full" in html
+    assert "Mom ×0.5 · out of points" in html
+
+    # No settings, no chips
+    plain = _pool_row(pool_my_share_left=None, pool_match_names=[])
+    assert "of your" not in plain
+    assert "mdi:handshake" not in plain
+
+
+def test_closed_pool_row_shows_delivered_with_a_lock() -> None:
+    """A pool closed after delivery is green, locked and says so."""
+    html = _pool_row(
+        state="locked",
+        pool_total=0,
+        pool_closed=True,
+        pool_match_ratio=1,
+        pool_match_names=["Mom"],
+    )
+    assert "✓ Delivered &nbsp;•&nbsp; pool closed" in html
+    assert "mdi:lock-outline' if" not in html
+    assert "icon='mdi:lock-outline' style='width:22px" in html
+    assert "Mom ×1" not in html
+    assert "Family pool <b" not in html
