@@ -501,6 +501,8 @@
   "share_full": "Твоя доля заполнена",
   "share_left": "Осталось {left} из {max}",
   "out_of_points": "нет баллов",
+  "chip_in": "Вложить",
+  "others": "Другие",
   "pool_closed": "копилка закрыта",
   "days_left_this_week": "дн. до конца недели",
   "days_left_this_month": "дн. до конца месяца"

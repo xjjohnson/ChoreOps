@@ -3463,6 +3463,40 @@ def test_pool_row_shows_share_and_match_chips() -> None:
     assert "mdi:handshake" not in plain
 
 
+def test_pool_row_status_stays_on_lines_and_shows_who_paid() -> None:
+    """Pool totals don't split mid-phrase, and You / Others paid show as chips."""
+    html = _pool_row(pool_total=50, pool_my_contribution=0)
+    assert (
+        "<span style='white-space:nowrap;'>Family pool <b style='color:var(--primary-text-color);'>50 / 300</b></span>"
+        in html
+    )
+    assert "<span style='white-space:nowrap;'><b>250</b> to go</span>" in html
+    assert "You: 0</span>" in html
+    assert "Others: 50</span>" in html
+
+    # Nobody else has paid in: no Others chip
+    html = _pool_row(pool_total=40, pool_my_contribution=40)
+    assert "You: 40</span>" in html
+    assert "Others:" not in html
+
+
+def test_pool_row_pill_shows_what_one_tap_pays() -> None:
+    """An open pool's pill is the chip-in, capped by what's left, not the cost."""
+    html = _pool_row(pool_chip_in=20)
+    assert ">Chip in</span>" in html
+    assert "</ha-icon>20</span>" in html
+    assert "</ha-icon>300</span>" not in html
+
+    # Capped by the share still left
+    html = _pool_row(pool_chip_in=50, pool_max_share=120, pool_my_share_left=10)
+    assert "</ha-icon>10</span>" in html
+
+    # Share full: the button is locked, so the pill shows the pool's goal
+    html = _pool_row(pool_chip_in=20, pool_max_share=120, pool_my_share_left=0)
+    assert ">Goal</span>" in html
+    assert "</ha-icon>300</span>" in html
+
+
 def test_closed_pool_row_shows_delivered_with_a_lock() -> None:
     """A pool closed after delivery is green, locked and says so."""
     html = _pool_row(

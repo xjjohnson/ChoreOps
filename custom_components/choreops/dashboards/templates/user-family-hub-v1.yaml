@@ -1510,13 +1510,13 @@ views:
                               {%- set to_go = [reward_cost - have, 0] | max -%}
 
                               {%- set bar_color = 'var(--success-color)' if pct >= 100 else accent -%}
-                              {%- set pool_chips = '' -%}
+                              {%- set pool_chips = '' -%}{%- set pool_tap = 0 -%}
                               {%- set pool_closed = is_pool and (state_attr(reward_sensor_eid, 'pool_closed') | default(false, true)) -%}
                               {%- if is_pool -%}
                                 {%- set pool_mine = state_attr(reward_sensor_eid, 'pool_my_contribution') | float(default=0) -%}
                                 {%- set bar_label = ui.get('family_pool', 'Family pool') -%}
                                 {%- set bar_value = ('%g' | format(have | round(2))) ~ ' / ' ~ ('%g' | format(reward_cost | round(2))) -%}
-                                {%- set bar_note = ui.get('you', 'You') ~ ': <b>' ~ ('%g' | format(pool_mine | round(2))) ~ '</b>' ~ (' &nbsp;•&nbsp; ' ~ ('%g' | format(to_go | round(2))) ~ ' ' ~ ui.get('to_go', 'to go') if to_go > 0 else '') -%}
+                                {%- set bar_note = ("<span style='white-space:nowrap;'><b>" ~ ('%g' | format(to_go | round(2))) ~ '</b> ' ~ ui.get('to_go', 'to go') ~ "</span>") if to_go > 0 else '' -%}
                                 {#-- Pool settings as chips: what this person may still pay in, and who matches --#}
                                 {%- set p_max = state_attr(reward_sensor_eid, 'pool_max_share') | float(default=0) -%}
                                 {%- set p_left = state_attr(reward_sensor_eid, 'pool_my_share_left') -%}
@@ -1534,7 +1534,16 @@ views:
                                   {%- endif -%}
                                 {%- endif -%}
                                 {%- set match_chip = ("<span style='" ~ chip_css ~ ("color:var(--warning-color);" if p_out else '') ~ "'>" ~ chip_icon | replace('ICON', 'mdi:handshake') | replace('COL', 'color:' ~ pref_pool_accent ~ ';') ~ (p_names | map('string') | map('replace', '&', '&amp;') | map('replace', '<', '&lt;') | map('replace', '>', '&gt;') | join(' + ')) ~ ' ×' ~ ('%g' | format(p_ratio)) ~ ((' · ' ~ ui.get('out_of_points', 'out of points')) if p_out else '') ~ "</span>") if (p_ratio > 0 and p_names and not pool_closed) else '' -%}
-                                {%- set pool_chips = ("<div style='display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;'>" ~ share_chip ~ match_chip ~ "</div>") if (share_chip or match_chip) else '' -%}
+                                {#-- Who has paid in so far: this person, and everyone else together --#}
+                                {%- set pool_others = [have - pool_mine, 0] | max -%}
+                                {%- set paid_chips = '' if pool_closed else ("<span style='" ~ chip_css ~ "'>" ~ ui.get('you', 'You') ~ ': ' ~ ('%g' | format(pool_mine | round(2))) ~ "</span>" ~ (("<span style='" ~ chip_css ~ "'>" ~ ui.get('others', 'Others') ~ ': ' ~ ('%g' | format(pool_others | round(2))) ~ "</span>") if pool_others > 0 else '')) -%}
+                                {%- set pool_chips = ("<div style='display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;'>" ~ paid_chips ~ share_chip ~ match_chip ~ "</div>") if (paid_chips or share_chip or match_chip) else '' -%}
+                                {#-- What one tap pays in: the chip-in amount, or all this person can afford (0), never more than the pool or their share still takes --#}
+                                {%- set p_chip_in = state_attr(reward_sensor_eid, 'pool_chip_in') | float(default=0) -%}
+                                {%- set p_tap = p_chip_in if p_chip_in > 0 else (current_points | float(default=0)) -%}
+                                {%- set p_tap = [p_tap, to_go] | min -%}
+                                {%- if p_left is not none and p_max > 0 -%}{%- set p_tap = [p_tap, p_left | float(0)] | min -%}{%- endif -%}
+                                {%- set pool_tap = p_tap if (reward_state == 'available' and not pool_closed and not primary_button_is_locked) else 0 -%}
                                 {%- if pool_closed -%}
                                   {%- set bar_note = '✓ ' ~ ui.get('delivered', 'delivered') | capitalize ~ ' &nbsp;•&nbsp; ' ~ ui.get('pool_closed', 'pool closed') -%}
                                 {%- endif -%}
@@ -1561,12 +1570,15 @@ views:
                               {#-- Fill row: the card background fills to show progress; green when claimable, pool accent while a family pool is filling --#}
                               {%- set row_col = 'var(--success-color)' if pool_closed else pref_claim_accent if reward_state == 'requested' else ('var(--success-color)' if (reward_state == 'approved' or pct >= 100) else (pref_pool_accent if is_pool else 'var(--primary-color)')) -%}
                               {%- set fill_pct = 100 if (reward_state in ['requested', 'approved'] or pool_closed) else pct -%}
-                              {%- set status_html = (bar_label ~ " <b style='color:var(--primary-text-color);'>" ~ bar_value ~ "</b> &nbsp;&bull;&nbsp; " ~ bar_note) if (is_pool and not pool_closed) else bar_note -%}
+                              {%- set status_html = ("<span style='white-space:nowrap;'>" ~ bar_label ~ " <b style='color:var(--primary-text-color);'>" ~ bar_value ~ "</b></span>" ~ (" &nbsp;&bull;&nbsp; " ~ bar_note if bar_note else '')) if (is_pool and not pool_closed) else bar_note -%}
                               {%- set sub_bits = [] -%}
                               {%- if pref_show_reward_description and rdesc | length > 0 -%}{%- set sub_bits = sub_bits + [rdesc] -%}{%- endif -%}
                               {%- if foot_bits | length > 0 -%}{%- set sub_bits = sub_bits + [foot_bits | join(' &nbsp;&bull;&nbsp; ')] -%}{%- endif -%}
                               {%- set tile = "<div style='flex:0 0 auto;width:40px;height:40px;border-radius:12px;background:color-mix(in srgb, " ~ row_col ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ ('mdi:lock-outline' if pool_closed else reward_icon) ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:" ~ row_col ~ ";display:block;'></ha-icon></div>" -%}
-                              {%- set cost_pill = "<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>" ~ ('%g' | format(reward_cost | round(2))) ~ "</div>" -%}
+                              {#-- An open pool's pill shows what one tap pays in (or the pool's goal when you can't chip in), not a price --#}
+                              {%- set pill_value = pool_tap if (is_pool and pool_tap > 0) else reward_cost -%}
+                              {%- set pill_label = (ui.get('chip_in', 'Chip in') if pool_tap > 0 else ui.get('goal', 'Goal')) if (is_pool and not pool_closed) else '' -%}
+                              {%- set cost_pill = "<div style='flex:0 0 auto;display:inline-flex;flex-direction:column;align-items:center;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);color:var(--primary-text-color);'>" ~ ("<span style='font-size:9px;line-height:1.1;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);white-space:nowrap;'>" ~ pill_label ~ "</span>" if pill_label else '') ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:800;'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>" ~ ('%g' | format(pill_value | round(2))) ~ "</span></div>" -%}
                               {%- set content_html = "<div style='display:flex;align-items:center;gap:10px;width:100%;text-align:left;'>" ~ tile
                                   ~ "<div style='flex:1;min-width:0;'><div style='font-size:15px;line-height:1.2;font-weight:800;color:var(--primary-text-color);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;'>" ~ rname ~ "</div>"
                                   ~ "<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);'>" ~ status_html ~ "</div>" ~ pool_chips

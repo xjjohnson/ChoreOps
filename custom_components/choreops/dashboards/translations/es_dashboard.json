@@ -501,6 +501,8 @@
   "share_full": "Tu parte está completa",
   "share_left": "Te quedan {left} de {max}",
   "out_of_points": "sin puntos",
+  "chip_in": "Aportar",
+  "others": "Otros",
   "pool_closed": "hucha cerrada",
   "days_left_this_week": "días restantes esta semana",
   "days_left_this_month": "días restantes este mes"
