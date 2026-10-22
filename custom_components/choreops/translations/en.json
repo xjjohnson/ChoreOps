@@ -505,7 +505,7 @@
       "reward_pool_cost_zero": "A family pool reward needs a cost above 0, because the cost is the pool's target",
       "reward_pool_chip_in_too_high": "The chip-in amount can't be more than the reward's cost",
       "reward_pool_max_share_invalid": "The most one person can pay must be between 0 and 100 %",
-      "reward_pool_match_no_parent": "Choose the parent who pays the match, or set the match to 0",
+      "reward_pool_match_no_parent": "Choose at least one parent to pay the match, or set the match to 0",
       "invalid_reward_assigned_users": "One or more assigned users are not valid",
       "mixed_reward_assignment_sentinel": "Cannot mix 'all users' with specific users",
       "invalid_bonus": "Invalid bonus",
@@ -984,15 +984,15 @@
           "pool_chip_in": "Chip-in amount",
           "pool_max_share": "Most one person can pay",
           "pool_match_ratio": "Parent match",
-          "pool_match_user_id": "Match paid by",
+          "pool_match_user_ids": "Match paid by",
           "pool_after_delivery": "After delivery"
         },
         "data_description": {
           "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full.",
           "pool_chip_in": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford.",
           "pool_max_share": "Family pool only: the most one person can pay in, as a percent of the cost, so everyone has to help. Use 0 for no limit.",
-          "pool_match_ratio": "Family pool only: points the parent below adds for every point someone pays in (1 = one for one, 0.5 = half). Comes out of the parent's own balance and stops when it runs out. Use 0 to turn it off.",
-          "pool_match_user_id": "The parent whose points pay the match. Only people who can approve and have a points balance are listed. Refunding the pool gives the match back to them.",
+          "pool_match_ratio": "Family pool only: points the parents below add, between them, for every point someone pays in (1 = one for one, 0.5 = half). Comes out of their own balances and stops when they run out. Use 0 to turn it off.",
+          "pool_match_user_ids": "The parents whose points pay the match, split evenly between them (if one runs out, the others cover the rest). Only people who can approve and have a points balance are listed. Refunding the pool gives each parent their part back.",
           "pool_after_delivery": "Start again lets the family save up for the reward again. Close stops chip-ins until you edit and save this reward."
         }
       },
@@ -1500,15 +1500,15 @@
           "pool_chip_in": "Chip-in amount",
           "pool_max_share": "Most one person can pay",
           "pool_match_ratio": "Parent match",
-          "pool_match_user_id": "Match paid by",
+          "pool_match_user_ids": "Match paid by",
           "pool_after_delivery": "After delivery"
         },
         "data_description": {
           "pooled": "Everyone assigned pays points into one shared pool, and the reward cost becomes the pool's target. Approvers confirm the reward once the pool is full.",
           "pool_chip_in": "Family pool only: points paid in each time the dashboard button is pressed. Use 0 to put in as much as the person can afford.",
           "pool_max_share": "Family pool only: the most one person can pay in, as a percent of the cost, so everyone has to help. Use 0 for no limit.",
-          "pool_match_ratio": "Family pool only: points the parent below adds for every point someone pays in (1 = one for one, 0.5 = half). Comes out of the parent's own balance and stops when it runs out. Use 0 to turn it off.",
-          "pool_match_user_id": "The parent whose points pay the match. Only people who can approve and have a points balance are listed. Refunding the pool gives the match back to them.",
+          "pool_match_ratio": "Family pool only: points the parents below add, between them, for every point someone pays in (1 = one for one, 0.5 = half). Comes out of their own balances and stops when they run out. Use 0 to turn it off.",
+          "pool_match_user_ids": "The parents whose points pay the match, split evenly between them (if one runs out, the others cover the rest). Only people who can approve and have a points balance are listed. Refunding the pool gives each parent their part back.",
           "pool_after_delivery": "Start again lets the family save up for the reward again. Close stops chip-ins until you edit and save this reward."
         }
       },
@@ -1998,7 +1998,7 @@
       "reward_pool_cost_zero": "A family pool reward needs a cost above 0, because the cost is the pool's target",
       "reward_pool_chip_in_too_high": "The chip-in amount can't be more than the reward's cost",
       "reward_pool_max_share_invalid": "The most one person can pay must be between 0 and 100 %",
-      "reward_pool_match_no_parent": "Choose the parent who pays the match, or set the match to 0"
+      "reward_pool_match_no_parent": "Choose at least one parent to pay the match, or set the match to 0"
     },
     "abort": {
       "invalid_action": "Invalid Action",
@@ -4952,7 +4952,7 @@
           "pool_match_ratio": {
             "name": "Parent Match"
           },
-          "pool_match_name": {
+          "pool_match_names": {
             "name": "Match Paid By"
           },
           "last_claimed": {
@@ -5963,7 +5963,7 @@
       "message": "The most one person can pay must be between 0 and 100 %"
     },
     "reward_pool_match_no_parent": {
-      "message": "Choose the parent who pays the match, or set the match to 0"
+      "message": "Choose at least one parent to pay the match, or set the match to 0"
     },
     "reward_pool_not_full": {
       "message": "The family pool for {reward} has {total} of {target} points and is not full yet"

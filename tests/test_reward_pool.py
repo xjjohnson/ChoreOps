@@ -784,7 +784,7 @@ async def test_parent_match_comes_from_the_parents_balance(
         reward_id,
         {
             rp.DATA_REWARD_POOL_MATCH_RATIO: 1,
-            rp.DATA_REWARD_POOL_MATCH_USER_ID: parent,
+            rp.DATA_REWARD_POOL_MATCH_USER_IDS: [parent],
             const.DATA_REWARD_ASSIGNED_USER_IDS: [zoe, max_],
         },
     )
@@ -866,14 +866,14 @@ def test_pool_settings_validation_and_cleanup() -> None:
         rp.DATA_REWARD_POOL_MAX_SHARE: rp.TRANS_KEY_CFOF_REWARD_POOL_MAX_SHARE_INVALID
     }
     assert validate_pool_settings({**pooled, rp.DATA_REWARD_POOL_MATCH_RATIO: 1}) == {
-        rp.DATA_REWARD_POOL_MATCH_USER_ID: rp.TRANS_KEY_CFOF_REWARD_POOL_MATCH_NO_PARENT
+        rp.DATA_REWARD_POOL_MATCH_USER_IDS: rp.TRANS_KEY_CFOF_REWARD_POOL_MATCH_NO_PARENT
     }
     assert (
         validate_pool_settings(
             {
                 **pooled,
                 rp.DATA_REWARD_POOL_MATCH_RATIO: 1,
-                rp.DATA_REWARD_POOL_MATCH_USER_ID: "parent",
+                rp.DATA_REWARD_POOL_MATCH_USER_IDS: ["parent"],
             }
         )
         == {}
@@ -883,7 +883,7 @@ def test_pool_settings_validation_and_cleanup() -> None:
     assert built == {
         rp.DATA_REWARD_POOL_MAX_SHARE: 0.0,
         rp.DATA_REWARD_POOL_MATCH_RATIO: 0.0,
-        rp.DATA_REWARD_POOL_MATCH_USER_ID: "",
+        rp.DATA_REWARD_POOL_MATCH_USER_IDS: [],
         rp.DATA_REWARD_POOL_AFTER_DELIVERY: rp.AFTER_DELIVERY_RESTART,
     }
 
@@ -900,4 +900,46 @@ def test_reward_form_offers_pool_settings_and_lists_only_parents() -> None:
     keys = {str(key) for key in build_reward_schema(assignees_dict=users).schema}
     assert set(rp.POOL_SETTING_KEYS) <= keys
     values = [option["value"] for option in match_parent_options(users)]
-    assert values == [const.SENTINEL_EMPTY, "mom"]
+    assert values == ["mom"]
+
+
+async def test_match_is_split_between_parents_and_covered_when_one_runs_out(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Two parents share the match evenly; one short of points, the other covers."""
+    coordinator = scenario_full.coordinator
+    pm = coordinator.reward_pool_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    mom = scenario_full.assignee_ids["Max!"]  # Stand-ins for parents with points
+    dad = scenario_full.assignee_ids["Lila"]
+    reward_id = _make_pool(scenario_full)
+    coordinator.reward_manager.update_reward(
+        reward_id,
+        {
+            rp.DATA_REWARD_POOL_MATCH_RATIO: 1,
+            rp.DATA_REWARD_POOL_MATCH_USER_IDS: [mom, dad],
+            const.DATA_REWARD_ASSIGNED_USER_IDS: [zoe],
+        },
+    )
+    _set_points(scenario_full, zoe, 100.0)
+    _set_points(scenario_full, mom, 100.0)
+    _set_points(scenario_full, dad, 4.0)
+
+    await pm.contribute_to_pool(zoe, reward_id, 10.0)
+    await hass.async_block_till_done()
+    # 10 to match: Dad can only give 4, Mom covers the other 6
+    assert _pool(scenario_full, reward_id) == {zoe: 10.0, dad: 4.0, mom: 6.0}
+
+    await pm.contribute_to_pool(zoe, reward_id, 10.0)
+    await hass.async_block_till_done()
+    assert _pool(scenario_full, reward_id) == {zoe: 20.0, dad: 4.0, mom: 16.0}
+
+    _set_points(scenario_full, dad, 50.0)
+    await pm.contribute_to_pool(zoe, reward_id, 10.0)
+    await hass.async_block_till_done()
+    assert _pool(scenario_full, reward_id) == {zoe: 30.0, dad: 9.0, mom: 21.0}
+
+    reward = coordinator.rewards_data[reward_id]
+    names = pm.sensor_attributes(reward, zoe)[rp.ATTR_REWARD_POOL_MATCH_NAMES]
+    assert names == ["Max!", "Lila"]

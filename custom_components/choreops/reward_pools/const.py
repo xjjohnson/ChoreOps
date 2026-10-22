@@ -12,8 +12,8 @@ from typing import Final
 DATA_REWARD_POOL_MAX_SHARE: Final = "pool_max_share"
 # A parent adds this many points for each point someone else pays in (0 = off)
 DATA_REWARD_POOL_MATCH_RATIO: Final = "pool_match_ratio"
-# The parent (a user with a points balance) the match is paid from
-DATA_REWARD_POOL_MATCH_USER_ID: Final = "pool_match_user_id"
+# The parents (users with a points balance) who share paying the match
+DATA_REWARD_POOL_MATCH_USER_IDS: Final = "pool_match_user_ids"
 # What happens once the reward is delivered: save up again, or close the pool
 DATA_REWARD_POOL_AFTER_DELIVERY: Final = "pool_after_delivery"
 AFTER_DELIVERY_RESTART: Final = "restart"
@@ -24,7 +24,7 @@ DATA_REWARD_POOL_CLOSED: Final = "pool_closed"
 POOL_SETTING_KEYS: Final = (
     DATA_REWARD_POOL_MAX_SHARE,
     DATA_REWARD_POOL_MATCH_RATIO,
-    DATA_REWARD_POOL_MATCH_USER_ID,
+    DATA_REWARD_POOL_MATCH_USER_IDS,
     DATA_REWARD_POOL_AFTER_DELIVERY,
 )
 
@@ -81,4 +81,4 @@ ATTR_REWARD_POOL_CLOSED: Final = "pool_closed"
 ATTR_REWARD_POOL_MAX_SHARE: Final = "pool_max_share"  # Points, 0 = no limit
 ATTR_REWARD_POOL_MY_SHARE_LEFT: Final = "pool_my_share_left"  # None = no limit
 ATTR_REWARD_POOL_MATCH_RATIO: Final = "pool_match_ratio"
-ATTR_REWARD_POOL_MATCH_NAME: Final = "pool_match_name"
+ATTR_REWARD_POOL_MATCH_NAMES: Final = "pool_match_names"

@@ -18,7 +18,7 @@ def match_parent_options(users: Mapping[str, Any]) -> list[selector.SelectOption
     Args:
         users: Assignee-capable user records keyed by ID (they hold balances).
     """
-    options = [selector.SelectOptionDict(value=const.SENTINEL_EMPTY, label="-")]
+    options: list[selector.SelectOptionDict] = []
     for user_id, info in users.items():
         if isinstance(info, Mapping) and info.get(const.DATA_USER_CAN_APPROVE):
             options.append(
@@ -53,11 +53,12 @@ def schema_fields(
             rp.DATA_REWARD_POOL_MATCH_RATIO, default=const.DEFAULT_ZERO
         ): selector.NumberSelector(number),
         vol.Optional(
-            rp.DATA_REWARD_POOL_MATCH_USER_ID, default=const.SENTINEL_EMPTY
+            rp.DATA_REWARD_POOL_MATCH_USER_IDS, default=[]
         ): selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=match_parent_options(users),
                 mode=selector.SelectSelectorMode.DROPDOWN,
+                multiple=True,
             )
         ),
         vol.Optional(

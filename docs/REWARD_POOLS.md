@@ -32,12 +32,13 @@ services):
   someone has paid in that much, their chip-ins are refused, so everyone has to
   help.
 - **Parent match** and **Match paid by**: for every point someone pays in, the
-  chosen parent adds this many points (1 = one for one, 0.5 = half). The match
-  comes out of the parent's own balance, so only people who can approve *and*
-  have a points balance are listed. It stops when the parent runs out of points
-  or the pool is full, and a parent chipping in themselves is not matched. The
-  match is recorded as the parent's contribution: refunding the pool gives it
-  back to them. Refunding one person leaves the match in the pool.
+  chosen parents add this many points between them (1 = one for one, 0.5 =
+  half), split evenly; when one runs out of points the others cover the rest.
+  The match comes out of the parents' own balances, so only people who can
+  approve *and* have a points balance are listed. It stops when they run out of
+  points or the pool is full, and a parent chipping in themselves is not
+  matched. Each parent's part is recorded as their contribution: refunding the
+  pool gives it back to them. Refunding one person leaves the match in the pool.
 - **After delivery**: *Start again* (the default) empties the pool so the family
   can save up again. *Close the pool* stops chip-ins once the reward is
   delivered, until you edit and save the reward.
@@ -121,4 +122,4 @@ It also has these attributes:
 | `pool_max_share` | The most one person can pay in, in points (0 = no limit) |
 | `pool_my_share_left` | What this person may still pay in (empty = no limit) |
 | `pool_match_ratio` | Parent match points per point paid in (0 = off) |
-| `pool_match_name` | The parent paying the match |
+| `pool_match_names` | The parents paying the match |

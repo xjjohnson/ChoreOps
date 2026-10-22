@@ -25,8 +25,8 @@ def suggested_values(reward: Mapping[str, Any]) -> dict[str, Any]:
         rp.DATA_REWARD_POOL_MATCH_RATIO: reward.get(
             rp.DATA_REWARD_POOL_MATCH_RATIO, const.DEFAULT_ZERO
         ),
-        rp.DATA_REWARD_POOL_MATCH_USER_ID: reward.get(
-            rp.DATA_REWARD_POOL_MATCH_USER_ID, const.SENTINEL_EMPTY
+        rp.DATA_REWARD_POOL_MATCH_USER_IDS: list(
+            reward.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
         ),
         rp.DATA_REWARD_POOL_AFTER_DELIVERY: reward.get(
             rp.DATA_REWARD_POOL_AFTER_DELIVERY, rp.AFTER_DELIVERY_RESTART
@@ -39,6 +39,16 @@ def _number(value: Any) -> float:
         return max(0.0, float(value or 0))
     except (TypeError, ValueError):
         return 0.0
+
+
+def match_user_ids(value: Any) -> list[str]:
+    """Return the match parents as a list of IDs, without blanks or repeats."""
+    items = value if isinstance(value, (list, tuple, set)) else [value]
+    ids: list[str] = []
+    for item in items:
+        if item not in (None, const.SENTINEL_EMPTY) and str(item) not in ids:
+            ids.append(str(item))
+    return ids
 
 
 def build_settings(get_field: Callable[[str, Any], Any]) -> dict[str, Any]:
@@ -58,8 +68,8 @@ def build_settings(get_field: Callable[[str, Any], Any]) -> dict[str, Any]:
         rp.DATA_REWARD_POOL_MATCH_RATIO: _number(
             get_field(rp.DATA_REWARD_POOL_MATCH_RATIO, 0)
         ),
-        rp.DATA_REWARD_POOL_MATCH_USER_ID: str(
-            get_field(rp.DATA_REWARD_POOL_MATCH_USER_ID, const.SENTINEL_EMPTY) or ""
+        rp.DATA_REWARD_POOL_MATCH_USER_IDS: match_user_ids(
+            get_field(rp.DATA_REWARD_POOL_MATCH_USER_IDS, [])
         ),
         rp.DATA_REWARD_POOL_AFTER_DELIVERY: (
             rp.AFTER_DELIVERY_CLOSE
@@ -81,11 +91,11 @@ def validate_settings(field: Callable[[str, Any], Any]) -> dict[str, str]:
                 rp.TRANS_KEY_CFOF_REWARD_POOL_MAX_SHARE_INVALID
             )
         }
-    if _number(field(rp.DATA_REWARD_POOL_MATCH_RATIO, 0)) > 0 and not field(
-        rp.DATA_REWARD_POOL_MATCH_USER_ID, ""
+    if _number(field(rp.DATA_REWARD_POOL_MATCH_RATIO, 0)) > 0 and not match_user_ids(
+        field(rp.DATA_REWARD_POOL_MATCH_USER_IDS, [])
     ):
         return {
-            rp.DATA_REWARD_POOL_MATCH_USER_ID: (
+            rp.DATA_REWARD_POOL_MATCH_USER_IDS: (
                 rp.TRANS_KEY_CFOF_REWARD_POOL_MATCH_NO_PARENT
             )
         }
