@@ -429,6 +429,49 @@ def get_friendly_label(hass: HomeAssistant, label_name: str) -> str:
     return label_name
 
 
+# Named colors Home Assistant's label picker stores; the frontend draws them
+# from the matching ``--<name>-color`` theme variable.
+_LABEL_THEME_COLORS: frozenset[str] = frozenset(
+    {
+        "primary",
+        "accent",
+        "disabled",
+        "red",
+        "pink",
+        "purple",
+        "deep-purple",
+        "indigo",
+        "blue",
+        "light-blue",
+        "cyan",
+        "teal",
+        "green",
+        "light-green",
+        "lime",
+        "yellow",
+        "amber",
+        "orange",
+        "deep-orange",
+        "brown",
+        "light-grey",
+        "grey",
+        "dark-grey",
+        "blue-grey",
+        "black",
+        "white",
+    }
+)
+
+
+def get_label_css_color(hass: HomeAssistant, label_name: str) -> str:
+    """Return a label's color as a CSS value, or "" when it has none."""
+    label_entry = async_get_label_registry(hass).async_get_label(label_name)
+    color = (label_entry.color if label_entry else None) or ""
+    if color in _LABEL_THEME_COLORS:
+        return f"var(--{color}-color)"
+    return color
+
+
 # ==============================================================================
 # Item Lookup Helpers (Domain Items in Storage)
 # Basic ID/name lookups returning None, and error-raising variants for services.
