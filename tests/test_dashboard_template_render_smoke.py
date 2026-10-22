@@ -2730,11 +2730,11 @@ def test_family_hub_daily_goals_are_two_column_ring_cards() -> None:
 
     assert "'columns': 2" in output
     # In-progress daily goal: ring filled to its percent, percent pill, reward chip.
-    assert "conic-gradient(var(--primary-color) 40%" in output
+    assert "stroke-dasharray='45.2 113.1'" in output  # 40% of the ring
     assert ">40%</span>" in output
     assert "+25" in output
     # Earned daily goal: solid green ring, check pill and award date.
-    assert "background:var(--success-color)" in output
+    assert "stroke='var(--success-color)' stroke-width='4'" in output
     assert "✓ 2026-10-19" in output
     # Both cards keep their own tap target.
     assert "'entity': 'sensor.lily_d1'" in output
@@ -2845,7 +2845,7 @@ def test_family_hub_chores_a_day_ring_follows_todays_count() -> None:
     helper["badges"][0]["badge_type"] = "daily"
     output = _render_hub_card(tpl, helper, extra, real_dates=True)
     assert ">5/7</span>" in output
-    assert "conic-gradient(var(--primary-color) 71%" in output
+    assert "stroke-dasharray='80.3 113.1'" in output  # 71% of the ring
 
 
 def _long_goal(progress: int, **attrs: object):
