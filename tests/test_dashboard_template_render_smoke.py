@@ -2445,7 +2445,7 @@ def test_family_hub_showcase_lists_earned_achievements_as_gold_tiles() -> None:
 
 
 def test_family_hub_showcase_sorts_newest_first_with_label_strips() -> None:
-    """Newest first; badges stay in one strip in their own color, labeled achievements get a strip."""
+    """Newest first; labeled badges and achievements get a strip in the label color."""
     tpl = _hub_card_template("ach_ns")
     output = _render_hub_card(
         tpl,
@@ -2506,17 +2506,19 @@ def test_family_hub_showcase_sorts_newest_first_with_label_strips() -> None:
         },
     )
     assert (
-        output.index("Bookworm")
-        < output.index("New Badge")
+        output.index("New Badge")
         < output.index("Old Badge")
+        < output.index("Reading")
+        < output.index("Bookworm")
         < output.index("Teal Star")
     )
-    # Badges never split into label strips; the badge color beats the label color.
-    assert "Reading" not in output
+    # The label strip uses the label color; a badge's own color wins for its icon.
+    reading_strip = output[output.index("Reading") : output.index("Bookworm")]
+    assert "var(--purple-color)" in reading_strip
     helper_tile = output[output.rindex("<ha-icon", 0, output.index("Teal Star")) :]
     assert "var(--teal-color)" in helper_tile[: helper_tile.index("Teal Star")]
     assert "var(--purple-color)" in output
-    assert output.index("Bookworm") < output.index("Newer Award")
+    assert output.index("Teal Star") < output.index("Newer Award")
     assert output.index("Newer Award") < output.index("Older Award")
     assert output.index("Older Award") < output.index("Kindness")
     assert output.index("Kindness") < output.index("Kind Words")

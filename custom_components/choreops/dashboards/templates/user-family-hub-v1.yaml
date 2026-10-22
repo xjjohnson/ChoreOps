@@ -195,8 +195,8 @@ views:
                     {%- set maintenance_rank_eid = highest_earned_rank_eid if rank_status == 'demoted' and highest_earned_rank_eid not in ['', 'None', 'unknown', 'unavailable', none] else current_rank_eid -%}
                     {%- set has_any_rank = current_rank_eid not in ['', 'None', 'unknown', 'unavailable', none] -%}
 
-                    {#-- BADGES: one strip, newest first. Each badge uses its own color, then its first label's color, then the theme color --#}
-                    {%- set bdg = namespace(items=[]) -%}
+                    {#-- BADGES: newest first. Labeled badges get their own strip in the label's color; each badge's icon uses its own color, then the strip's --#}
+                    {%- set bdg = namespace(items=[], groups=[], html='') -%}
                     {%- for badge in badge_list -%}
                       {%- if badge is mapping -%}
                         {%- set badge_earned_raw = badge.get('earned', false) -%}
@@ -207,18 +207,25 @@ views:
                           {%- set badge_name = badge_name_raw[8:] if badge_name_raw[:8] == 'Badge - ' else badge_name_raw -%}
                           {%- set badge_label = ((badge.get('labels') or [{}]) | first) -%}
                           {%- set badge_label = badge_label if badge_label is mapping else {} -%}
-                          {%- set bdg.items = bdg.items + [{'name': badge_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;'), 'icon': state_attr(badge_entity, 'icon') | default('mdi:medal-outline', true), 'count': badge.get('earned_count', 0) | int(default=0), 'last': (badge.get('last_awarded') or '') | string, 'color': (badge.get('color') or badge_label.get('color') or '') | string}] -%}
+                          {%- set bdg.items = bdg.items + [{'name': badge_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;'), 'icon': state_attr(badge_entity, 'icon') | default('mdi:medal-outline', true), 'count': badge.get('earned_count', 0) | int(default=0), 'last': (badge.get('last_awarded') or '') | string, 'label': (badge_label.get('name') or '') | string, 'color': (badge_label.get('color') or '') | string, 'own': (badge.get('color') or '') | string}] -%}
                         {%- endif -%}
                       {%- endif -%}
                     {%- endfor -%}
                     {%- set bdg.items = bdg.items | sort(attribute='last', reverse=true) -%}
-                    {%- set tiles = namespace(v='') -%}
                     {%- for b in bdg.items -%}
-                      {%- set c = b.color or 'var(--primary-color)' -%}
-                      {%- set badge_count_badge = "<div style='position:absolute;right:-6px;bottom:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:" ~ c ~ ";border:2px solid var(--card-background-color);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--text-primary-color, #fff);line-height:1;'>x" ~ b.count|string ~ "</div>" if b.count > 0 else "<div style='position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:999px;background:" ~ c ~ ";border:2px solid var(--card-background-color);box-sizing:border-box;display:flex;align-items:center;justify-content:center;'><ha-icon icon='mdi:check-bold' style='width:11px;height:11px;--mdc-icon-size:11px;color:var(--text-primary-color, #fff);display:block;'></ha-icon></div>" -%}
-                      {%- set tiles.v = tiles.v ~ "<div style='width:62px;min-width:62px;flex:0 0 auto;text-align:center;'><div style='position:relative;width:46px;height:46px;margin:0 auto;border-radius:50%;background:var(--card-background-color);box-shadow:0 2px 5px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:24px;height:24px;--mdc-icon-size:24px;color:" ~ c ~ ";display:block;'></ha-icon>" ~ badge_count_badge ~ "</div><div style='margin-top:6px;font-size:9px;line-height:1.15;color:var(--secondary-text-color);white-space:normal;overflow-wrap:anywhere;'>" ~ b.name ~ "</div></div>" -%}
+                      {%- if b.label not in bdg.groups -%}{%- set bdg.groups = bdg.groups + [b.label] -%}{%- endif -%}
                     {%- endfor -%}
-                    {%- set earned_badges_section = ("<div style='margin-top:16px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('badges', 'Badges') ~ "</div><div style='margin-top:8px;display:flex;gap:12px;overflow-x:auto;padding:12px 6px;border-radius:14px;background:linear-gradient(180deg, color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color)), color-mix(in srgb, var(--primary-color) 14%, var(--card-background-color)));border-bottom:4px solid color-mix(in srgb, var(--primary-color) 35%, var(--divider-color));scrollbar-width:none;'>" ~ tiles.v ~ "</div>") if tiles.v | length > 0 else '' -%}
+                    {%- for g in ([''] + (bdg.groups | reject('eq', '') | list)) if g in bdg.groups -%}
+                      {%- set c = ((bdg.items | selectattr('label', 'eq', g) | map(attribute='color') | reject('eq', '') | first) or 'var(--primary-color)') if g else 'var(--primary-color)' -%}
+                      {%- set tiles = namespace(v='') -%}
+                      {%- for b in bdg.items | selectattr('label', 'eq', g) -%}
+                        {%- set tc = b.own or c -%}
+                        {%- set badge_count_badge = "<div style='position:absolute;right:-6px;bottom:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:" ~ tc ~ ";border:2px solid var(--card-background-color);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--text-primary-color, #fff);line-height:1;'>x" ~ b.count|string ~ "</div>" if b.count > 0 else "<div style='position:absolute;right:-3px;bottom:-3px;width:18px;height:18px;border-radius:999px;background:" ~ tc ~ ";border:2px solid var(--card-background-color);box-sizing:border-box;display:flex;align-items:center;justify-content:center;'><ha-icon icon='mdi:check-bold' style='width:11px;height:11px;--mdc-icon-size:11px;color:var(--text-primary-color, #fff);display:block;'></ha-icon></div>" -%}
+                        {%- set tiles.v = tiles.v ~ "<div style='width:62px;min-width:62px;flex:0 0 auto;text-align:center;'><div style='position:relative;width:46px;height:46px;margin:0 auto;border-radius:50%;background:var(--card-background-color);box-shadow:0 2px 5px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ b.icon ~ "' style='width:24px;height:24px;--mdc-icon-size:24px;color:" ~ tc ~ ";display:block;'></ha-icon>" ~ badge_count_badge ~ "</div><div style='margin-top:6px;font-size:9px;line-height:1.15;color:var(--secondary-text-color);white-space:normal;overflow-wrap:anywhere;'>" ~ b.name ~ "</div></div>" -%}
+                      {%- endfor -%}
+                      {%- set bdg.html = bdg.html ~ "<div style='margin-top:16px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ("<span style='width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:" ~ c ~ ";'></span>" ~ (g | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) if g else ui.get('badges', 'Badges')) ~ "</div><div style='margin-top:8px;display:flex;gap:12px;overflow-x:auto;padding:12px 6px;border-radius:14px;background:linear-gradient(180deg, color-mix(in srgb, " ~ c ~ " 6%, var(--card-background-color)), color-mix(in srgb, " ~ c ~ " 14%, var(--card-background-color)));border-bottom:4px solid color-mix(in srgb, " ~ c ~ " 35%, var(--divider-color));scrollbar-width:none;'>" ~ tiles.v ~ "</div>" -%}
+                    {%- endfor -%}
+                    {%- set earned_badges_section = bdg.html -%}
 
                     {%- set compact_row_base = "display:grid;grid-template-columns:18px minmax(0,max-content) minmax(0,1fr);align-items:center;column-gap:8px;padding:5px 0;" -%}
                     {%- set compact_section_base = "margin-top:12px;padding-top:10px;border-top:1px solid var(--divider-color);" -%}
