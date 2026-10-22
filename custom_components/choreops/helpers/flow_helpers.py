@@ -2043,6 +2043,18 @@ def build_badge_common_schema(
                 default=[],
             ): selector.LabelSelector(selector.LabelSelectorConfig(multiple=True)),
             vol.Optional(const.CFOF_BADGES_INPUT_ICON): selector.IconSelector(),
+            vol.Optional(
+                const.CFOF_BADGES_INPUT_COLOR,
+                default=const.BADGE_COLOR_DEFAULT,
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=cast(
+                        "list[selector.SelectOptionDict]", const.BADGE_COLOR_OPTIONS
+                    ),
+                    translation_key=const.TRANS_KEY_FLOW_HELPERS_BADGE_COLOR,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
         }
     )
     # --- End Common Schema ---

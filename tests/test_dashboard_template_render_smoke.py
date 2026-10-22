@@ -2445,7 +2445,7 @@ def test_family_hub_showcase_lists_earned_achievements_as_gold_tiles() -> None:
 
 
 def test_family_hub_showcase_sorts_newest_first_with_label_strips() -> None:
-    """Badges and achievements run newest first; labeled ones get a strip in the label color."""
+    """Newest first; badges stay in one strip in their own color, labeled achievements get a strip."""
     tpl = _hub_card_template("ach_ns")
     output = _render_hub_card(
         tpl,
@@ -2473,6 +2473,15 @@ def test_family_hub_showcase_sorts_newest_first_with_label_strips() -> None:
                     "last_awarded": "2026-10-10",
                     "labels": [{"name": "Reading", "color": "var(--purple-color)"}],
                 },
+                {
+                    "eid": "sensor.lily_badge_helper",
+                    "name": "Teal Star",
+                    "earned": True,
+                    "earned_count": 1,
+                    "last_awarded": "2026-08-15",
+                    "color": "var(--teal-color)",
+                    "labels": [{"name": "Reading", "color": "var(--purple-color)"}],
+                },
             ],
             "achievements": [
                 {"eid": "sensor.lily_ach_a", "name": "Older Award"},
@@ -2496,10 +2505,16 @@ def test_family_hub_showcase_sorts_newest_first_with_label_strips() -> None:
             ),
         },
     )
-    assert output.index("New Badge") < output.index("Old Badge")
     assert (
-        output.index("Old Badge") < output.index("Reading") < output.index("Bookworm")
+        output.index("Bookworm")
+        < output.index("New Badge")
+        < output.index("Old Badge")
+        < output.index("Teal Star")
     )
+    # Badges never split into label strips; the badge color beats the label color.
+    assert "Reading" not in output
+    helper_tile = output[output.rindex("<ha-icon", 0, output.index("Teal Star")) :]
+    assert "var(--teal-color)" in helper_tile[: helper_tile.index("Teal Star")]
     assert "var(--purple-color)" in output
     assert output.index("Bookworm") < output.index("Newer Award")
     assert output.index("Newer Award") < output.index("Older Award")

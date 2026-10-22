@@ -466,7 +466,11 @@ _LABEL_THEME_COLORS: frozenset[str] = frozenset(
 def get_label_css_color(hass: HomeAssistant, label_name: str) -> str:
     """Return a label's color as a CSS value, or "" when it has none."""
     label_entry = async_get_label_registry(hass).async_get_label(label_name)
-    color = (label_entry.color if label_entry else None) or ""
+    return css_color_from_name((label_entry.color if label_entry else None) or "")
+
+
+def css_color_from_name(color: str) -> str:
+    """Turn a Home Assistant color name into CSS; hex and other values pass through."""
     if color in _LABEL_THEME_COLORS:
         return f"var(--{color}-color)"
     return color

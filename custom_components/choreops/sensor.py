@@ -79,6 +79,7 @@ from .helpers.device_helpers import (
     create_system_device_info,
 )
 from .helpers.entity_helpers import (
+    css_color_from_name,
     get_assignee_name_by_id,
     get_friendly_label,
     get_item_name_or_log_error,
@@ -4979,6 +4980,9 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     badge_payload["last_awarded"] = badge_earned.get(
                         const.DATA_USER_BADGES_EARNED_LAST_AWARDED
                     )
+                badge_color = str(badge_info.get(const.DATA_BADGE_COLOR) or "")
+                if badge_color:
+                    badge_payload["color"] = css_color_from_name(badge_color)
                 badge_labels = self._build_colored_label_entries(
                     self.hass, badge_info.get(const.DATA_BADGE_LABELS, [])
                 )
