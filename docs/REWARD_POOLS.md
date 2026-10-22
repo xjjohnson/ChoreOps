@@ -30,7 +30,8 @@ services):
 
 - **Most one person can pay**: a percent of the cost (0 = no limit). Once
   someone has paid in that much, their chip-ins are refused, so everyone has to
-  help.
+  help. On the Family Hub their chip-in button shows a lock once their share is
+  full.
 - **Parent match** and **Match paid by**: for every point someone pays in, the
   chosen parents add this many points between them (1 = one for one, 0.5 =
   half), split evenly; when one runs out of points the others cover the rest.

@@ -501,5 +501,7 @@
   "share_full": "La tua quota è completa",
   "share_left": "Ti restano {left} su {max}",
   "out_of_points": "senza punti",
-  "pool_closed": "salvadanaio chiuso"
+  "pool_closed": "salvadanaio chiuso",
+  "days_left_this_week": "giorni rimasti questa settimana",
+  "days_left_this_month": "giorni rimasti questo mese"
 }

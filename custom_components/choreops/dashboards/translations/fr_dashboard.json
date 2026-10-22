@@ -501,5 +501,7 @@
   "share_full": "Ta part est complète",
   "share_left": "Il te reste {left} sur {max}",
   "out_of_points": "plus de points",
-  "pool_closed": "cagnotte fermée"
+  "pool_closed": "cagnotte fermée",
+  "days_left_this_week": "jours restants cette semaine",
+  "days_left_this_month": "jours restants ce mois-ci"
 }

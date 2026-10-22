@@ -501,5 +501,7 @@
   "share_full": "Dein Anteil ist voll",
   "share_left": "{left} von deinen {max} übrig",
   "out_of_points": "keine Punkte",
-  "pool_closed": "Sparschwein geschlossen"
+  "pool_closed": "Sparschwein geschlossen",
+  "days_left_this_week": "Tage übrig diese Woche",
+  "days_left_this_month": "Tage übrig diesen Monat"
 }
