@@ -1250,3 +1250,101 @@ async def test_chore_changes_during_an_evaluation_are_not_read_stale(
         await gm.drain_pending()
 
     assert seen == [const.CHORE_STATE_CLAIMED, const.CHORE_STATE_CLAIMED]
+
+
+async def test_shares_count_again_after_points_and_chore_history_reset(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A data reset lowers everyone's counts; goal snapshots follow them down.
+
+    Otherwise each person's share in the current level reads 0 until they
+    out-earn what they had before the reset.
+    """
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    points_goal = gm.create_goal(
+        {
+            fg.DATA_NAME: "Points before reset",
+            fg.DATA_ASSIGNED_USER_IDS: [zoe, max_],
+            fg.DATA_TYPE: fg.GOAL_TYPE_POINTS,
+            fg.DATA_TARGET_VALUE: 5000.0,
+            fg.DATA_REWARD_POINTS: 5.0,
+            fg.DATA_LEVELS: "100:5, 5000:5",
+        }
+    )
+    chores_goal = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_CHORES,
+        target=500.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+    coordinator.challenges_data[chores_goal][fg.DATA_LEVELS] = "10:5, 500:5"
+
+    await _earn_points(scenario_full, zoe, 300.0)
+    await _earn_points(scenario_full, max_, 200.0)
+    _set_all_time_approved(scenario_full, zoe, 40)
+    _set_all_time_approved(scenario_full, max_, 30)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_level_info(points_goal)["level"] == 1
+    assert gm.get_level_info(chores_goal)["level"] == 1
+
+    await coordinator.system_manager._call_data_reset_managers(
+        "global", None, None, None
+    )
+    # Earned straight after the reset, before the debounced re-check runs
+    await _earn_points(scenario_full, zoe, 50.0)
+    _set_all_time_approved(scenario_full, max_, 2)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    assert gm.get_level_contributions(points_goal) == {
+        zoe: pytest.approx(50.0),
+        max_: pytest.approx(0.0),
+    }
+    assert gm.get_level_contributions(chores_goal) == {
+        zoe: pytest.approx(0.0),
+        max_: pytest.approx(2.0),
+    }
+    # Levels already reached and paid stay reached
+    assert gm.get_level_info(points_goal)["level"] == 1
+
+
+async def test_snapshot_above_current_count_is_lowered(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Goals saved with snapshots above today's counts heal on the next check."""
+    gm = scenario_full.coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_CHORES,
+        target=250.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+    goal = scenario_full.coordinator.challenges_data[goal_id]
+    goal[fg.DATA_LEVELS] = "10:5, 250:5"
+    goal[fg.DATA_LEVEL] = 1
+    goal[fg.DATA_LEVEL_START] = {zoe: 64.0, max_: 7.0}
+    goal[fg.DATA_BASELINE] = {zoe: 90.0}
+    _set_all_time_approved(scenario_full, zoe, 2)
+    _set_all_time_approved(scenario_full, max_, 1)
+
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert goal[fg.DATA_BASELINE] == {zoe: 2.0}
+    assert goal[fg.DATA_LEVEL_START] == {zoe: 0.0, max_: 1.0}
+
+    _set_all_time_approved(scenario_full, zoe, 5)
+    _set_all_time_approved(scenario_full, max_, 3)
+    assert gm.get_level_contributions(goal_id) == {
+        zoe: pytest.approx(3.0),
+        max_: pytest.approx(2.0),
+    }
