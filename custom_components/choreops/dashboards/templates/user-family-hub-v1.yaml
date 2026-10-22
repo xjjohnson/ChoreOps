@@ -2290,7 +2290,7 @@ views:
                                 ~ "<div style='font-size:10px;color:var(--secondary-text-color);opacity:0.8;'>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div></div>" -%}
                           {%- endfor -%}
                           {%- set trk_frac = 0 if tr.ci < 0 else ([((tr.ci + ((tr.nxt_pct / 100) if tr.has_next else 0)) / ([n_b - 1, 1] | max)), 1] | min) -%}
-                          {%- set trk_caption = ("<div style='text-align:center;margin-top:2px;font-size:11px;color:var(--secondary-text-color);'><b style='color:var(--primary-color);'>" ~ (format_points(tr.nxt_to_go, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ ' ' ~ ui.get('to_go', 'to go') ~ "</b> &rarr; <b style='color:var(--primary-text-color);'>" ~ tr.nxt_name ~ "</b></div>") if tr.has_next and tr.nxt_to_go > 0 else '' -%}
+                          {%- set trk_caption = ("<div style='text-align:center;margin-top:2px;white-space:normal;font-size:11px;color:var(--secondary-text-color);'><b style='color:var(--primary-color);'>" ~ (format_points(tr.nxt_to_go, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ ' ' ~ ui.get('to_go', 'to go') ~ "</b> &rarr; <b style='color:var(--primary-text-color);'>" ~ tr.nxt_name ~ "</b></div>") if tr.has_next and tr.nxt_to_go > 0 else '' -%}
                           {%- set trk_html = "<div style='box-sizing:border-box;width:100%;border-radius:16px;border:1px solid var(--divider-color);background:var(--card-background-color);padding:8px 8px 8px;'>"
                               ~ "<div style='position:relative;display:flex;'>"
                               ~ "<div style='position:absolute;left:calc(50% / " ~ n_b ~ ");right:calc(50% / " ~ n_b ~ ");top:15px;height:3px;border-radius:4px;background:var(--divider-color);'></div>"
@@ -2361,10 +2361,10 @@ views:
                               {%- if ns.m_remaining <= 0 -%}
                                 {%- set prog_note = "<span style='color:var(--success-color);font-weight:800;'>✓ " ~ ui.get('maintenance_met', 'Maintenance met') ~ "</span>" -%}
                               {%- else -%}
-                                {%- set prog_note = "<span style='color:" ~ prog_color ~ ";font-weight:800;'>" ~ ui.get('need', 'Need') ~ ' ' ~ (format_points(ns.m_remaining, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ "</span>" ~ ((" <span style='opacity:0.75;'>" ~ (ui.get('grace_period', 'Grace') if ns.m_status == 'grace' else ui.get('by', 'by')) ~ ' ' ~ by_date ~ "</span>") if by_date | length > 0 else '') -%}
+                                {%- set prog_note = "<span style='color:" ~ prog_color ~ ";font-weight:800;white-space:nowrap;'>" ~ ui.get('need', 'Need') ~ ' ' ~ (format_points(ns.m_remaining, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ "</span>" ~ ((" <span style='opacity:0.75;white-space:nowrap;'>" ~ (ui.get('grace_period', 'Grace') if ns.m_status == 'grace' else ui.get('by', 'by')) ~ ' ' ~ by_date ~ "</span>") if by_date | length > 0 else '') -%}
                               {%- endif -%}
                               {%- if ns.m_frequency not in ['', 'none'] -%}
-                                {%- set prog_note = prog_note ~ " <span style='opacity:0.75;'>• ↻ " ~ ui.get(ns.m_frequency, ns.m_frequency | replace('_', ' ') | title) ~ "</span>" -%}
+                                {%- set prog_note = prog_note ~ " <span style='opacity:0.75;white-space:nowrap;'>• ↻ " ~ ui.get(ns.m_frequency, ns.m_frequency | replace('_', ' ') | title) ~ "</span>" -%}
                               {%- endif -%}
                               {%- if ns.m_status == 'demoted' -%}
                                 {%- set cur_mult = (state_attr(points_sensor, 'points_multiplier') | float(default=0)) if points_sensor else 0 -%}
@@ -2415,25 +2415,26 @@ views:
                               {%- set chip_label = pill_text if is_current else ui.get('next_rank', 'Next rank') -%}
                               {%- set sub_html = '' -%}
                               {%- if show_bar -%}
-                                {%- set sub_html = (("<span>" ~ prog_label ~ " <b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b></span> &nbsp;&bull;&nbsp; ") if is_current else ("<b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b> &nbsp;&bull;&nbsp; ")) ~ prog_note -%}
+                                {#-- Button-card keeps custom fields on one line, so the current rank puts its note on a second line --#}
+                                {%- set sub_html = ("<div>" ~ prog_label ~ " <b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b></div><div>" ~ prog_note ~ "</div>") if is_current else ("<b style='color:var(--primary-text-color);'>" ~ prog_value ~ "</b> &nbsp;&bull;&nbsp; " ~ prog_note) -%}
                               {%- endif -%}
                               {%- set tile = "<div style='flex:0 0 auto;width:" ~ ('36px' if is_current else '30px') ~ ";height:" ~ ('36px' if is_current else '30px') ~ ";border-radius:12px;background:color-mix(in srgb, " ~ accent ~ " 22%, transparent);display:flex;align-items:center;justify-content:center;'><ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('22' if is_current else '18') ~ "px;height:" ~ ('22' if is_current else '18') ~ "px;--mdc-icon-size:" ~ ('22' if is_current else '18') ~ "px;color:" ~ accent ~ ";display:block;'></ha-icon></div>" -%}
                               {%- set chip = "<span style='flex:0 0 auto;font-size:9px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:" ~ accent ~ ";color:#fff;'>" ~ chip_label ~ "</span>" -%}
                               {%- set cost_pill = "<div style='flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:14px;font-weight:800;color:var(--primary-text-color);'><ha-icon icon='" ~ points_icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:var(--warning-color, #ffc107);display:block;'></ha-icon>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div>" -%}
-                              {%- set pill_row = ("<div style='margin-top:3px;text-align:left;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
+                              {%- set pill_row = ("<div style='margin-top:3px;text-align:left;white-space:normal;'>" ~ pills.v ~ "</div>") if pills.v | length > 0 else '' -%}
                               {%- set foot_row = ("<div style='margin-top:2px;font-size:10px;font-weight:600;color:var(--secondary-text-color);text-align:left;'>" ~ (foot | join(' &nbsp;•&nbsp; ')) ~ "</div>") if foot | length > 0 else '' -%}
                               {%- set desc_row = ("<div style='margin-top:2px;display:flex;align-items:center;font-size:11px;line-height:1.3;color:var(--secondary-text-color);'><span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ bdesc ~ "</span>" ~ mult_pill ~ "</div>") if (bdesc | length > 0 or mult_pill | length > 0) else '' -%}
                               {%- set row_html = "<div style='position:relative;overflow:hidden;box-sizing:border-box;width:100%;border-radius:16px;border:" ~ (('1px solid ' ~ accent) if is_current else '1px solid var(--divider-color)') ~ ";background:linear-gradient(90deg, color-mix(in srgb, " ~ fill_col ~ " 34%, var(--card-background-color)) 0%, color-mix(in srgb, " ~ fill_col ~ " 13%, var(--card-background-color)) " ~ fill_pct ~ "%, var(--card-background-color) " ~ fill_pct ~ "%);padding:" ~ ('9px 12px' if is_current else '6px 10px') ~ ";text-align:left;'>"
                                   ~ "<div style='display:flex;align-items:center;gap:10px;'>" ~ tile
                                   ~ "<div style='flex:1;min-width:0;'><div style='display:flex;align-items:center;gap:6px;'><span style='font-size:" ~ ('18px' if is_current else '15px') ~ ";line-height:1.2;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>" ~ chip ~ "</div>"
-                                  ~ (("<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);'>" ~ sub_html ~ "</div>") if sub_html | length > 0 else '')
+                                  ~ (("<div style='font-size:12px;line-height:1.3;color:var(--secondary-text-color);white-space:normal;'>" ~ sub_html ~ "</div>") if sub_html | length > 0 else '')
                                   ~ desc_row ~ pill_row ~ foot_row
                                   ~ "</div>" ~ cost_pill ~ "</div></div>" -%}
                             {%- else -%}
                               {%- set slim_col = 'var(--success-color)' if badge.role == 'earned' else 'var(--secondary-text-color)' -%}
                               {%- set slim_right = ('✓ ' ~ ui.get('earned', 'Earned') ~ ((' ' ~ last_earned) if last_earned | length > 0 else '')) if badge.role == 'earned' else ('🔒 ' ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ ' ' ~ ns.points_label) -%}
                               {%- set row_html = "<div style='display:flex;align-items:center;gap:10px;box-sizing:border-box;width:100%;padding:5px 10px;border-radius:12px;background:var(--card-background-color);border:1px solid var(--divider-color);opacity:" ~ ('1' if badge.role == 'earned' else '0.8') ~ ";text-align:left;'>"
-                                  ~ "<ha-icon icon='" ~ badge.icon ~ "' style='flex:0 0 auto;width:20px;height:20px;--mdc-icon-size:20px;color:" ~ slim_col ~ ";display:block;'></ha-icon>"
+                                  ~ "<ha-icon icon='" ~ badge.icon ~ "' style='flex:0 0 auto;margin:0;width:20px;height:20px;--mdc-icon-size:20px;color:" ~ slim_col ~ ";display:block;'></ha-icon>"
                                   ~ "<span style='min-width:0;font-size:14px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ bname ~ "</span>"
                                   ~ "<span style='margin-left:auto;flex:0 0 auto;font-size:12px;color:var(--secondary-text-color);'>" ~ slim_right ~ "</span></div>" -%}
                             {%- endif -%}
@@ -2449,7 +2450,7 @@ views:
                             {%- endif -%}
                           {%- endfor -%}
 
-                          {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);margin:2px 0 4px 2px;text-align:left;" -%}
+                          {%- set head_style = "font-size:11px;font-weight:800;letter-spacing:0.7px;text-transform:uppercase;color:var(--secondary-text-color);margin:2px 0 4px 10px;text-align:left;" -%}
                           {%- set emit = namespace(items=[]) -%}
                           {%- for it in rows.cur -%}
                             {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html, 'head': ''}] -%}
