@@ -50,6 +50,7 @@ from typing import Any, Literal, cast
 import uuid
 
 from . import const
+from .reward_pools import const as rp_const, settings as pool_settings
 from .reward_pools.validation import validate_pool_settings
 from .type_defs import AssigneeData, BadgeData, ChoreData, RewardData, UserData
 from .utils.dt_utils import dt_now_utc, dt_parse, dt_to_utc_iso
@@ -441,6 +442,8 @@ def build_reward(
             allow_negative=False,
             allow_zero=True,
         )
+        # Fork: share limit, parent match, after-delivery (reward_pools/settings.py)
+        reward.update(cast("RewardData", pool_settings.build_settings(get_field)))
     return reward
 
 
@@ -468,6 +471,7 @@ _REWARD_DATA_RESET_PRESERVE_FIELDS: frozenset[str] = frozenset(
         const.DATA_REWARD_POOLED,
         const.DATA_REWARD_POOL_CONTRIBUTIONS,
         const.DATA_REWARD_POOL_CHIP_IN,
+        *rp_const.POOL_SETTING_KEYS,
     }
 )
 

@@ -133,6 +133,7 @@ from homeassistant.helpers import config_validation as cv, selector
 import voluptuous as vol
 
 from .. import const
+from ..reward_pools import const as rp_const, form as pool_settings
 from ..utils.dt_utils import dt_parse, dt_parse_duration
 from ..utils.math_utils import parse_points_value
 from . import entity_helpers as eh, translation_helpers as th
@@ -2902,6 +2903,9 @@ def build_reward_schema(default=None, assignees_dict=None):
         ),
     }
 
+    # Family pool settings (fork: reward_pools/settings.py)
+    fields.update(pool_settings.schema_fields(assignees_dict or {}))
+
     # Add assigned users multi-select when assignees are available
     if assignees_dict:
         assignee_choices = [
@@ -2970,6 +2974,7 @@ def validate_rewards_inputs(
     for pool_key in (
         const.CFOF_REWARDS_INPUT_POOLED,
         const.CFOF_REWARDS_INPUT_POOL_CHIP_IN,
+        *rp_const.POOL_SETTING_KEYS,
     ):
         if pool_key in user_input:
             data_dict[pool_key] = user_input[pool_key]

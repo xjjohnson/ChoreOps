@@ -23,6 +23,25 @@ Family pools are different: people *spend* their points into them.
 The `create_reward` and `update_reward` services also take `pooled: true` and
 `pool_chip_in`, with the same rules.
 
+### Pool settings
+
+These are on the reward form under the chip-in amount (form only, not the
+services):
+
+- **Most one person can pay**: a percent of the cost (0 = no limit). Once
+  someone has paid in that much, their chip-ins are refused, so everyone has to
+  help.
+- **Parent match** and **Match paid by**: for every point someone pays in, the
+  chosen parent adds this many points (1 = one for one, 0.5 = half). The match
+  comes out of the parent's own balance, so only people who can approve *and*
+  have a points balance are listed. It stops when the parent runs out of points
+  or the pool is full, and a parent chipping in themselves is not matched. The
+  match is recorded as the parent's contribution: refunding the pool gives it
+  back to them. Refunding one person leaves the match in the pool.
+- **After delivery**: *Start again* (the default) empties the pool so the family
+  can save up again. *Close the pool* stops chip-ins once the reward is
+  delivered, until you edit and save the reward.
+
 ## On the dashboard
 
 A pooled reward uses the same reward buttons every dashboard already shows:
@@ -58,7 +77,8 @@ would be charged the full cost.
 Every approver gets a "Family Pool Full" notification. After delivering the
 reward, an approver calls `choreops.approve_reward_pool` with the
 `reward_name`. Each contributor gets the normal "reward approved" notification,
-and the pool starts again from zero.
+and the pool starts again from zero (or closes, if **After delivery** is set to
+close). A parent who only paid a match is not recorded as receiving the reward.
 
 If the cost was lowered after the pool filled, the extra is refunded on
 approval in proportion to what each person paid in.
@@ -83,7 +103,7 @@ Each person's reward status sensor for a pooled reward is:
 | --- | --- |
 | `requested` | The pool is full and waiting for an approver |
 | `available` | The person has points to put in |
-| `locked` | The person has no points |
+| `locked` | The person has no points, or the pool closed after delivery |
 
 It also has these attributes:
 
@@ -97,3 +117,8 @@ It also has these attributes:
 | `pool_chip_in` | Points paid in per dashboard button press (0 = all affordable) |
 | `pool_my_contribution` | This person's share of the current pool |
 | `pool_contributions` | Everyone's share, keyed by display name |
+| `pool_closed` | The pool closed after delivery |
+| `pool_max_share` | The most one person can pay in, in points (0 = no limit) |
+| `pool_my_share_left` | What this person may still pay in (empty = no limit) |
+| `pool_match_ratio` | Parent match points per point paid in (0 = off) |
+| `pool_match_name` | The parent paying the match |

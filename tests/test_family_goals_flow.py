@@ -177,6 +177,49 @@ async def test_edit_family_goal_keeps_its_progress(
     assert updated[fg.DATA_PROGRESS][assignee_id][fg.DATA_AWARDED] is True
 
 
+async def test_goal_settings_save_and_a_cleared_finish_date_is_removed(
+    hass: HomeAssistant, scenario_minimal: SetupResult
+) -> None:
+    """Repeat, finish date and notify save; leaving the date empty removes it."""
+    coordinator = scenario_minimal.coordinator
+    assignee_id = next(iter(coordinator.assignees_data))
+    entry_id = scenario_minimal.config_entry.entry_id
+
+    await FlowTestHelper.add_entity_via_options_flow(
+        hass,
+        entry_id,
+        const.OPTIONS_FLOW_CHALLENGES,
+        const.OPTIONS_FLOW_STEP_ADD_CHALLENGE,
+        _goal_form(
+            assignee_id,
+            **{
+                fg.DATA_REPEAT: fg.REPEAT_MONTHLY,
+                fg.DATA_END_DATE: "2026-12-24",
+                fg.DATA_NOTIFY: fg.NOTIFY_APPROVERS,
+            },
+        ),
+    )
+    goal_id, goal = _find(coordinator, "Movie night fund")
+    assert goal[fg.DATA_REPEAT] == fg.REPEAT_MONTHLY
+    assert goal[fg.DATA_END_DATE] == "2026-12-24"
+    assert goal[fg.DATA_NOTIFY] == fg.NOTIFY_APPROVERS
+
+    # The date picker leaves a cleared date out of the input
+    result = await FlowTestHelper.edit_entity_via_options_flow(
+        hass,
+        entry_id,
+        const.OPTIONS_FLOW_CHALLENGES,
+        "Movie night fund",
+        _goal_form(assignee_id, **{fg.DATA_REPEAT: fg.REPEAT_MONTHLY}),
+    )
+    assert result.get("step_id") == const.OPTIONS_FLOW_STEP_INIT
+    # Saving from the form reloads the integration: read the live coordinator
+    live = scenario_minimal.config_entry.runtime_data
+    updated = live.challenges_data[goal_id]
+    assert updated[fg.DATA_END_DATE] == ""
+    assert updated[fg.DATA_REPEAT] == fg.REPEAT_MONTHLY
+
+
 async def test_delete_family_goal(
     hass: HomeAssistant, scenario_minimal: SetupResult
 ) -> None:

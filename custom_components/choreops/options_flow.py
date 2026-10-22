@@ -24,6 +24,7 @@ from .data_builders import EntityValidationError
 from .family_goals.flow import FamilyGoalsOptionsMixin
 from .helpers import backup_helpers as bh, entity_helpers as eh, flow_helpers as fh
 from .helpers.storage_helpers import get_entry_storage_key_from_entry
+from .reward_pools import settings as pool_settings
 from .utils.dt_utils import dt_now_utc, dt_parse, validate_daily_multi_times
 from .utils.math_utils import parse_points_adjust_values
 
@@ -3243,6 +3244,8 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
             const.CFOF_REWARDS_INPUT_POOL_CHIP_IN: existing_reward.get(
                 const.DATA_REWARD_POOL_CHIP_IN, const.DEFAULT_ZERO
             ),
+            # Fork: share limit, parent match, after delivery
+            **pool_settings.suggested_values(existing_reward),
         }
 
         # On validation error, merge user's attempted input with existing data

@@ -254,6 +254,7 @@ class FamilyGoalManager(BaseManager):
         """Create a goal and return its internal ID."""
         goal = dict(builders.build_goal(user_input))
         goal[fg.DATA_POINTS_BASIS] = fg.POINTS_BASIS_NO_AWARDS
+        goal[fg.DATA_STARTED] = dt_today_iso()
         if internal_id:
             goal[fg.DATA_ID] = internal_id
         goal_id = str(goal[fg.DATA_ID])
@@ -283,6 +284,10 @@ class FamilyGoalManager(BaseManager):
             raise self._not_found(goal_id)
         goal = dict(builders.build_goal(updates, existing=existing))
         goal[fg.DATA_ID] = goal_id
+        if goal.get(fg.DATA_REPEAT) != existing.get(fg.DATA_REPEAT, fg.REPEAT_NEVER):
+            # A new repeat setting starts counting periods from now, rather
+            # than restarting the goal at once
+            goal.pop(fg.DATA_PERIOD_START, None)
         # build_goal copies progress by value; keep the live object.
         goal[fg.DATA_PROGRESS] = existing.get(fg.DATA_PROGRESS, {})
         self.coordinator._data[base.DATA_CHALLENGES][goal_id] = goal
@@ -361,12 +366,13 @@ class FamilyGoalManager(BaseManager):
         if goal_type == fg.GOAL_TYPE_DAY:
             return float(self._approved_today(assignee_id))
 
-        # Chores goal: optionally scoped to one chore, otherwise all chores.
-        selected = str(goal.get(fg.DATA_SELECTED_CHORE_ID, ""))
-        if selected and selected not in _NO_CHORE:
+        # Chores goal: optionally scoped to one chore and/or chores with chosen
+        # labels, otherwise all chores.
+        counted = self._counted_chore_ids(goal)
+        if counted is not None:
             scoped = (
                 self.coordinator.statistics_manager.get_badge_scoped_all_time_stats(
-                    assignee_id, [selected]
+                    assignee_id, counted
                 )
             )
             return float(scoped.get(base.DATA_USER_CHORE_DATA_PERIOD_APPROVED, 0))
@@ -380,6 +386,28 @@ class FamilyGoalManager(BaseManager):
             "dict[str, Any]", all_time_container.get(base.PERIOD_ALL_TIME, {})
         )
         return float(bucket.get(base.DATA_USER_CHORE_DATA_PERIOD_APPROVED, 0))
+
+    def _counted_chore_ids(self, goal: dict[str, Any]) -> list[str] | None:
+        """Return the chores a chores goal counts, or None for every chore.
+
+        The selected chore plus every chore carrying one of the goal's chore
+        labels. Only Total Chores Completed goals are scoped.
+        """
+        if goal.get(fg.DATA_TYPE) != fg.GOAL_TYPE_CHORES:
+            return None
+        selected = str(goal.get(fg.DATA_SELECTED_CHORE_ID, ""))
+        labels = set(goal.get(fg.DATA_CHORE_LABELS) or [])
+        if (not selected or selected in _NO_CHORE) and not labels:
+            return None
+        counted = [selected] if selected and selected not in _NO_CHORE else []
+        if labels:
+            counted.extend(
+                str(chore_id)
+                for chore_id, chore in self.coordinator.chores_data.items()
+                if str(chore_id) != selected
+                and labels.intersection(chore.get(base.DATA_CHORE_LABELS) or [])
+            )
+        return counted
 
     @staticmethod
     def _award_points(assignee_data: Any) -> float:
@@ -499,6 +527,13 @@ class FamilyGoalManager(BaseManager):
         if not goal or goal.get(fg.DATA_TYPE) in fg.STREAK_GOAL_TYPES:
             # Streak goals are a shared day count, not a sum of shares.
             return {}
+        frozen = goal.get(fg.DATA_FROZEN)
+        if isinstance(frozen, dict) and self.is_finished(goal):
+            # Past the finish date: shares stay where they were on the day
+            return {
+                assignee_id: float(frozen.get(assignee_id, 0.0))
+                for assignee_id in self._assigned_ids(goal)
+            }
         return {
             assignee_id: self._contribution(assignee_id, goal)
             for assignee_id in self._assigned_ids(goal)
@@ -862,10 +897,19 @@ class FamilyGoalManager(BaseManager):
         goal = self.goals.get(goal_id)
         if not goal:
             raise self._not_found(goal_id)
+        self._restart(goal)
+        base.LOGGER.info("Family goal %s restarted", goal_id)
+        self.coordinator._persist_and_update()
 
+    def _restart(self, goal: dict[str, Any]) -> None:
+        """Start a goal over from zero (the reset, without saving).
+
+        A finish date already passed stops applying, so the goal counts again.
+        """
+        today = dt_today_iso()
         if goal.get(fg.DATA_TYPE) in fg.STREAK_GOAL_TYPES:
             goal[fg.DATA_STREAK_COUNT] = 0
-            goal[fg.DATA_STREAK_LAST_DAY] = dt_today_iso()
+            goal[fg.DATA_STREAK_LAST_DAY] = today
         else:
             goal[fg.DATA_BASELINE] = {
                 assignee_id: self._raw_contribution(assignee_id, goal)
@@ -880,8 +924,161 @@ class FamilyGoalManager(BaseManager):
                 entry_dict[fg.DATA_AWARDED] = False
                 entry_dict[fg.PROGRESS_CURRENT_VALUE] = base.DEFAULT_ZERO
 
-        base.LOGGER.info("Family goal %s restarted", goal_id)
-        self.coordinator._persist_and_update()
+        goal[fg.DATA_STARTED] = today
+        period_start = self._period_start(goal, date.fromisoformat(today))
+        if period_start is not None:
+            goal[fg.DATA_PERIOD_START] = period_start.isoformat()
+        goal.pop(fg.DATA_FROZEN, None)
+        end = self._end_date(goal)
+        if end is not None and end.isoformat() < today:
+            goal[fg.DATA_END_CLEARED] = end.isoformat()
+
+    # ------------------------------------------------------------------
+    # Repeat, finish date and pace
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _period_start(goal: dict[str, Any], today: date) -> date | None:
+        """Return the first day of the goal's current repeat period, or None."""
+        if goal.get(fg.DATA_TYPE) not in fg.REPEAT_GOAL_TYPES:
+            return None
+        repeat = goal.get(fg.DATA_REPEAT)
+        if repeat == fg.REPEAT_WEEKLY:
+            return today - timedelta(days=today.weekday())
+        if repeat == fg.REPEAT_MONTHLY:
+            return today.replace(day=1)
+        return None
+
+    @staticmethod
+    def _period_end(goal: dict[str, Any], start: date) -> date:
+        """Return the last day of the repeat period that begins on `start`."""
+        if goal.get(fg.DATA_REPEAT) == fg.REPEAT_WEEKLY:
+            return start + timedelta(days=6)
+        next_month = (start.replace(day=28) + timedelta(days=4)).replace(day=1)
+        return next_month - timedelta(days=1)
+
+    @staticmethod
+    def _end_date(goal: dict[str, Any]) -> date | None:
+        """Return the goal's finish date, or None."""
+        try:
+            return builders.parse_end_date(goal.get(fg.DATA_END_DATE))
+        except ValueError:
+            return None
+
+    def is_finished(self, goal: dict[str, Any]) -> bool:
+        """Return True once the finish date has passed (until a reset or repeat)."""
+        end = self._end_date(goal)
+        return (
+            end is not None
+            and end.isoformat() < dt_today_iso()
+            and goal.get(fg.DATA_END_CLEARED) != end.isoformat()
+        )
+
+    def _update_run(self, goal_id: str, goal: dict[str, Any]) -> bool:
+        """Start a new repeat period, or freeze the goal after its finish date.
+
+        Returns:
+            True when stored state changed.
+        """
+        today = date.fromisoformat(dt_today_iso())
+        changed = False
+        period_start = self._period_start(goal, today)
+        if period_start is not None:
+            stored = goal.get(fg.DATA_PERIOD_START)
+            if not stored:
+                # First period: count from now, restart when the next begins
+                goal[fg.DATA_PERIOD_START] = period_start.isoformat()
+                changed = True
+            elif stored != period_start.isoformat():
+                self._restart(goal)
+                base.LOGGER.info("Family goal %s repeated for a new period", goal_id)
+                changed = True
+        if not goal.get(fg.DATA_STARTED):
+            goal[fg.DATA_STARTED] = today.isoformat()
+            changed = True
+
+        finished = self.is_finished(goal)
+        if finished and not isinstance(goal.get(fg.DATA_FROZEN), dict):
+            goal[fg.DATA_FROZEN] = {
+                assignee_id: self._contribution(assignee_id, goal)
+                for assignee_id in self._assigned_ids(goal)
+            }
+            base.LOGGER.info("Family goal %s finished; progress frozen", goal_id)
+            changed = True
+        elif not finished and fg.DATA_FROZEN in goal:
+            # The finish date was moved later: count again
+            goal.pop(fg.DATA_FROZEN)
+            changed = True
+        return changed
+
+    def get_schedule(self, goal_id: str) -> dict[str, Any]:
+        """Return the goal's deadline, days left and pace (read-only, for sensors).
+
+        The deadline is the finish date or the end of the repeat period,
+        whichever comes first. Pace compares the total with an even pace from
+        the run's start to the deadline toward the final level: ahead (10 %
+        over), on track, or behind (10 % under). The streak and one-day goals
+        get no pace.
+        """
+        goal = self.goals.get(goal_id)
+        empty: dict[str, Any] = {
+            fg.ATTR_REPEAT: fg.REPEAT_NEVER,
+            fg.ATTR_END_DATE: "",
+            fg.ATTR_DAYS_LEFT: None,
+            fg.ATTR_PACE: "",
+            fg.ATTR_FINISHED: False,
+        }
+        if not goal:
+            return empty
+        today = date.fromisoformat(dt_today_iso())
+        period_start = self._period_start(goal, today)
+        deadlines: list[date] = []
+        end = self._end_date(goal)
+        if end is not None and goal.get(fg.DATA_END_CLEARED) != end.isoformat():
+            deadlines.append(end)
+        if period_start is not None:
+            deadlines.append(self._period_end(goal, period_start))
+        finished = self.is_finished(goal)
+        result = {
+            **empty,
+            fg.ATTR_REPEAT: fg.REPEAT_NEVER
+            if period_start is None
+            else str(goal.get(fg.DATA_REPEAT)),
+            fg.ATTR_FINISHED: finished,
+        }
+        if not deadlines:
+            return result
+        deadline = min(deadlines)
+        result[fg.ATTR_END_DATE] = deadline.isoformat()
+        result[fg.ATTR_DAYS_LEFT] = max(0, (deadline - today).days + 1)
+
+        levels = self._levels(goal)
+        try:
+            started = date.fromisoformat(str(goal.get(fg.DATA_STARTED, ""))[:10])
+        except ValueError:
+            return result
+        if period_start is not None:
+            started = max(started, period_start)
+        if (
+            finished
+            or not levels
+            or goal.get(fg.DATA_TYPE) in (*fg.STREAK_GOAL_TYPES, fg.GOAL_TYPE_DAY)
+            or not started <= today <= deadline
+        ):
+            return result
+        target = levels[-1][0]
+        total = self.get_total(goal_id)
+        span = (deadline - started).days + 1
+        # Half of today counts as gone: on day one nobody is already behind
+        expected = target * ((today - started).days + 0.5) / span
+        ratio = total / expected if expected > 0 else 1.0
+        if total >= target or ratio >= 1.1:
+            result[fg.ATTR_PACE] = fg.PACE_AHEAD
+        elif ratio >= 0.9:
+            result[fg.ATTR_PACE] = fg.PACE_ON_TRACK
+        else:
+            result[fg.ATTR_PACE] = fg.PACE_BEHIND
+        return result
 
     # ------------------------------------------------------------------
     # Evaluation and awarding
@@ -906,6 +1103,11 @@ class FamilyGoalManager(BaseManager):
         goal = live_goal
         levels = self._levels(goal)
         if not levels:
+            return
+
+        if self._update_run(goal_id, goal):
+            self.coordinator._persist_and_update()
+        if self.is_finished(goal):
             return
 
         goal_type = goal.get(fg.DATA_TYPE)
@@ -1037,7 +1239,9 @@ class FamilyGoalManager(BaseManager):
         self.coordinator._persist_and_update()
 
         # EconomyManager deposits the points and NotificationManager notifies
-        # the person and their approvers; both already listen for this signal.
+        # the person and/or their approvers (as the goal's setting says); both
+        # already listen for this signal.
+        notify = goal.get(fg.DATA_NOTIFY, fg.NOTIFY_EVERYONE)
         self.emit(
             base.SIGNAL_SUFFIX_CHALLENGE_COMPLETED,
             user_id=assignee_id,
@@ -1045,6 +1249,8 @@ class FamilyGoalManager(BaseManager):
             user_name=eh.get_assignee_name_by_id(self.coordinator, assignee_id) or "",
             challenge_name=name,
             challenge_points=reward,
+            notify_assignee=notify in (fg.NOTIFY_EVERYONE, fg.NOTIFY_ASSIGNEES),
+            notify_approvers=notify in (fg.NOTIFY_EVERYONE, fg.NOTIFY_APPROVERS),
         )
 
     # ------------------------------------------------------------------

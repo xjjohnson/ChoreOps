@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -949,3 +950,246 @@ async def test_old_points_goal_snapshots_are_converted(
     assert gm.get_total(goal_id) == pytest.approx(130.0)
     # Runs once
     assert gm.migrate_points_basis() == 0
+
+
+# ---------------------------------------------------------------------------
+# Goal settings: repeat, chore labels, finish date and pace, notifications
+# ---------------------------------------------------------------------------
+
+_TODAY = "custom_components.choreops.family_goals.manager.dt_today_iso"
+
+
+async def test_weekly_goal_starts_over_each_monday(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A repeating goal restarts at the new period like a reset; points are kept."""
+    from unittest.mock import patch
+
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=100.0,
+        reward=10.0,
+        assigned=[zoe],
+    )
+    gm.update_goal(goal_id, {fg.DATA_REPEAT: fg.REPEAT_WEEKLY})
+    goal = coordinator.challenges_data[goal_id]
+
+    with patch(_TODAY, return_value="2026-10-21"):  # Wednesday
+        await _earn_points(scenario_full, zoe, 100.0)
+        await gm.evaluate_assignee(zoe)
+        await hass.async_block_till_done()
+        assert goal[fg.DATA_PERIOD_START] == "2026-10-19"
+        assert _awarded(scenario_full, goal_id, zoe)
+        schedule = gm.get_schedule(goal_id)
+        assert schedule[fg.ATTR_END_DATE] == "2026-10-25"
+        assert schedule[fg.ATTR_DAYS_LEFT] == 5
+    balance = coordinator.assignees_data[zoe][const.DATA_USER_POINTS]
+
+    with patch(_TODAY, return_value="2026-10-25"):  # Sunday, same week
+        await gm.evaluate_assignee(zoe)
+        assert gm.get_total(goal_id) == pytest.approx(100.0)
+
+    with patch(_TODAY, return_value="2026-10-26"):  # Monday: a new week
+        await gm.evaluate_assignee(zoe)
+        await hass.async_block_till_done()
+        assert goal[fg.DATA_PERIOD_START] == "2026-10-26"
+        assert gm.get_total(goal_id) == 0
+        assert not _awarded(scenario_full, goal_id, zoe)
+        assert coordinator.assignees_data[zoe][const.DATA_USER_POINTS] == balance
+
+    # Streak goals ignore the setting
+    streak = {fg.DATA_TYPE: fg.GOAL_TYPE_ACTIVE, fg.DATA_REPEAT: fg.REPEAT_WEEKLY}
+    assert gm._period_start(streak, date(2026, 10, 21)) is None
+    monthly = {fg.DATA_TYPE: fg.GOAL_TYPE_CHORES, fg.DATA_REPEAT: fg.REPEAT_MONTHLY}
+    start = gm._period_start(monthly, date(2026, 2, 14))
+    assert start == date(2026, 2, 1)
+    assert gm._period_end(monthly, start) == date(2026, 2, 28)
+
+
+async def test_chores_goal_counts_chores_with_chosen_labels(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Total Chores Completed counts the chosen chore plus every labelled chore."""
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    chore_ids = list(coordinator.chores_data)
+    labelled, other, selected = chore_ids[0], chore_ids[1], chore_ids[2]
+    coordinator.chores_data[labelled][const.DATA_CHORE_LABELS] = ["kitchen"]
+    coordinator.chores_data[other][const.DATA_CHORE_LABELS] = ["garden"]
+
+    goal = {
+        fg.DATA_TYPE: fg.GOAL_TYPE_CHORES,
+        fg.DATA_SELECTED_CHORE_ID: selected,
+        fg.DATA_CHORE_LABELS: ["kitchen"],
+    }
+    counted = gm._counted_chore_ids(goal)
+    assert counted is not None
+    assert selected in counted
+    assert labelled in counted
+    assert other not in counted
+    assert gm._counted_chore_ids({fg.DATA_TYPE: fg.GOAL_TYPE_CHORES}) is None
+    assert gm._counted_chore_ids({**goal, fg.DATA_TYPE: fg.GOAL_TYPE_POINTS}) is None
+    goal[fg.DATA_CHORE_LABELS] = ["nothing-has-this"]
+    goal[fg.DATA_SELECTED_CHORE_ID] = const.SENTINEL_EMPTY
+    assert gm._counted_chore_ids(goal) == []
+
+
+async def test_finish_date_freezes_progress_until_reset(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """After the finish date shares stop moving and nothing pays; a reset reopens."""
+    from unittest.mock import patch
+
+    gm = scenario_full.coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=50.0,
+        reward=10.0,
+        assigned=[zoe],
+    )
+    gm.update_goal(goal_id, {fg.DATA_END_DATE: "2026-10-20"})
+
+    with patch(_TODAY, return_value="2026-10-20"):
+        await _earn_points(scenario_full, zoe, 30.0)
+        await gm.evaluate_assignee(zoe)
+        assert gm.get_schedule(goal_id)[fg.ATTR_DAYS_LEFT] == 1
+        assert not gm.get_schedule(goal_id)[fg.ATTR_FINISHED]
+
+    with patch(_TODAY, return_value="2026-10-21"):
+        await gm.evaluate_assignee(zoe)
+        await _earn_points(scenario_full, zoe, 40.0)
+        await gm.evaluate_assignee(zoe)
+        await hass.async_block_till_done()
+        assert gm.get_total(goal_id) == pytest.approx(30.0)
+        assert not _awarded(scenario_full, goal_id, zoe)
+        schedule = gm.get_schedule(goal_id)
+        assert schedule[fg.ATTR_FINISHED]
+        assert schedule[fg.ATTR_DAYS_LEFT] == 0
+
+        gm.reset_goal(goal_id)
+        assert not gm.get_schedule(goal_id)[fg.ATTR_FINISHED]
+        assert gm.get_schedule(goal_id)[fg.ATTR_END_DATE] == ""
+        await _earn_points(scenario_full, zoe, 50.0)
+        await gm.evaluate_assignee(zoe)
+        await hass.async_block_till_done()
+        assert _awarded(scenario_full, goal_id, zoe)
+
+
+async def test_pace_compares_total_with_an_even_pace(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Behind, on track or ahead against an even pace to the finish date."""
+    from unittest.mock import patch
+
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=100.0,
+        reward=10.0,
+        assigned=[zoe],
+    )
+    gm.update_goal(goal_id, {fg.DATA_END_DATE: "2026-10-10"})
+    coordinator.challenges_data[goal_id][fg.DATA_STARTED] = "2026-10-01"
+
+    with patch(_TODAY, return_value="2026-10-05"):
+        # Day 5 of 10: an even pace has 45 by midday
+        for total, pace in ((30.0, fg.PACE_BEHIND), (45.0, fg.PACE_ON_TRACK)):
+            with patch.object(gm, "get_total", return_value=total):
+                schedule = gm.get_schedule(goal_id)
+            assert schedule[fg.ATTR_PACE] == pace
+        with patch.object(gm, "get_total", return_value=60.0):
+            assert gm.get_schedule(goal_id)[fg.ATTR_PACE] == fg.PACE_AHEAD
+        assert gm.get_schedule(goal_id)[fg.ATTR_DAYS_LEFT] == 6
+
+    # No deadline, no pace
+    gm.update_goal(goal_id, {fg.DATA_END_DATE: ""})
+    assert gm.get_schedule(goal_id)[fg.ATTR_PACE] == ""
+    assert gm.get_schedule(goal_id)[fg.ATTR_DAYS_LEFT] is None
+
+
+@pytest.mark.parametrize(
+    ("notify", "to_person", "to_parents"),
+    [
+        (fg.NOTIFY_EVERYONE, True, True),
+        (fg.NOTIFY_ASSIGNEES, True, False),
+        (fg.NOTIFY_APPROVERS, False, True),
+        (fg.NOTIFY_OFF, False, False),
+    ],
+)
+async def test_level_up_notifications_follow_the_setting(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+    notify: str,
+    to_person: bool,
+    to_parents: bool,
+) -> None:
+    """The goal's setting picks who is told; the points are paid either way."""
+    from unittest.mock import AsyncMock, patch
+
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=10.0,
+        reward=5.0,
+        assigned=[zoe],
+    )
+    gm.update_goal(goal_id, {fg.DATA_NOTIFY: notify})
+    await _earn_points(scenario_full, zoe, 10.0)
+    before = coordinator.assignees_data[zoe][const.DATA_USER_POINTS]
+
+    nm = coordinator.notification_manager
+    person, parents = AsyncMock(), AsyncMock()
+    with (
+        patch.object(nm, "notify_assignee_translated", person),
+        patch.object(nm, "notify_approvers_translated", parents),
+    ):
+        await gm.evaluate_assignee(zoe)
+        await hass.async_block_till_done()
+
+    assert coordinator.assignees_data[zoe][const.DATA_USER_POINTS] == before + 5.0
+    assert person.await_count == (1 if to_person else 0)
+    assert parents.await_count == (1 if to_parents else 0)
+
+
+def test_goal_settings_are_built_and_validated() -> None:
+    """New settings get safe defaults; a bad finish date is reported."""
+    goal = builders.build_goal(
+        {
+            fg.DATA_NAME: "Goal",
+            fg.DATA_REPEAT: "fortnightly",
+            fg.DATA_END_DATE: "2026-12-24",
+        }
+    )
+    assert goal[fg.DATA_REPEAT] == fg.REPEAT_NEVER
+    assert goal[fg.DATA_NOTIFY] == fg.NOTIFY_EVERYONE
+    assert goal[fg.DATA_END_DATE] == "2026-12-24"
+    assert goal[fg.DATA_CHORE_LABELS] == []
+    # A cleared date on edit removes it
+    edited = builders.build_goal({fg.DATA_END_DATE: ""}, existing=goal)
+    assert edited[fg.DATA_END_DATE] == ""
+
+    data = {
+        fg.DATA_NAME: "Goal",
+        fg.DATA_ASSIGNED_USER_IDS: ["a"],
+        fg.DATA_TYPE: fg.GOAL_TYPE_POINTS,
+        fg.DATA_END_DATE: "next week",
+    }
+    assert builders.validate_goal(data) == {
+        fg.DATA_END_DATE: builders.ERR_INVALID_END_DATE
+    }

@@ -7,6 +7,27 @@ the reward record and its forms are shared with upstream code.
 
 from typing import Final
 
+# Pool settings stored on the reward record (form fields use the same names)
+# Most one person may pay in, as a percent of the cost (0 = no limit)
+DATA_REWARD_POOL_MAX_SHARE: Final = "pool_max_share"
+# A parent adds this many points for each point someone else pays in (0 = off)
+DATA_REWARD_POOL_MATCH_RATIO: Final = "pool_match_ratio"
+# The parent (a user with a points balance) the match is paid from
+DATA_REWARD_POOL_MATCH_USER_ID: Final = "pool_match_user_id"
+# What happens once the reward is delivered: save up again, or close the pool
+DATA_REWARD_POOL_AFTER_DELIVERY: Final = "pool_after_delivery"
+AFTER_DELIVERY_RESTART: Final = "restart"
+AFTER_DELIVERY_CLOSE: Final = "close"
+# Runtime: a closed pool takes no chip-ins until the reward is edited and saved
+DATA_REWARD_POOL_CLOSED: Final = "pool_closed"
+
+POOL_SETTING_KEYS: Final = (
+    DATA_REWARD_POOL_MAX_SHARE,
+    DATA_REWARD_POOL_MATCH_RATIO,
+    DATA_REWARD_POOL_MATCH_USER_ID,
+    DATA_REWARD_POOL_AFTER_DELIVERY,
+)
+
 # Events emitted by the pool manager
 SIGNAL_SUFFIX_REWARD_POOL_CONTRIBUTED: Final = "reward_pool_contributed"
 SIGNAL_SUFFIX_REWARD_POOL_FILLED: Final = "reward_pool_filled"
@@ -28,10 +49,16 @@ TRANS_KEY_ERROR_REWARD_POOL_NOT_FULL: Final = (
     "reward_pool_not_full"  # {reward} has {total} of {target}
 )
 TRANS_KEY_ERROR_REWARD_POOL_INVALID_AMOUNT: Final = "reward_pool_invalid_amount"
+TRANS_KEY_ERROR_REWARD_POOL_CLOSED: Final = "reward_pool_closed"  # {reward}
+TRANS_KEY_ERROR_REWARD_POOL_SHARE_REACHED: Final = (
+    "reward_pool_share_reached"  # {name} {reward} {limit}
+)
 
 # Reward form / service validation keys (options error and exceptions)
 TRANS_KEY_CFOF_REWARD_POOL_COST_ZERO: Final = "reward_pool_cost_zero"
 TRANS_KEY_CFOF_REWARD_POOL_CHIP_IN_TOO_HIGH: Final = "reward_pool_chip_in_too_high"
+TRANS_KEY_CFOF_REWARD_POOL_MAX_SHARE_INVALID: Final = "reward_pool_max_share_invalid"
+TRANS_KEY_CFOF_REWARD_POOL_MATCH_NO_PARENT: Final = "reward_pool_match_no_parent"
 
 # Services
 SERVICE_CONTRIBUTE_TO_REWARD_POOL: Final = "contribute_to_reward_pool"
@@ -50,3 +77,8 @@ ATTR_REWARD_POOL_CONTRIBUTIONS: Final = "pool_contributions"
 ATTR_REWARD_POOL_MY_CONTRIBUTION: Final = "pool_my_contribution"
 ATTR_REWARD_POOL_FULL: Final = "pool_full"
 ATTR_REWARD_POOL_CHIP_IN: Final = "pool_chip_in"
+ATTR_REWARD_POOL_CLOSED: Final = "pool_closed"
+ATTR_REWARD_POOL_MAX_SHARE: Final = "pool_max_share"  # Points, 0 = no limit
+ATTR_REWARD_POOL_MY_SHARE_LEFT: Final = "pool_my_share_left"  # None = no limit
+ATTR_REWARD_POOL_MATCH_RATIO: Final = "pool_match_ratio"
+ATTR_REWARD_POOL_MATCH_NAME: Final = "pool_match_name"

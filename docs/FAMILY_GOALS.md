@@ -39,6 +39,11 @@ target. It also exposes:
 | --- | --- |
 | `family_total` | Pooled total so far |
 | `family_contributions` | Each person's share, keyed by display name |
+| `family_repeat` | `never`, `weekly` or `monthly` |
+| `family_end_date` | The finish date or the end of the repeat period, whichever comes first |
+| `family_days_left` | Days left including today (empty without an end) |
+| `family_pace` | `ahead`, `on_track`, `behind`, or empty when there is no pace |
+| `family_finished` | The finish date has passed and progress is frozen |
 
 Each person's goal progress sensor shows the same pooled percentage and
 exposes `family_total`; its `raw_progress` attribute is that person's own share.
@@ -68,6 +73,27 @@ Call the `choreops.reset_family_goal` service with the goal's name
 already contributed and count only new activity from then on; the caught-up goal
 clears its streak (tomorrow is day one). Everyone's award is cleared so the goal
 can be earned again. Reward points already paid out are kept.
+
+## Goal settings
+
+- **Also count chores with these labels** (Total Chores Completed): counts every
+  chore with one of the labels, together with the chosen chore if there is one.
+  A chore given the label later brings its past approvals with it.
+- **Repeat** (Never / Every week / Every month): at the start of each week
+  (Monday) or month the goal starts over, exactly like a reset. Points already
+  paid are kept. Only for Total Points, Total Chores and Everyone Completes
+  goals; the streak and one-day goals ignore it. Changing the setting starts
+  counting periods from then, without restarting the goal.
+- **Finish date**: the last day that counts. The day after, everyone's share is
+  frozen and nothing more is paid until the goal repeats or is reset (a reset
+  moves past a finish date that already passed). Moving the date later lets it
+  count again.
+- **Pace**: with a finish date or a repeat, the sensors show days left and
+  whether the total is ahead, on track or behind an even pace from the start of
+  the run to the deadline (10 % either side counts as on track). Streak and
+  one-day goals get days left but no pace.
+- **Who is told when a level is reached**: everyone (the default), only the
+  people working on it, only parents, or nobody. The points are paid either way.
 
 ## "Everyone caught up for X days"
 

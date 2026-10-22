@@ -160,6 +160,7 @@ class _FamilyGoalBase(ChoreOpsCoordinatorEntity, SensorEntity):
             },
         }
         attributes.update(self._manager.get_day_record(self._goal_id))
+        attributes.update(self._manager.get_schedule(self._goal_id))
         if goal_type == fg.GOAL_TYPE_CAUGHT_UP:
             attributes[fg.ATTR_CAUGHT_UP_TODAY] = self._manager.get_caught_up_status(
                 self._goal_id

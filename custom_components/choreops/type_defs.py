@@ -136,6 +136,11 @@ class RewardData(TypedDict):
     pooled: NotRequired[bool]  # Family pool: assignees pay into one shared pot
     pool_contributions: NotRequired[dict[str, float]]  # user_id -> points paid in
     pool_chip_in: NotRequired[float]  # Points per button press (0 = all affordable)
+    pool_max_share: NotRequired[float]  # Most one person pays, % of cost (0 = none)
+    pool_match_ratio: NotRequired[float]  # Parent's points per point paid in
+    pool_match_user_id: NotRequired[str]  # Parent the match is paid from
+    pool_after_delivery: NotRequired[str]  # "restart" or "close"
+    pool_closed: NotRequired[bool]  # Closed after delivery until the reward is saved
 
 
 class PenaltyData(TypedDict):
