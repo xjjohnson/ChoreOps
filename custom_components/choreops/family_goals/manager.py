@@ -662,6 +662,30 @@ class FamilyGoalManager(BaseManager):
             for assignee_id, value in self.get_contributions(goal_id).items()
         }
 
+    def _next_level_start(
+        self,
+        goal_id: str,
+        goal: dict[str, Any],
+        level_shares: dict[str, float],
+        overshoot: float,
+    ) -> dict[str, float]:
+        """Return the level-start snapshot for a level just begun.
+
+        Points past the finished level's target carry into the new level, so a
+        big jump does not leave everyone at 0. Each person carries the same
+        fraction of what they added during the finished level.
+        """
+        shares = self.get_contributions(goal_id)
+        level_total = sum(level_shares.values())
+        if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_EVERYONE or level_total <= 0:
+            # Only as strong as the smallest share: there is no pooled extra.
+            return shares
+        carry = min(max(overshoot, 0.0), level_total) / level_total
+        return {
+            assignee_id: value - level_shares.get(assignee_id, 0.0) * carry
+            for assignee_id, value in shares.items()
+        }
+
     def get_level_info(self, goal_id: str) -> dict[str, Any]:
         """Return level progress for a goal (read-only, for sensors)."""
         empty: dict[str, Any] = {
@@ -1222,7 +1246,9 @@ class FamilyGoalManager(BaseManager):
                 else set()
             )
             goal[fg.DATA_LEVEL] = reached
-            goal[fg.DATA_LEVEL_START] = self.get_contributions(goal_id)
+            goal[fg.DATA_LEVEL_START] = self._next_level_start(
+                goal_id, goal, level_shares, total - levels[reached - 1][0]
+            )
 
             for assignee_id in self._assigned_ids(goal):
                 entry = progress.get(assignee_id)
