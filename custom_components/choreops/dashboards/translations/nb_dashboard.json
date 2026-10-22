@@ -501,5 +501,7 @@
   "share_full": "Din andel er full",
   "share_left": "{left} av dine {max} igjen",
   "out_of_points": "ingen poeng",
-  "pool_closed": "sparegris stengt"
+  "pool_closed": "sparegris stengt",
+  "days_left_this_week": "dager igjen denne uken",
+  "days_left_this_month": "dager igjen denne måneden"
 }

@@ -988,6 +988,7 @@ async def test_weekly_goal_starts_over_each_monday(
         schedule = gm.get_schedule(goal_id)
         assert schedule[fg.ATTR_END_DATE] == "2026-10-25"
         assert schedule[fg.ATTR_DAYS_LEFT] == 5
+        assert schedule[fg.ATTR_DEADLINE] == fg.DEADLINE_WEEK
     balance = coordinator.assignees_data[zoe][const.DATA_USER_POINTS]
 
     with patch(_TODAY, return_value="2026-10-25"):  # Sunday, same week
@@ -1113,7 +1114,9 @@ async def test_pace_compares_total_with_an_even_pace(
         with patch.object(gm, "get_total", return_value=60.0):
             assert gm.get_schedule(goal_id)[fg.ATTR_PACE] == fg.PACE_AHEAD
             assert gm.get_schedule(goal_id)[fg.ATTR_PACE_EXPECTED] == 45.0
-        assert gm.get_schedule(goal_id)[fg.ATTR_DAYS_LEFT] == 6
+        schedule = gm.get_schedule(goal_id)
+        assert schedule[fg.ATTR_DAYS_LEFT] == 6
+        assert schedule[fg.ATTR_DEADLINE] == fg.DEADLINE_FINISH
 
     # No deadline, no pace
     gm.update_goal(goal_id, {fg.DATA_END_DATE: ""})

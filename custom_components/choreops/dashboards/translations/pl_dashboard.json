@@ -501,5 +501,7 @@
   "share_full": "Twój udział jest pełny",
   "share_left": "Zostało {left} z {max}",
   "out_of_points": "brak punktów",
-  "pool_closed": "skarbonka zamknięta"
+  "pool_closed": "skarbonka zamknięta",
+  "days_left_this_week": "dni do końca tygodnia",
+  "days_left_this_month": "dni do końca miesiąca"
 }

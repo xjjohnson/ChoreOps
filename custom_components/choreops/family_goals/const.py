@@ -169,6 +169,11 @@ ATTR_DAYS_LEFT: Final = "family_days_left"  # Including today; None without an e
 ATTR_PACE: Final = "family_pace"  # ahead / on_track / behind / "" (no pace)
 ATTR_FINISHED: Final = "family_finished"  # Past the finish date: progress frozen
 ATTR_PACE_EXPECTED: Final = "family_pace_expected"  # Even-pace total by now
+# What the end date is: the finish date, or the end of this week or month
+ATTR_DEADLINE: Final = "family_deadline"
+DEADLINE_FINISH: Final = "finish"
+DEADLINE_WEEK: Final = "week"
+DEADLINE_MONTH: Final = "month"
 PACE_AHEAD: Final = "ahead"
 PACE_ON_TRACK: Final = "on_track"
 PACE_BEHIND: Final = "behind"

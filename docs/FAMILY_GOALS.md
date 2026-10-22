@@ -45,6 +45,7 @@ target. It also exposes:
 | `family_pace` | `ahead`, `on_track`, `behind`, or empty when there is no pace |
 | `family_finished` | The finish date has passed and progress is frozen |
 | `family_pace_expected` | The total an even pace would have by now (the dashed line on the card) |
+| `family_deadline` | What `family_end_date` is: `finish`, `week` or `month` (cards say "5 days left this week") |
 
 Each person's goal progress sensor shows the same pooled percentage and
 exposes `family_total`; its `raw_progress` attribute is that person's own share.

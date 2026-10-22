@@ -501,5 +501,7 @@
   "share_full": "你的份额已满",
   "share_left": "你的 {max} 还剩 {left}",
   "out_of_points": "积分不足",
-  "pool_closed": "储蓄罐已关闭"
+  "pool_closed": "储蓄罐已关闭",
+  "days_left_this_week": "天（本周剩余）",
+  "days_left_this_month": "天（本月剩余）"
 }
