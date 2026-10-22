@@ -222,7 +222,7 @@ views:
                       {%- if b.label not in bdg.groups -%}{%- set bdg.groups = bdg.groups + [b.label] -%}{%- endif -%}
                     {%- endfor -%}
                     {%- for g in ([''] + (bdg.groups | reject('eq', '') | list)) if g in bdg.groups -%}
-                      {%- set c = ((bdg.items | selectattr('label', 'eq', g) | map(attribute='color') | reject('eq', '') | first) or 'var(--primary-color)') if g else 'var(--primary-color)' -%}
+                      {%- set c = ((bdg.items | selectattr('label', 'eq', g) | map(attribute='color') | reject('eq', '') | list) + ['var(--primary-color)']) | first if g else 'var(--primary-color)' -%}
                       {%- set tiles = namespace(v='') -%}
                       {%- for b in bdg.items | selectattr('label', 'eq', g) -%}
                         {%- set tc = b.own or c -%}
@@ -297,7 +297,7 @@ views:
                       {%- if a.label not in ach_ns.groups -%}{%- set ach_ns.groups = ach_ns.groups + [a.label] -%}{%- endif -%}
                     {%- endfor -%}
                     {%- for g in ([''] + (ach_ns.groups | reject('eq', '') | list)) if g in ach_ns.groups -%}
-                      {%- set c = ((ach_ns.items | selectattr('label', 'eq', g) | map(attribute='color') | reject('eq', '') | first) or '#d4a017') if g else '#d4a017' -%}
+                      {%- set c = ((ach_ns.items | selectattr('label', 'eq', g) | map(attribute='color') | reject('eq', '') | list) + ['#d4a017']) | first if g else '#d4a017' -%}
                       {%- set tiles = namespace(v='') -%}
                       {%- for ach in ach_ns.items | selectattr('label', 'eq', g) -%}
                         {%- set when = as_datetime(ach.last, none) if ach.last else none -%}

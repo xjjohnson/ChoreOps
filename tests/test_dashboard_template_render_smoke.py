@@ -3732,3 +3732,39 @@ def test_family_hub_level_chip_uses_the_rank_color() -> None:
     plain = _showcase_card()
     chip = plain[: plain.index(">Gold</span>")]
     assert "#ffd54f" in chip[chip.rindex("border-radius:999px") :]
+
+
+def test_family_hub_showcase_label_without_color_falls_back_quietly() -> None:
+    """A label with no color uses the default strip color instead of an empty `first`."""
+    tpl = _hub_card_template("ach_ns")
+    output = _render_hub_card(
+        tpl,
+        {
+            "badges": [
+                {
+                    "eid": "sensor.lily_badge_test",
+                    "name": "Test badge",
+                    "earned": True,
+                    "earned_count": 1,
+                    "last_awarded": "2026-10-10",
+                    "labels": [{"name": "Important"}],
+                },
+            ],
+            "achievements": [
+                {
+                    "eid": "sensor.lily_ach_k",
+                    "name": "Kind Words",
+                    "labels": [{"name": "Kindness", "color": ""}],
+                },
+            ],
+        },
+        {
+            "sensor.lily_ach_k": _achievement_state(
+                "sensor.lily_ach_k", "Kind Words", 1, "2026-10-12T10:00:00"
+            ),
+        },
+    )
+    important = output[output.index("Important") - 400 : output.index("Test badge")]
+    assert "var(--primary-color)" in important
+    kindness = output[output.index("Kindness") - 400 : output.index("Kind Words")]
+    assert "#d4a017" in kindness
