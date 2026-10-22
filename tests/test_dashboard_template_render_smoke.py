@@ -2545,6 +2545,7 @@ def _showcase_card(
     streak: dict[str, int] | None = None,
     gamification: bool = True,
     extra_helper: dict[str, object] | None = None,
+    rank_attrs: dict[str, object] | None = None,
     marker: str = "SHOWCASE CARD",
 ) -> str:
     """Render the Showcase (or Welcome) card with a fully wired Lily."""
@@ -2593,7 +2594,7 @@ def _showcase_card(
         "sensor.lily_rank": _MockState(
             entity_id="sensor.lily_rank",
             state="Gold",
-            attributes={"icon": "mdi:medal"},
+            attributes={"icon": "mdi:medal", **(rank_attrs or {})},
             name="rank",
         ),
     }
@@ -3586,3 +3587,148 @@ def test_pool_row_locks_chip_in_when_share_is_full() -> None:
     )
     assert primary(room)["icon"] == "mdi:arrow-right"
     assert primary(room)["tap_action"]["target"] == {"entity_id": "button.lego"}
+
+
+_RANKS = [
+    ("beginner", "Beginner", 0, ""),
+    ("bronze_1", "Bronze 1", 1000, "#795548"),
+    ("bronze_2", "Bronze 2", 2000, "#0288d1"),
+    ("bronze_3", "Bronze 3", 3000, "#757575"),
+    ("silver_1", "Silver 1", 5000, "#9e9e9e"),
+    ("silver_2", "Silver 2", 7000, "#9e9e9e"),
+    ("silver_3", "Silver 3", 9000, "#9e9e9e"),
+    ("gold_1", "Gold 1", 12000, "#f9a825"),
+    ("gold_2", "Gold 2", 15000, "#f9a825"),
+    ("gold_3", "Gold 3", 20000, "#f9a825"),
+    ("platinum", "Platinum", 25000, "#4dd0e1"),
+    ("legend", "Legend", 40000, "#ab47bc"),
+]
+
+
+def _ranks_card(*, show_all: bool = False, count: int = len(_RANKS)) -> str:
+    """Render the Ranks card for Lily at Bronze 1 with 1565 points earned."""
+    ranks = _RANKS[:count]
+    helper = {
+        "dashboard_helpers": {"translation_sensor_eid": "sensor.lily_ui"},
+        "core_sensors": {
+            "points_eid": "sensor.lily_points",
+            "badges_eid": "sensor.lily_rank",
+        },
+        "integration_entry_id": "entry-123",
+        "user_id": "user-lily",
+        "ui_control": (
+            {"gamification": {"cumulative": {"show_all_ranks": True}}}
+            if show_all
+            else {}
+        ),
+        "badges": [
+            {
+                "eid": f"sensor.lily_{key}",
+                "name": name,
+                "badge_type": "cumulative",
+                "color": color,
+            }
+            for key, name, _, color in ranks
+        ],
+    }
+    states = {
+        "sensor.lily_ui": _MockState(
+            entity_id="sensor.lily_ui",
+            state="ok",
+            attributes={"ui_translations": {"earned": "Earned"}},
+            name="ui",
+        ),
+        "sensor.lily_points": _MockState(
+            entity_id="sensor.lily_points",
+            state="1565",
+            attributes={"point_stat_points_earned_all_time": 1565},
+            name="points",
+        ),
+        "sensor.lily_rank": _MockState(
+            entity_id="sensor.lily_rank",
+            state="Bronze 1",
+            attributes={
+                "current_badge_eid": "sensor.lily_bronze_1",
+                "highest_earned_badge_eid": "sensor.lily_bronze_1",
+                "next_higher_badge_eid": "sensor.lily_bronze_2",
+                "next_lower_badge_eid": "sensor.lily_beginner",
+                "points_to_next_badge": 435,
+            },
+            name="rank",
+        ),
+    }
+    for key, name, threshold, _ in ranks:
+        states[f"sensor.lily_{key}"] = _MockState(
+            entity_id=f"sensor.lily_{key}",
+            state="ok",
+            attributes={
+                "badge_name": name,
+                "icon": "mdi:medal",
+                "target": {"threshold_value": threshold, "maintenance_rules": 0},
+            },
+            name=name,
+        )
+    return _render_hub_card(
+        _hub_card_template("CUMULATIVE BADGES CARD"), helper, states
+    )
+
+
+def test_family_hub_rank_strip_swipes_through_every_rank() -> None:
+    """Past 5 ranks the strip lists them all and scrolls sideways."""
+    output = _ranks_card()
+    strip = output[: output.index("to go</b>")]
+    for _, name, _, _ in _RANKS:
+        assert name in strip
+    assert "overflow-x:auto" in strip
+    assert "scroll-initial-target:nearest" in strip
+    assert "1 earned" in strip and "10 more" in strip
+    assert "&rsaquo;<br>+" not in output
+
+
+def test_family_hub_rank_strip_stays_fixed_with_few_ranks() -> None:
+    """Five ranks or fewer still share the width with no scrolling."""
+    output = _ranks_card(count=4)
+    strip = output[: output.index("to go</b>")]
+    assert "overflow-x:auto" not in strip
+    assert "flex:1 1 0;" in strip
+
+
+def test_family_hub_future_ranks_toggle_shows_all_and_back() -> None:
+    """Show all ranks lists every locked rank; Show fewer goes back."""
+    closed = _ranks_card()
+    rows = closed[closed.index("to go</b>") :]
+    assert "Show all ranks" in rows and "7 more" in rows
+    assert "Legend" not in rows
+    assert "'value': True" in closed or '"value": true' in closed.lower()
+    assert "more ranks above" not in closed
+
+    opened = _ranks_card(show_all=True)
+    rows = opened[opened.index("to go</b>") :]
+    assert "Legend" in rows and "Gold 2" in rows
+    assert "Show fewer" in rows
+    assert "'ui_control_action': 'remove'" in opened
+    assert "gamification/cumulative/show_all_ranks" in opened
+
+
+def test_family_hub_level_chip_uses_the_rank_color() -> None:
+    """The header chip's rank circle takes the current rank's color."""
+    colored = _showcase_card(
+        extra_helper={
+            "badges": [
+                {
+                    "eid": "sensor.lily_gold",
+                    "name": "Gold",
+                    "badge_type": "cumulative",
+                    "color": "#795548",
+                }
+            ]
+        },
+        rank_attrs={"current_badge_eid": "sensor.lily_gold"},
+    )
+    chip = colored[: colored.index(">Gold</span>")]
+    chip = chip[chip.rindex("border-radius:999px") :]
+    assert "color:#795548" in chip and "#ffd54f" not in chip
+
+    plain = _showcase_card()
+    chip = plain[: plain.index(">Gold</span>")]
+    assert "#ffd54f" in chip[chip.rindex("border-radius:999px") :]
