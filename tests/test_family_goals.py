@@ -728,6 +728,32 @@ async def test_points_past_a_level_carry_into_the_next_level(
     assert sum(shares.values()) == pytest.approx(gm.get_total(goal_id) - 1000.0)
 
 
+async def test_overview_target_is_the_current_level(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """The Parents reset card shows the level being worked toward, not level 1."""
+    gm = scenario_full.coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=100.0,
+        reward=5.0,
+        assigned=[zoe],
+    )
+    scenario_full.coordinator.challenges_data[goal_id][fg.DATA_LEVELS] = (
+        "100, 1000, 5000"
+    )
+    await _earn_points(scenario_full, zoe, 581.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+
+    (entry,) = [g for g in gm.get_overview() if g["name"].endswith("100.0")]
+    assert entry["total"] == pytest.approx(581.0)
+    assert entry["target"] == pytest.approx(1000.0)
+
+
 async def test_active_streak_needs_everyone_every_day(
     hass: HomeAssistant,
     scenario_full: SetupResult,

@@ -1366,7 +1366,7 @@ class FamilyGoalManager(BaseManager):
         """Return every goal as name/type/total/target for the OpsCenter card.
 
         Read straight from storage so the card does not depend on per-person
-        entity lookups.
+        entity lookups. The target is the level being worked toward now.
         """
         overview: list[dict[str, Any]] = []
         for goal_id, goal in self.goals.items():
@@ -1378,7 +1378,14 @@ class FamilyGoalManager(BaseManager):
                     "name": name,
                     "type": str(goal.get(fg.DATA_TYPE, "")),
                     "total": round(float(self.get_total(goal_id)), 2),
-                    "target": round(float(goal.get(fg.DATA_TARGET_VALUE, 0) or 0), 2),
+                    "target": round(
+                        float(
+                            self.get_level_info(goal_id)["next_target"]
+                            or goal.get(fg.DATA_TARGET_VALUE, 0)
+                            or 0
+                        ),
+                        2,
+                    ),
                 }
             )
         overview.sort(key=lambda item: item["name"].lower())
