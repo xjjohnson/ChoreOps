@@ -2868,6 +2868,8 @@ class TestMidnightResetFlash:
             f"Transient overdue published during midnight reset: {states}"
         )
 
+    # Midday: "an hour ago" must fall on the same local day
+    @pytest.mark.freeze_time("2026-10-21 19:00:00+00:00", tick=True)
     @pytest.mark.asyncio
     async def test_midnight_reset_preapproved_no_overdue_flash(
         self,

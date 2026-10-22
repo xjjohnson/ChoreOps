@@ -337,6 +337,8 @@ async def test_turn_resets_to_primary_after_approval(
 
 
 @pytest.mark.asyncio
+# Midday: "an hour ago" must fall on the same local day
+@pytest.mark.freeze_time("2026-10-21 19:00:00+00:00", tick=True)
 async def test_standby_completion_clears_others_overdue_and_global(
     hass: HomeAssistant,
     scenario_primary_standby: SetupResult,

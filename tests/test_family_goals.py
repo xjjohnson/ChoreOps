@@ -1197,3 +1197,56 @@ def test_goal_settings_are_built_and_validated() -> None:
     assert builders.validate_goal(data) == {
         fg.DATA_END_DATE: builders.ERR_INVALID_END_DATE
     }
+
+
+async def test_chore_changes_during_an_evaluation_are_not_read_stale(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A claim made while a goal evaluation waits sees the claimed state.
+
+    Wording loads from disk the first time, which lets other work run in the
+    middle of an evaluation. Cached chore statuses must not leak into it.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from tests.helpers.workflows import find_chore, get_dashboard_helper
+
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    chore_manager = coordinator.chore_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    chore_id = scenario_full.chore_ids["Feed the cåts"]
+    _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_CAUGHT_UP,
+        target=3.0,
+        reward=0.0,
+        assigned=[zoe],
+    )
+    before = chore_manager.get_chore_status_context(zoe, chore_id)
+    assert before[const.CHORE_CTX_STATE] == const.CHORE_STATE_PENDING
+
+    chore = find_chore(get_dashboard_helper(hass, "zoe"), "Feed the cåts")
+    assert chore is not None
+    real_words = gm._goal_words
+    seen: list[str] = []
+
+    async def words_with_a_claim_in_between(language: str | None) -> dict[str, str]:
+        if not seen:
+            with patch.object(
+                coordinator.notification_manager, "notify_approvers", new=AsyncMock()
+            ):
+                await chore_manager.claim_chore(zoe, chore_id, "Zoë")
+            context = chore_manager.get_chore_status_context(zoe, chore_id)
+            seen.append(context[const.CHORE_CTX_STATE])
+            # The chore sensor, rewritten by the claim, shows it too
+            state = hass.states.get(chore["eid"])
+            seen.append(state.state if state else "missing")
+        return await real_words(language)
+
+    with patch.object(gm, "_goal_words", side_effect=words_with_a_claim_in_between):
+        gm._pending.add(zoe)
+        await gm.drain_pending()
+
+    assert seen == [const.CHORE_STATE_CLAIMED, const.CHORE_STATE_CLAIMED]

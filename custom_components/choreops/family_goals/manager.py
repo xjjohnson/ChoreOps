@@ -210,10 +210,7 @@ class FamilyGoalManager(BaseManager):
         self._pending.clear()
         for assignee_id in queued:
             try:
-                # Caught-up checks ask for every chore's status for everyone in
-                # a goal; reuse those lookups within one person's evaluation
-                with self.coordinator.chore_manager.status_cache():
-                    await self.evaluate_assignee(assignee_id)
+                await self.evaluate_assignee(assignee_id)
             except Exception:
                 base.LOGGER.exception(
                     "Error evaluating family goals for assignee %s", assignee_id
@@ -221,12 +218,31 @@ class FamilyGoalManager(BaseManager):
 
     async def evaluate_assignee(self, assignee_id: str) -> None:
         """Re-check one person's streak and every goal they are part of."""
-        if self._update_assignee_caught_up_streak(assignee_id):
-            self.coordinator._persist_and_update()
-        for goal_id, goal in list(self.goals.items()):
-            # Only people assigned to a goal can move its total.
-            if assignee_id in goal.get(fg.DATA_ASSIGNED_USER_IDS, []):
-                await self._evaluate_goal(goal_id, goal)
+        # Only people assigned to a goal can move its total.
+        goal_ids = [
+            goal_id
+            for goal_id, goal in self.goals.items()
+            if assignee_id in goal.get(fg.DATA_ASSIGNED_USER_IDS, [])
+            and self._levels(goal)
+        ]
+        # Wording is loaded up front: nothing below may await, so two
+        # evaluations can never interleave and pay the same level twice, and
+        # cached chore statuses never outlive a change made by other work.
+        words: dict[str, dict[str, dict[str, str]]] = {}
+        for goal_id in goal_ids:
+            if (goal := self.goals.get(goal_id)) is not None:
+                words[goal_id] = await self._words_by_assignee(goal)
+
+        # Caught-up checks ask for every chore's status for everyone in a
+        # goal; reuse those lookups within one person's evaluation
+        with self.coordinator.chore_manager.status_cache():
+            if self._update_assignee_caught_up_streak(assignee_id):
+                self.coordinator._persist_and_update()
+            for goal_id in goal_ids:
+                # An edit during the await replaces the stored record; use the live one.
+                goal = self.goals.get(goal_id)
+                if goal is not None and goal_id in words:
+                    self._evaluate_goal(goal_id, goal, words[goal_id])
 
     # ------------------------------------------------------------------
     # CRUD
@@ -1093,23 +1109,18 @@ class FamilyGoalManager(BaseManager):
     # Evaluation and awarding
     # ------------------------------------------------------------------
 
-    async def _evaluate_goal(self, goal_id: str, goal: dict[str, Any]) -> None:
+    def _evaluate_goal(
+        self,
+        goal_id: str,
+        goal: dict[str, Any],
+        words: dict[str, dict[str, str]],
+    ) -> None:
         """Award a goal to everyone assigned once the pooled total is met.
 
         People who already hold the award are skipped, so this is safe to call
         repeatedly (it runs whenever any assigned person is re-evaluated).
+        Never awaits; ``words`` is each person's wording, loaded beforehand.
         """
-        levels = self._levels(goal)
-        if not levels:
-            return
-        # Wording is loaded up front: nothing below may await, so two
-        # evaluations can never interleave and pay the same level twice.
-        words = await self._words_by_assignee(goal)
-        # An edit during the await replaces the stored record; use the live one.
-        live_goal = self.goals.get(goal_id)
-        if live_goal is None:
-            return
-        goal = live_goal
         levels = self._levels(goal)
         if not levels:
             return
