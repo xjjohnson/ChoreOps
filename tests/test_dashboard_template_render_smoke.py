@@ -2104,7 +2104,11 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert len(cards) == 1
     html = cards[0]["custom_fields"]["content"]
     assert "Brush Teeth" in html
-    assert "0 of 2 done" in html
+    # Footer chips: nobody done yet, so both show their initial
+    assert re.findall(
+        r"<span style='width:16px;height:16px;border-radius:50%;[^']*'>([^<]+)</span>",
+        html,
+    ) == ["D", "L"]
     assert "3 days left" in html
     # Milestone notches (no labels, the lanes use that space) and the finish flag
     assert html.count("width:1.5px;height:10px") == 3 and "🏁" in html
@@ -3200,3 +3204,10 @@ def test_family_home_race_track_moves_with_todays_chores() -> None:
     }
     # Olivia is done (sits at the finish, drawn at 94%); the rest by today's count
     assert positions == {"O": 94.0, "L": 80.0, "D": 60.0, "M": 0.0}
+    # Footer: one chip per person, finished people first as green ticks
+    chips = re.findall(
+        r"<span style='width:16px;height:16px;border-radius:50%;[^']*'>([^<]+)</span>",
+        output,
+    )
+    assert chips == ["✓", "L", "M", "D"]
+    assert "of 4" not in output
