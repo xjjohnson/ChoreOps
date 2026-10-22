@@ -194,6 +194,12 @@ views:
                     {%- set next_rank_eid = highest_badge_attrs.get('next_higher_badge_eid') | default('', true) if highest_badge_attrs is mapping else '' -%}
                     {%- set maintenance_rank_eid = highest_earned_rank_eid if rank_status == 'demoted' and highest_earned_rank_eid not in ['', 'None', 'unknown', 'unavailable', none] else current_rank_eid -%}
                     {%- set has_any_rank = current_rank_eid not in ['', 'None', 'unknown', 'unavailable', none] -%}
+                    {#-- The header chip's rank circle uses the rank's own color (then its label's), else the old yellow --#}
+                    {%- set rank_chip = namespace(color='') -%}
+                    {%- for lb in badge_list if has_any_rank and lb is mapping and lb.get('eid') == current_rank_eid -%}
+                      {%- set lb_label = ((lb.get('labels') or [{}]) | first) -%}
+                      {%- set rank_chip.color = (lb.get('color') or (lb_label.get('color') if lb_label is mapping else '') or '') | string -%}
+                    {%- endfor -%}
 
                     {#-- BADGES: newest first. Labeled badges get their own strip in the label's color; each badge's icon uses its own color, then the strip's --#}
                     {%- set bdg = namespace(items=[], groups=[], html='') -%}
@@ -350,7 +356,7 @@ views:
 
                     {#-- hero: greeting, level and total earned, then status tiles --#}
                     {%- set highest_badge_safe = highest_badge_display | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                    {%- set level_chip = ("<div style='margin-top:5px;display:inline-flex;align-items:center;gap:5px;max-width:100%;box-sizing:border-box;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.2);font-size:12px;font-weight:800;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#ffd54f;display:block;flex:0 0 auto;'></ha-icon><span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ highest_badge_safe ~ "</span></div>") if highest_badge_display != ui.get('none', 'err-none') else '' -%}
+                    {%- set level_chip = ("<div style='margin-top:5px;display:inline-flex;align-items:center;gap:5px;max-width:100%;box-sizing:border-box;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.2);font-size:12px;font-weight:800;'>" ~ (("<span style='width:18px;height:18px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ highest_badge_icon ~ "' style='width:18px;height:18px;--mdc-icon-size:18px;color:" ~ rank_chip.color ~ ";display:block;'></ha-icon></span>") if rank_chip.color else ("<ha-icon icon='" ~ highest_badge_icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#ffd54f;display:block;flex:0 0 auto;'></ha-icon>")) ~ "<span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ highest_badge_safe ~ "</span></div>") if highest_badge_display != ui.get('none', 'err-none') else '' -%}
                     {%- set tile_open = "<div style='min-width:0;box-sizing:border-box;padding:12px 6px;border-radius:14px;background:var(--card-background-color);box-shadow:0 2px 8px rgba(0,0,0,.12);text-align:center;'>" -%}
                     {%- set tile_lbl_open = "<div style='margin-top:3px;font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--secondary-text-color);line-height:1.2;'>" -%}
                     {%- set tile_sub_open = "<div style='margin-top:2px;font-size:10px;color:var(--secondary-text-color);line-height:1.2;'>" -%}
@@ -1805,6 +1811,7 @@ views:
                     {%- set ui_control_key_settings_open = ui_control_key_root ~ '/settings_open' -%}
                     {%- set ui_control_key_show_next_higher_badge = ui_control_key_root ~ '/show_next_higher_badge' -%}
                     {%- set ui_control_key_show_next_lower_badge = ui_control_key_root ~ '/show_next_lower_badge' -%}
+                    {%- set ui_control_key_show_all_ranks = ui_control_key_root ~ '/show_all_ranks' -%}
                     {%- set ui_root = namespace(current=ui_control if ui_control is mapping else {}) -%}
                     {%- for segment in ui_control_key_root.split('/') -%}
                       {%- if ui_root.current is mapping -%}
@@ -1821,6 +1828,7 @@ views:
                     {%- set effective_show_next_higher_badge = (effective_show_next_higher_badge | string | lower) == 'true' -%}
                     {%- set effective_show_next_lower_badge = ui_root.current.get('show_next_lower_badge', pref_show_next_lower_badge) if ui_root.current is mapping else pref_show_next_lower_badge -%}
                     {%- set effective_show_next_lower_badge = (effective_show_next_lower_badge | string | lower) == 'true' -%}
+                    {%- set show_all_ranks = ((ui_root.current.get('show_all_ranks', false) if ui_root.current is mapping else false) | string | lower) == 'true' -%}
                     {%- set integration_entry_id = state_attr(dashboard_helper, 'integration_entry_id') -%}
                     {%- set dashboard_helper_user_id = state_attr(dashboard_helper, 'user_id') -%}
 
@@ -2284,8 +2292,11 @@ views:
                               {%- set tr.ci = loop.index0 -%}
                             {%- endif -%}
                           {%- endfor -%}
-                          {#-- Show at most 5 ranks; the window slides so the current rank sits in the middle with 2 before and 2 after --#}
+                          {#-- The rows below show at most 5 ranks; the window slides so the current rank sits in the middle with 2 before and 2 after.
+                               The strip shows every rank and swipes sideways once there are more than 5 --#}
                           {%- set w_cnt = [n_b, 5] | min -%}
+                          {%- set trk_scroll = n_b > 5 -%}
+                          {%- set trk_node_w = 64 -%}
                           {%- set w_start = [[tr.ci - 2, 0] | max, n_b - w_cnt] | min -%}
                           {%- set w_end = w_start + w_cnt -%}
                           {%- for badge in ns.badges -%}
@@ -2298,33 +2309,33 @@ views:
                                 {%- set tr.nxt_pct = [((([badge.threshold - tr.nxt_to_go, 0] | max) / badge.threshold) * 100) | round(0) | int, 100] | min -%}
                               {%- endif -%}
                             {%- endif -%}
-                            {%- if loop.index0 >= w_start and loop.index0 < w_end -%}
-                              {%- set nrole = badge.role -%}
-                              {%- set rcol = badge.color -%}
-                              {%- set ncol = cur_accent if nrole == 'current' else ('var(--primary-color)' if nrole == 'next_higher' else ('var(--success-color)' if nrole == 'earned' else 'var(--secondary-text-color)')) -%}
-                              {%- set nsz = 34 if nrole == 'current' else 26 -%}
-                              {%- set nname = badge.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
-                              {%- set tr.nodes = tr.nodes
-                                  ~ "<div style='position:relative;z-index:1;flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;'>"
-                                  ~ "<div style='height:34px;display:flex;align-items:center;justify-content:center;'>"
-                                  ~ ("<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid color-mix(in srgb, " ~ rcol ~ " " ~ ('55%, #fff' if nrole == 'current' else '70%, #000') ~ ");background:" ~ rcol ~ ";" ~ (("box-shadow:0 0 0 3px color-mix(in srgb, " ~ rcol ~ " 35%, transparent);") if nrole == 'current' else '') ~ "display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.45' if nrole in ['future', 'next_higher'] else '1') ~ ";'>"
-                                    if rcol else "<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid " ~ ncol ~ ";background:" ~ ("color-mix(in srgb, " ~ ncol ~ " 20%, var(--card-background-color))" if nrole == 'current' else "var(--card-background-color)") ~ ";display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.6' if nrole == 'future' else '1') ~ ";'>")
-                                  ~ "<ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('18' if nrole == 'current' else '14') ~ "px;height:" ~ ('18' if nrole == 'current' else '14') ~ "px;--mdc-icon-size:" ~ ('18' if nrole == 'current' else '14') ~ "px;color:" ~ ('#fff' if rcol else ncol) ~ ";display:block;'></ha-icon></div></div>"
-                                  ~ "<div style='max-width:100%;margin-top:4px;font-size:11px;font-weight:800;color:" ~ ('var(--primary-text-color)' if nrole == 'current' else 'var(--secondary-text-color)') ~ ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ nname ~ "</div>"
-                                  ~ "<div style='font-size:10px;color:var(--secondary-text-color);opacity:0.8;'>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div></div>" -%}
-                            {%- endif -%}
+                            {%- set nrole = badge.role -%}
+                            {%- set rcol = badge.color -%}
+                            {%- set ncol = cur_accent if nrole == 'current' else ('var(--primary-color)' if nrole == 'next_higher' else ('var(--success-color)' if nrole == 'earned' else 'var(--secondary-text-color)')) -%}
+                            {%- set nsz = 34 if nrole == 'current' else 26 -%}
+                            {%- set nname = badge.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') | replace('"', '&quot;') | replace("'", '&#39;') -%}
+                            {%- set tr.nodes = tr.nodes
+                                ~ "<div style='position:relative;z-index:1;" ~ (('flex:0 0 ' ~ trk_node_w ~ 'px;width:' ~ trk_node_w ~ 'px;') if trk_scroll else 'flex:1 1 0;') ~ "min-width:0;display:flex;flex-direction:column;align-items:center;" ~ ('scroll-initial-target:nearest;scroll-snap-align:center;' if trk_scroll and nrole == 'current' else '') ~ "'>"
+                                ~ "<div style='height:34px;display:flex;align-items:center;justify-content:center;'>"
+                                ~ ("<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid color-mix(in srgb, " ~ rcol ~ " " ~ ('55%, #fff' if nrole == 'current' else '70%, #000') ~ ");background:" ~ rcol ~ ";" ~ (("box-shadow:0 0 0 3px color-mix(in srgb, " ~ rcol ~ " 35%, transparent);") if nrole == 'current' else '') ~ "display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.45' if nrole in ['future', 'next_higher'] else '1') ~ ";'>"
+                                  if rcol else "<div style='width:" ~ nsz ~ "px;height:" ~ nsz ~ "px;box-sizing:border-box;border-radius:50%;border:3px solid " ~ ncol ~ ";background:" ~ ("color-mix(in srgb, " ~ ncol ~ " 20%, var(--card-background-color))" if nrole == 'current' else "var(--card-background-color)") ~ ";display:flex;align-items:center;justify-content:center;opacity:" ~ ('0.6' if nrole == 'future' else '1') ~ ";'>")
+                                ~ "<ha-icon icon='" ~ badge.icon ~ "' style='width:" ~ ('18' if nrole == 'current' else '14') ~ "px;height:" ~ ('18' if nrole == 'current' else '14') ~ "px;--mdc-icon-size:" ~ ('18' if nrole == 'current' else '14') ~ "px;color:" ~ ('#fff' if rcol else ncol) ~ ";display:block;'></ha-icon></div></div>"
+                                ~ "<div style='max-width:100%;margin-top:4px;font-size:11px;font-weight:800;color:" ~ ('var(--primary-text-color)' if nrole == 'current' else 'var(--secondary-text-color)') ~ ";white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" ~ nname ~ "</div>"
+                                ~ "<div style='font-size:10px;color:var(--secondary-text-color);opacity:0.8;'>" ~ (format_points(badge.threshold, pref_points_precision) | trim) ~ "</div></div>" -%}
                           {%- endfor -%}
-                          {%- set trk_frac = 0 if tr.ci < 0 else ([((tr.ci - w_start + ((tr.nxt_pct / 100) if tr.has_next else 0)) / ([w_cnt - 1, 1] | max)), 1] | min) -%}
-                          {%- macro trk_more(count, arrow) -%}
-                            {{- ("<div style='flex:0 0 22px;padding-top:6px;text-align:center;font-size:10px;font-weight:800;line-height:1.3;color:var(--secondary-text-color);opacity:0.8;'>" ~ arrow ~ "<br>+" ~ count ~ "</div>") if count > 0 else '' -}}
-                          {%- endmacro -%}
+                          {%- set trk_frac = 0 if tr.ci < 0 else ([((tr.ci + ((tr.nxt_pct / 100) if tr.has_next else 0)) / ([n_b - 1, 1] | max)), 1] | min) -%}
                           {%- set trk_caption = ("<div style='text-align:center;margin-top:2px;white-space:normal;font-size:11px;color:var(--secondary-text-color);'><b style='color:var(--primary-color);'>" ~ (format_points(tr.nxt_to_go, pref_points_precision) | trim) ~ ' ' ~ ns.points_label ~ ' ' ~ ui.get('to_go', 'to go') ~ "</b> &rarr; <b style='color:var(--primary-text-color);'>" ~ tr.nxt_name ~ "</b></div>") if tr.has_next and tr.nxt_to_go > 0 else '' -%}
+                          {%- set trk_below = [tr.ci, 0] | max -%}
+                          {%- set trk_above = (n_b - tr.ci - 1) if tr.ci >= 0 else n_b -%}
+                          {%- set trk_hint = ("<div style='display:flex;justify-content:space-between;gap:8px;margin-top:2px;padding:0 4px;font-size:10px;font-weight:800;color:var(--secondary-text-color);opacity:0.75;'><span>" ~ (('&lsaquo; ' ~ trk_below ~ ' ' ~ ui.get('earned', 'Earned') | lower) if trk_below > 0 else '') ~ "</span><span>" ~ ((trk_above ~ ' ' ~ ui.get('more', 'more') ~ ' &rsaquo;') if trk_above > 0 else '') ~ "</span></div>") if trk_scroll else '' -%}
+                          {%- set trk_inset = ((trk_node_w // 2) | string ~ 'px') if trk_scroll else ('calc(50% / ' ~ n_b ~ ')') -%}
+                          {%- set trk_span = ((trk_node_w * (n_b - 1)) | string ~ 'px') if trk_scroll else ('(100% - 100% / ' ~ n_b ~ ')') -%}
                           {%- set trk_html = "<div style='box-sizing:border-box;width:100%;border-radius:16px;border:1px solid var(--divider-color);background:var(--card-background-color);padding:8px 8px 8px;'>"
-                              ~ "<div style='display:flex;'>" ~ trk_more(w_start, '&lsaquo;')
-                              ~ "<div style='position:relative;flex:1;min-width:0;display:flex;'>"
-                              ~ "<div style='position:absolute;left:calc(50% / " ~ w_cnt ~ ");right:calc(50% / " ~ w_cnt ~ ");top:15px;height:3px;border-radius:4px;background:var(--divider-color);'></div>"
-                              ~ "<div style='position:absolute;left:calc(50% / " ~ w_cnt ~ ");width:calc((100% - 100% / " ~ w_cnt ~ ") * " ~ ('%.3f' | format(trk_frac)) ~ ");top:15px;height:3px;border-radius:4px;background:var(--success-color);'></div>"
-                              ~ tr.nodes ~ "</div>" ~ trk_more(n_b - w_end, '&rsaquo;') ~ "</div>" ~ trk_caption ~ "</div>" -%}
+                              ~ "<div style='" ~ ('overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;-webkit-mask-image:linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 28px), transparent 100%);mask-image:linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 28px), transparent 100%);' if trk_scroll else '') ~ "'>"
+                              ~ "<div style='position:relative;display:flex;" ~ (('width:' ~ (trk_node_w * n_b) ~ 'px;') if trk_scroll else 'width:100%;') ~ "'>"
+                              ~ "<div style='position:absolute;left:" ~ trk_inset ~ ";right:" ~ trk_inset ~ ";top:15px;height:3px;border-radius:4px;background:var(--divider-color);'></div>"
+                              ~ "<div style='position:absolute;left:" ~ trk_inset ~ ";width:calc(" ~ trk_span ~ " * " ~ ('%.3f' | format(trk_frac)) ~ ");top:15px;height:3px;border-radius:4px;background:var(--success-color);'></div>"
+                              ~ tr.nodes ~ "</div></div>" ~ trk_hint ~ trk_caption ~ "</div>" -%}
                           {%- set row_styles = {
                             'card': [
                               {'padding': '0'},
@@ -2482,10 +2493,14 @@ views:
                               {%- else -%}
                                 {%- set rows.earned_hidden = rows.earned_hidden + 1 -%}
                               {%- endif -%}
-                            {%- elif in_window -%}
-                              {%- set rows.locked = rows.locked + [item] -%}
                             {%- else -%}
-                              {%- set rows.locked_hidden = rows.locked_hidden + 1 -%}
+                              {#-- Locked ranks outside the window are counted, and listed too while "Show all ranks" is on --#}
+                              {%- if not in_window -%}
+                                {%- set rows.locked_hidden = rows.locked_hidden + 1 -%}
+                              {%- endif -%}
+                              {%- if in_window or show_all_ranks -%}
+                                {%- set rows.locked = rows.locked + [item] -%}
+                              {%- endif -%}
                             {%- endif -%}
                           {%- endfor -%}
 
@@ -2507,7 +2522,7 @@ views:
                           {%- endif -%}
                           {%- if effective_show_next_higher_badge -%}
                             {%- for it in rows.locked -%}
-                              {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html ~ (("<div style='" ~ note_style ~ "'>+" ~ rows.locked_hidden ~ ' ' ~ ui.get('more_ranks_above', 'more ranks above') ~ "</div>") if loop.last and rows.locked_hidden > 0 else ''), 'head': ("<div style='" ~ head_style ~ "'>" ~ ui.get('future_goal', 'Locked') ~ "</div>") if loop.first else ''}] -%}
+                              {%- set emit.items = emit.items + [{'eid': it.eid, 'html': it.html, 'head': ("<div style='" ~ head_style ~ "'>" ~ ui.get('future_goal', 'Locked') ~ "</div>") if loop.first else ''}] -%}
                             {%- endfor -%}
                           {%- endif -%}
                           {%- for it in emit.items -%}
@@ -2524,6 +2539,41 @@ views:
                               }
                             }},
                           {%- endfor -%}
+                          {#-- Show all ranks / Show fewer: remembered per person in ui_control --#}
+                          {%- if effective_show_next_higher_badge and rows.locked_hidden > 0 -%}
+                            {%- set can_toggle = integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] -%}
+                            {%- set toggle_txt = (ui.get('show_fewer', 'Show fewer') ~ ' &#9652;') if show_all_ranks else (ui.get('show_all_ranks', 'Show all ranks') ~ ' &middot; ' ~ rows.locked_hidden ~ ' ' ~ ui.get('more', 'more') ~ ' &#9662;') -%}
+                            {{
+                              {
+                                'type': 'custom:button-card',
+                                'show_name': false,
+                                'show_icon': false,
+                                'show_state': false,
+                                'tap_action': ({
+                                  'action': 'call-service',
+                                  'service': 'choreops.manage_ui_control',
+                                  'data': {
+                                    'config_entry_id': integration_entry_id,
+                                    'user_id': dashboard_helper_user_id,
+                                    'ui_control_action': 'remove',
+                                    'key': ui_control_key_show_all_ranks
+                                  }
+                                } if show_all_ranks else {
+                                  'action': 'call-service',
+                                  'service': 'choreops.manage_ui_control',
+                                  'data': {
+                                    'config_entry_id': integration_entry_id,
+                                    'user_id': dashboard_helper_user_id,
+                                    'ui_control_action': 'update',
+                                    'key': ui_control_key_show_all_ranks,
+                                    'value': true
+                                  }
+                                }) if can_toggle else {'action': 'none'},
+                                'custom_fields': {'content': "<div style='box-sizing:border-box;width:100%;padding:7px 10px;border-radius:12px;border:1px dashed var(--divider-color);text-align:center;font-size:12px;font-weight:800;color:var(--primary-color);'>" ~ toggle_txt ~ "</div>"},
+                                'styles': row_styles
+                              }
+                            }},
+                          {%- endif -%}
                         {%- endif -%}
                       {%- endif -%}
                     {%- endif -%}
