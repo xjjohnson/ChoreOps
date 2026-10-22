@@ -82,6 +82,7 @@ from .helpers.entity_helpers import (
     get_assignee_name_by_id,
     get_friendly_label,
     get_item_name_or_log_error,
+    get_label_css_color,
     is_user_assigned_to_reward,
     should_create_entity,
     should_create_entity_for_user_assignee,
@@ -4311,6 +4312,23 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             for label, friendly_label in zip(raw_labels, friendly_labels, strict=False)
         ]
 
+    @staticmethod
+    def _build_colored_label_entries(
+        hass: HomeAssistant | None,
+        stored_labels: Any,
+    ) -> list[dict[str, str]]:
+        """Label names and CSS colors, for the badge and achievement strips."""
+        if hass is None or not isinstance(stored_labels, list):
+            return []
+        return [
+            {
+                "name": get_friendly_label(hass, label),
+                "color": get_label_css_color(hass, label),
+            }
+            for label in stored_labels
+            if isinstance(label, str) and label.strip()
+        ]
+
     def _build_chore_rows(
         self,
         entity_registry,
@@ -4957,6 +4975,15 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     const.ATTR_BADGE_EARNED: is_earned,
                     const.ATTR_EARNED_COUNT: earned_count,
                 }
+                if is_earned:
+                    badge_payload["last_awarded"] = badge_earned.get(
+                        const.DATA_USER_BADGES_EARNED_LAST_AWARDED
+                    )
+                badge_labels = self._build_colored_label_entries(
+                    self.hass, badge_info.get(const.DATA_BADGE_LABELS, [])
+                )
+                if badge_labels:
+                    badge_payload[const.ATTR_LABELS] = badge_labels
                 if badge_type != const.BADGE_TYPE_CUMULATIVE:
                     badge_progress = assignee_info.get(
                         const.DATA_USER_BADGE_PROGRESS, {}
@@ -5084,12 +5111,17 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     achievement_eid = entity_registry.async_get_entity_id(
                         "sensor", const.DOMAIN, unique_id
                     )
-                achievements_attr.append(
-                    {
-                        const.ATTR_EID: achievement_eid,
-                        const.ATTR_NAME: achievement_name,
-                    }
+                achievement_payload: dict[str, Any] = {
+                    const.ATTR_EID: achievement_eid,
+                    const.ATTR_NAME: achievement_name,
+                }
+                achievement_labels = self._build_colored_label_entries(
+                    self.hass,
+                    achievement_info.get(const.DATA_ACHIEVEMENT_LABELS, []),
                 )
+                if achievement_labels:
+                    achievement_payload[const.ATTR_LABELS] = achievement_labels
+                achievements_attr.append(achievement_payload)
 
             achievements_attr.sort(
                 key=lambda achievement: str(

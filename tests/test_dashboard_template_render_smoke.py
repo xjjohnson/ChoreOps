@@ -2196,7 +2196,7 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
         mock_states
     )
     env.globals["now"] = lambda: _dt.datetime(2026, 10, 19, 13, 0)
-    env.globals["as_datetime"] = lambda v: _dt.datetime.fromisoformat(str(v))
+    env.globals["as_datetime"] = lambda v, *default: _dt.datetime.fromisoformat(str(v))
     env.filters["as_local"] = lambda v: v
     output = env.from_string(tpl).render(
         integration_entities=integration_entities,
@@ -2358,7 +2358,7 @@ def _render_hub_card(
         mock_states
     )
     env.globals["now"] = lambda: _dt.datetime(2026, 10, 19, 13, 0)
-    env.globals["as_datetime"] = lambda v: _dt.datetime.fromisoformat(str(v))
+    env.globals["as_datetime"] = lambda v, *default: _dt.datetime.fromisoformat(str(v))
     env.globals["as_timestamp"] = lambda v: 0
     if real_dates:
         env.globals["as_timestamp"] = lambda v: _dt.datetime.fromisoformat(
@@ -2441,6 +2441,71 @@ def test_family_hub_showcase_lists_earned_achievements_as_gold_tiles() -> None:
     assert "×2" in output
     assert "#d4a017" in output
     assert "Not Yet" not in output
+
+
+def test_family_hub_showcase_sorts_newest_first_with_label_strips() -> None:
+    """Badges and achievements run newest first; labeled ones get a strip in the label color."""
+    tpl = _hub_card_template("ach_ns")
+    output = _render_hub_card(
+        tpl,
+        {
+            "badges": [
+                {
+                    "eid": "sensor.lily_badge_old",
+                    "name": "Old Badge",
+                    "earned": True,
+                    "earned_count": 1,
+                    "last_awarded": "2026-09-01",
+                },
+                {
+                    "eid": "sensor.lily_badge_new",
+                    "name": "New Badge",
+                    "earned": True,
+                    "earned_count": 1,
+                    "last_awarded": "2026-10-01",
+                },
+                {
+                    "eid": "sensor.lily_badge_book",
+                    "name": "Bookworm",
+                    "earned": True,
+                    "earned_count": 2,
+                    "last_awarded": "2026-10-10",
+                    "labels": [{"name": "Reading", "color": "var(--purple-color)"}],
+                },
+            ],
+            "achievements": [
+                {"eid": "sensor.lily_ach_a", "name": "Older Award"},
+                {"eid": "sensor.lily_ach_b", "name": "Newer Award"},
+                {
+                    "eid": "sensor.lily_ach_k",
+                    "name": "Kind Words",
+                    "labels": [{"name": "Kindness", "color": "#e91e63"}],
+                },
+            ],
+        },
+        {
+            "sensor.lily_ach_a": _achievement_state(
+                "sensor.lily_ach_a", "Older Award", 1, "2026-10-02T10:00:00"
+            ),
+            "sensor.lily_ach_b": _achievement_state(
+                "sensor.lily_ach_b", "Newer Award", 1, "2026-10-18T10:00:00"
+            ),
+            "sensor.lily_ach_k": _achievement_state(
+                "sensor.lily_ach_k", "Kind Words", 1, "2026-10-12T10:00:00"
+            ),
+        },
+    )
+    assert output.index("New Badge") < output.index("Old Badge")
+    assert (
+        output.index("Old Badge") < output.index("Reading") < output.index("Bookworm")
+    )
+    assert "var(--purple-color)" in output
+    assert output.index("Bookworm") < output.index("Newer Award")
+    assert output.index("Newer Award") < output.index("Older Award")
+    assert output.index("Older Award") < output.index("Kindness")
+    assert output.index("Kindness") < output.index("Kind Words")
+    assert "#e91e63" in output
+    assert "Oct 18" in output
 
 
 _SHOWCASE_UI = {
