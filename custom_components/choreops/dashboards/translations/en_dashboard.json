@@ -501,6 +501,8 @@
   "share_full": "Your share is full",
   "share_left": "{left} of your {max} left",
   "out_of_points": "out of points",
+  "chip_in": "Chip in",
+  "others": "Others",
   "pool_closed": "pool closed",
   "days_left_this_week": "days left this week",
   "days_left_this_month": "days left this month"

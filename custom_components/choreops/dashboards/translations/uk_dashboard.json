@@ -501,6 +501,8 @@
   "share_full": "Твоя частка заповнена",
   "share_left": "Залишилось {left} з {max}",
   "out_of_points": "немає балів",
+  "chip_in": "Внести",
+  "others": "Інші",
   "pool_closed": "скарбничку закрито",
   "days_left_this_week": "дн. до кінця тижня",
   "days_left_this_month": "дн. до кінця місяця"
