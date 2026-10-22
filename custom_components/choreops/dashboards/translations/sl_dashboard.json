@@ -500,5 +500,7 @@
   "share_full": "Tvoj delež je poln",
   "share_left": "Še {left} od {max}",
   "out_of_points": "brez točk",
-  "pool_closed": "hranilnik zaprt"
+  "pool_closed": "hranilnik zaprt",
+  "days_left_this_week": "dni do konca tedna",
+  "days_left_this_month": "dni do konca meseca"
 }

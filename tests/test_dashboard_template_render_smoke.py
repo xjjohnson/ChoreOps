@@ -3267,6 +3267,12 @@ def _family_goal_card_html(template: str, **attrs: object) -> str:
         )
         env.add_extension("jinja2.ext.loopcontrols")
         env.globals["now"] = lambda: _dt.datetime(2026, 10, 21, 12, 0)
+        env.globals["as_timestamp"] = lambda v: _dt.datetime.fromisoformat(
+            str(v)
+        ).timestamp()
+        env.filters["timestamp_custom"] = lambda v, f="%Y-%m-%d", local=True: (
+            _dt.datetime.fromtimestamp(float(v)).strftime(f)
+        )
         out = env.from_string(tpl).render(
             integration_entities=integration_entities,
             states=states,
@@ -3274,7 +3280,10 @@ def _family_goal_card_html(template: str, **attrs: object) -> str:
         )
         return str(ast.literal_eval(f"[{out}]")[0]["custom_fields"]["content"])
     return _render_hub_card(
-        _hub_card_template("family_total"), {}, {"sensor.fam_goal": goal}
+        _hub_card_template("family_total"),
+        {},
+        {"sensor.fam_goal": goal},
+        real_dates=True,
     )
 
 
@@ -3290,7 +3299,11 @@ def test_family_goal_card_shows_pace_line_and_days_left(template: str) -> None:
         family_pace_expected=330.0,
     )
     assert "Behind pace</b> · 11 days left" in html
-    assert "left:66.0%;border-left:2px dashed var(--warning-color)" in html
+    # The dashed line stops at the bottom of the bar, clear of the title
+    assert (
+        "bottom:0;height:22px;left:66.0%;border-left:2px dashed var(--warning-color)"
+        in html
+    )
 
     html = _family_goal_card_html(template, family_days_left=1, family_pace="ahead")
     assert "Ahead of pace</b> · Ends today" in html
@@ -3302,8 +3315,16 @@ def test_family_goal_card_shows_pace_line_and_days_left(template: str) -> None:
         family_end_date="2026-10-31",
         family_days_left=0,
     )
-    assert "Finished 2026-10-31</b> · counting stopped" in html
+    assert "Finished Oct 31</b> · counting stopped" in html
     assert "border-left:2px dashed" not in html
+
+    # Repeating goals count down to the end of the week or month
+    html = _family_goal_card_html(
+        template, family_days_left=5, family_pace="on_track", family_deadline="week"
+    )
+    assert "On track</b> · 5 days left this week" in html
+    html = _family_goal_card_html(template, family_days_left=9, family_deadline="month")
+    assert "9 days left this month" in html
 
     # Goals without a finish date or repeat look as before
     plain = _family_goal_card_html(template)
@@ -3374,3 +3395,78 @@ def test_closed_pool_row_shows_delivered_with_a_lock() -> None:
     assert "icon='mdi:lock-outline' style='width:22px" in html
     assert "Mom ×1" not in html
     assert "Family pool <b" not in html
+
+
+@pytest.mark.parametrize("template", ["home", "hub"])
+def test_family_goal_pace_line_on_level_track_and_single_bar(template: str) -> None:
+    """Everyone-contributes goals get the pace line on their track or bar."""
+    track = _family_goal_card_html(
+        template,
+        type="family_everyone_contributes",
+        family_total=12,
+        family_levels=[10, 20, 30],
+        family_level_rewards=[5, 10, 15],
+        family_level=1,
+        family_next_target=20,
+        family_contributions={"Lily": 18, "Dad": 12},
+        family_level_contributions={"Lily": 18, "Dad": 12},
+        family_pace="on_track",
+        family_days_left=11,
+        family_pace_expected=15.0,
+    )
+    # Halfway from level 1 (node 0) to level 2 (node 1) of three nodes
+    assert "* 0.250);top:6px;height:22px;border-left:2px dashed" in track
+
+    bar = _family_goal_card_html(
+        template,
+        type="family_everyone_contributes",
+        family_total=12,
+        family_levels=[30],
+        family_level_rewards=[15],
+        family_level=0,
+        family_next_target=30,
+        family_contributions={"Lily": 18, "Dad": 12},
+        family_level_contributions={"Lily": 18, "Dad": 12},
+        family_pace="behind",
+        family_days_left=11,
+        family_pace_expected=15.0,
+    )
+    assert "left:50.0%;top:-3px;bottom:-3px;border-left:2px dashed" in bar
+
+
+def test_pool_row_locks_chip_in_when_share_is_full() -> None:
+    """A full share locks the chip-in button; names in the match chip are escaped."""
+    import ast
+
+    def primary(html: str) -> dict:
+        found: list[dict] = []
+
+        def walk(node: object) -> None:
+            if isinstance(node, dict):
+                if isinstance(node.get("btn_primary"), dict):
+                    found.append(node["btn_primary"]["card"])
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+
+        walk(ast.literal_eval(f"[{html}]"))
+        return found[0]
+
+    full = _pool_row(
+        pool_max_share=120,
+        pool_my_share_left=0,
+        pool_match_ratio=1,
+        pool_match_names=["Mom & Dad"],
+        claim_button_eid="button.lego",
+    )
+    assert primary(full)["icon"] == "mdi:lock-outline"
+    assert primary(full)["tap_action"] == {"action": "none"}
+    assert "Mom &amp; Dad ×1" in full
+
+    room = _pool_row(
+        pool_max_share=120, pool_my_share_left=80, claim_button_eid="button.lego"
+    )
+    assert primary(room)["icon"] == "mdi:arrow-right"
+    assert primary(room)["tap_action"]["target"] == {"entity_id": "button.lego"}

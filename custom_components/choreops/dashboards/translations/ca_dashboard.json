@@ -500,5 +500,7 @@
   "share_full": "La teva part està completa",
   "share_left": "Et queden {left} de {max}",
   "out_of_points": "sense punts",
-  "pool_closed": "guardiola tancada"
+  "pool_closed": "guardiola tancada",
+  "days_left_this_week": "dies restants aquesta setmana",
+  "days_left_this_month": "dies restants aquest mes"
 }

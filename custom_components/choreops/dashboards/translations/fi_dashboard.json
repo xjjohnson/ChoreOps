@@ -500,5 +500,7 @@
   "share_full": "Osuutesi on täynnä",
   "share_left": "{left}/{max} jäljellä",
   "out_of_points": "ei pisteitä",
-  "pool_closed": "säästöpossu suljettu"
+  "pool_closed": "säästöpossu suljettu",
+  "days_left_this_week": "päivää jäljellä tällä viikolla",
+  "days_left_this_month": "päivää jäljellä tässä kuussa"
 }

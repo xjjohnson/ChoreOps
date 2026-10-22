@@ -500,5 +500,7 @@
   "share_full": "Din andel er fuld",
   "share_left": "{left} af dine {max} tilbage",
   "out_of_points": "ingen point",
-  "pool_closed": "sparebøsse lukket"
+  "pool_closed": "sparebøsse lukket",
+  "days_left_this_week": "dage tilbage denne uge",
+  "days_left_this_month": "dage tilbage denne måned"
 }

@@ -500,5 +500,7 @@
   "share_full": "Din andel är full",
   "share_left": "{left} av dina {max} kvar",
   "out_of_points": "inga poäng",
-  "pool_closed": "spargris stängd"
+  "pool_closed": "spargris stängd",
+  "days_left_this_week": "dagar kvar denna vecka",
+  "days_left_this_month": "dagar kvar denna månad"
 }

@@ -12,7 +12,7 @@ managers through their public methods, so those files stay identical to upstream
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.exceptions import HomeAssistantError
 
@@ -665,9 +665,10 @@ class RewardPoolManager(BaseManager):
         ]
         match_out = bool(match_names) and not any(
             float(
-                self.coordinator.assignees_data.get(parent_id, {}).get(
-                    const.DATA_USER_POINTS, 0
-                )
+                cast(
+                    "dict[str, Any]",
+                    self.coordinator.assignees_data.get(parent_id) or {},
+                ).get(const.DATA_USER_POINTS)
                 or 0
             )
             > 0

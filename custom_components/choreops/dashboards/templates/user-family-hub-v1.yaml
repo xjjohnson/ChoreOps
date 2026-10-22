@@ -1460,6 +1460,13 @@ views:
                                 {%- set primary_button_icon = 'mdi:lock-outline' -%}
                                 {%- set primary_button_is_locked = true -%}
                               {%- endif -%}
+                              {#-- A pool you have paid your full share into takes no more chip-ins from you: lock the button --#}
+                              {%- set share_cap = state_attr(reward_sensor_eid, 'pool_max_share') | float(default=0) -%}
+                              {%- set share_left = state_attr(reward_sensor_eid, 'pool_my_share_left') -%}
+                              {%- if reward_state == 'available' and (state_attr(reward_sensor_eid, 'pooled') | default(false, true)) and share_cap > 0 and share_left is not none and (share_left | float(default=0)) <= 0 -%}
+                                {%- set primary_button_icon = 'mdi:lock-outline' -%}
+                                {%- set primary_button_is_locked = true -%}
+                              {%- endif -%}
                               {%- set has_primary = primary_button_eid not in ['', none] or primary_button_is_locked -%}
                               {%- set has_secondary = secondary_button_eid not in ['', none] -%}
 
@@ -1503,7 +1510,7 @@ views:
                                     {%- set share_chip = "<span style='" ~ chip_css ~ "'>" ~ chip_icon | replace('ICON', 'mdi:account') | replace('COL', '') ~ ui.get('share_left', '{left} of your {max} left') | replace('{left}', '%g' | format(p_left | float(0) | round(2))) | replace('{max}', '%g' | format(p_max | round(2))) ~ "</span>" -%}
                                   {%- endif -%}
                                 {%- endif -%}
-                                {%- set match_chip = ("<span style='" ~ chip_css ~ ("color:var(--warning-color);" if p_out else '') ~ "'>" ~ chip_icon | replace('ICON', 'mdi:handshake') | replace('COL', 'color:' ~ pref_pool_accent ~ ';') ~ (p_names | join(' + ')) ~ ' ×' ~ ('%g' | format(p_ratio)) ~ ((' · ' ~ ui.get('out_of_points', 'out of points')) if p_out else '') ~ "</span>") if (p_ratio > 0 and p_names and not pool_closed) else '' -%}
+                                {%- set match_chip = ("<span style='" ~ chip_css ~ ("color:var(--warning-color);" if p_out else '') ~ "'>" ~ chip_icon | replace('ICON', 'mdi:handshake') | replace('COL', 'color:' ~ pref_pool_accent ~ ';') ~ (p_names | map('string') | map('replace', '&', '&amp;') | map('replace', '<', '&lt;') | map('replace', '>', '&gt;') | join(' + ')) ~ ' ×' ~ ('%g' | format(p_ratio)) ~ ((' · ' ~ ui.get('out_of_points', 'out of points')) if p_out else '') ~ "</span>") if (p_ratio > 0 and p_names and not pool_closed) else '' -%}
                                 {%- set pool_chips = ("<div style='display:flex;gap:4px;margin-top:3px;flex-wrap:wrap;'>" ~ share_chip ~ match_chip ~ "</div>") if (share_chip or match_chip) else '' -%}
                                 {%- if pool_closed -%}
                                   {%- set bar_note = '✓ ' ~ ui.get('delivered', 'delivered') | capitalize ~ ' &nbsp;•&nbsp; ' ~ ui.get('pool_closed', 'pool closed') -%}
@@ -3305,15 +3312,17 @@ views:
                             {%- set fpace = (state_attr(fe, 'family_pace') or '') | string -%}
                             {%- set ffin = state_attr(fe, 'family_finished') | default(false, true) -%}
                             {%- set fend = (state_attr(fe, 'family_end_date') or '') | string -%}
+                            {%- set fdeadline = (state_attr(fe, 'family_deadline') or '') | string -%}
+                            {%- set fend_txt = (as_timestamp(fend ~ 'T12:00:00') | timestamp_custom('%b %d')) if (ffin and fend) else fend -%}
                             {%- set pace_col = {'ahead': 'var(--success-color)', 'on_track': 'var(--primary-color)', 'behind': 'var(--warning-color)'}.get(fpace, '') -%}
                             {%- set pace_word = {'ahead': ui.get('ahead_of_pace', 'Ahead of pace'), 'on_track': ui.get('on_track', 'On track'), 'behind': ui.get('behind_pace', 'Behind pace')}.get(fpace, '') -%}
-                            {%- set days_txt = '' if (fdays is none or ffin) else (ui.get('ends_today', 'Ends today') if (fdays | int(0)) <= 1 else ((fdays | int(0)) ~ ' ' ~ ui.get('days_left', 'days left'))) -%}
+                            {%- set days_txt = '' if (fdays is none or ffin) else (ui.get('ends_today', 'Ends today') if (fdays | int(0)) <= 1 else ((fdays | int(0)) ~ ' ' ~ (ui.get('days_left_this_week', 'days left this week') if fdeadline == 'week' else (ui.get('days_left_this_month', 'days left this month') if fdeadline == 'month' else ui.get('days_left', 'days left'))))) -%}
                             {%- set pace_bits = ((["<b style='color:" ~ pace_col ~ ";'>" ~ pace_word ~ "</b>"]) if pace_word else []) + ([days_txt] if days_txt else []) -%}
-                            {%- set pace_txt = ("<b>" ~ ui.get('finished', 'Finished') ~ ' ' ~ fend ~ "</b> · " ~ ui.get('counting_stopped', 'counting stopped')) if ffin else (pace_bits | join(' · ')) -%}
+                            {%- set pace_txt = ("<b>" ~ ui.get('finished', 'Finished') ~ ' ' ~ fend_txt ~ "</b> · " ~ ui.get('counting_stopped', 'counting stopped')) if ffin else (pace_bits | join(' · ')) -%}
                             {%- set pace_html = ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ pace_txt ~ "</div>") if pace_txt else '' -%}
                             {%- set fexp = state_attr(fe, 'family_pace_expected') -%}
                             {%- set tick_pct = (([[(fexp | float(0)) - fprev, 0] | max, wspan] | min) / wspan * 100) | round(1) if (pace_word and fexp is not none and not fdone) else none -%}
-                            {%- set tick_html = ("<div style='position:absolute;top:0;bottom:0;left:" ~ tick_pct ~ "%;border-left:2px dashed " ~ pace_col ~ ";opacity:0.9;'></div><div style='position:absolute;bottom:2px;left:calc(" ~ tick_pct ~ "% + 4px);font-size:9px;font-weight:800;color:" ~ pace_col ~ ";'>" ~ ui.get('pace', 'pace') ~ "</div>") if tick_pct is not none else '' -%}
+                            {%- set tick_html = ("<div style='position:absolute;bottom:0;height:22px;left:" ~ tick_pct ~ "%;border-left:2px dashed " ~ pace_col ~ ";opacity:0.9;'></div><div style='position:absolute;bottom:2px;left:calc(" ~ tick_pct ~ "% + 4px);font-size:9px;font-weight:800;color:" ~ pace_col ~ ";'>" ~ ui.get('pace', 'pace') ~ "</div>") if tick_pct is not none else '' -%}
                             {%- set tile = "<div style='width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg," ~ accent ~ "," ~ accent2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ ficon ~ "' style='width:22px;height:22px;--mdc-icon-size:22px;color:#fff;display:block;'></ha-icon></div>" -%}
 
                             {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
@@ -3358,11 +3367,20 @@ views:
                               {%- endif -%}
                               {%- set tfrac = 1 if fdone else (0 if elevel == 0 else ([([elevel - wstart - 1 + bpct / 100, 0] | max) / ([wcnt - 1, 1] | max), 1] | min)) -%}
                               {%- set tinset = 'calc(100% / ' ~ (wcnt * 2) ~ ')' -%}
+                              {#-- Pace on the level track: between the two levels the even-pace total falls between --#}
+                              {%- set fexp_v = fexp | float(0) -%}
+                              {%- set pk = namespace(n=0) -%}
+                              {%- for lv1 in flevels -%}{%- if lv1 <= fexp_v -%}{%- set pk.n = pk.n + 1 -%}{%- endif -%}{%- endfor -%}
+                              {%- set pk_lo = (flevels[pk.n - 1] if pk.n > 0 else 0) | float(0) -%}
+                              {%- set pk_hi = (flevels[pk.n] if pk.n < fcount else pk_lo) | float(0) -%}
+                              {%- set pk_part = ((fexp_v - pk_lo) / (pk_hi - pk_lo)) if pk_hi > pk_lo else 0 -%}
+                              {%- set tpos = ([[((pk.n - 1 + pk_part - wstart) if pk.n > 0 else 0) / ([wcnt - 1, 1] | max), 0] | max, 1] | min) -%}
+                              {%- set pace_lbl = "<span style='position:absolute;left:4px;top:13px;font-size:9px;font-weight:800;color:" ~ pace_col ~ ";white-space:nowrap;'>" ~ ui.get('pace', 'pace') ~ "</span>" -%}
                               {%- set fui_v = "<div style='text-align:left;padding:14px 10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                                 ~ "<div style='display:flex;align-items:center;gap:10px;padding:0 4px;margin-bottom:12px;'>" ~ tile
                                 ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:16px;font-weight:800;line-height:1.15;color:var(--primary-text-color);'>" ~ fname ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);line-height:1.3;'>" ~ (fdesc if fdesc else sub) ~ "</div>" ~ pace_html ~ "</div>"
                                 ~ "<div style='text-align:right;flex:0 0 auto;'><div style='font-size:20px;font-weight:800;line-height:1;color:var(--primary-text-color);'>" ~ ftotal ~ "</div><div style='font-size:10px;opacity:0.65;margin-top:2px;'>/ " ~ wtarget ~ funit ~ "</div>" ~ time_html ~ "</div></div>"
-                                ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:var(--success-color);'></div>" ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;margin:0 4px 8px 4px;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>"))
+                                ~ (("<div style='position:relative;display:flex;margin-bottom:8px;'><div style='position:absolute;left:" ~ tinset ~ ";right:" ~ tinset ~ ";top:15px;height:4px;border-radius:4px;background:var(--divider-color);'></div><div style='position:absolute;left:" ~ tinset ~ ";width:calc((100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tfrac)) ~ ");top:15px;height:4px;border-radius:4px;background:var(--success-color);'></div>" ~ (("<div style='position:absolute;left:calc(" ~ tinset ~ " + (100% - 2 * " ~ tinset ~ ") * " ~ ('%.3f' | format(tpos)) ~ ");top:6px;height:22px;border-left:2px dashed " ~ pace_col ~ ";opacity:0.9;'>" ~ pace_lbl ~ "</div>") if tick_pct is not none else '') ~ nodes.v ~ "</div>") if fcount > 1 else ("<div style='position:relative;margin:0 4px 8px 4px;'><div style='height:14px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='width:" ~ bpct ~ "%;height:100%;border-radius:999px;background:linear-gradient(90deg," ~ accent ~ "," ~ accent2 ~ ");'></div></div>" ~ (("<div style='position:absolute;left:" ~ tick_pct ~ "%;top:-3px;bottom:-3px;border-left:2px dashed " ~ pace_col ~ ";opacity:0.9;'></div>") if tick_pct is not none else '') ~ "</div>"))
                                 ~ ("<div style='text-align:center;font-size:12px;color:var(--secondary-text-color);'>" ~ sub ~ "</div>" if fdesc else '')
                                 ~ (("<div style='text-align:center;'>" ~ mult_html ~ "</div>") if mult_html else '')
                                 ~ rec_html

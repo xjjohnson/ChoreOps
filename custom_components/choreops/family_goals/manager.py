@@ -1028,6 +1028,7 @@ class FamilyGoalManager(BaseManager):
             fg.ATTR_PACE: "",
             fg.ATTR_FINISHED: False,
             fg.ATTR_PACE_EXPECTED: None,
+            fg.ATTR_DEADLINE: "",
         }
         if not goal:
             return empty
@@ -1051,6 +1052,12 @@ class FamilyGoalManager(BaseManager):
             return result
         deadline = min(deadlines)
         result[fg.ATTR_END_DATE] = deadline.isoformat()
+        if end is not None and deadline == end:
+            result[fg.ATTR_DEADLINE] = fg.DEADLINE_FINISH
+        elif goal.get(fg.DATA_REPEAT) == fg.REPEAT_WEEKLY:
+            result[fg.ATTR_DEADLINE] = fg.DEADLINE_WEEK
+        else:
+            result[fg.ATTR_DEADLINE] = fg.DEADLINE_MONTH
         result[fg.ATTR_DAYS_LEFT] = max(0, (deadline - today).days + 1)
 
         levels = self._levels(goal)
