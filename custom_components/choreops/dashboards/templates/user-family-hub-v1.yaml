@@ -213,11 +213,14 @@ views:
                           {%- set badge_name = badge_name_raw[8:] if badge_name_raw[:8] == 'Badge - ' else badge_name_raw -%}
                           {%- set badge_label = ((badge.get('labels') or [{}]) | first) -%}
                           {%- set badge_label = badge_label if badge_label is mapping else {} -%}
-                          {%- set bdg.items = bdg.items + [{'name': badge_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;'), 'icon': state_attr(badge_entity, 'icon') | default('mdi:medal-outline', true), 'count': badge.get('earned_count', 0) | int(default=0), 'last': (badge.get('last_awarded') or '') | string, 'label': (badge_label.get('name') or '') | string, 'color': (badge_label.get('color') or '') | string, 'own': (badge.get('color') or '') | string}] -%}
+                          {%- set badge_target = state_attr(badge_entity, 'target') -%}
+                          {%- set badge_pts = (badge_target.get('threshold_value') if badge_target is mapping else state_attr(badge_entity, 'threshold_value')) | float(default=0) -%}
+                          {%- set bdg.items = bdg.items + [{'pts': badge_pts, 'name': badge_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;'), 'icon': state_attr(badge_entity, 'icon') | default('mdi:medal-outline', true), 'count': badge.get('earned_count', 0) | int(default=0), 'last': (badge.get('last_awarded') or '') | string, 'label': (badge_label.get('name') or '') | string, 'color': (badge_label.get('color') or '') | string, 'own': (badge.get('color') or '') | string}] -%}
                         {%- endif -%}
                       {%- endif -%}
                     {%- endfor -%}
-                    {%- set bdg.items = bdg.items | sort(attribute='last', reverse=true) -%}
+                    {#-- Award dates are often just a day, so ranks earned the same day put the higher rank first --#}
+                    {%- set bdg.items = bdg.items | sort(attribute='last,pts', reverse=true) -%}
                     {%- for b in bdg.items -%}
                       {%- if b.label not in bdg.groups -%}{%- set bdg.groups = bdg.groups + [b.label] -%}{%- endif -%}
                     {%- endfor -%}

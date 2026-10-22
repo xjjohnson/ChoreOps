@@ -3768,3 +3768,42 @@ def test_family_hub_showcase_label_without_color_falls_back_quietly() -> None:
     assert "var(--primary-color)" in important
     kindness = output[output.index("Kindness") - 400 : output.index("Kind Words")]
     assert "#d4a017" in kindness
+
+
+def test_family_hub_badges_same_day_put_the_higher_rank_left() -> None:
+    """Badges earned the same day list the higher rank first, newest day first."""
+    names = [
+        ("beginner", "Beginner", 0, "2026-10-22"),
+        ("silver_1", "Silver 1", 5000, "2026-10-22"),
+        ("bronze_1", "Bronze 1", 1000, "2026-10-22"),
+        ("bronze_2", "Bronze 2", 2000, "2026-10-22"),
+        ("bronze_3", "Bronze 3", 3000, "2026-10-22"),
+        ("old", "Old Badge", 0, "2026-10-01"),
+    ]
+    output = _render_hub_card(
+        _hub_card_template("ach_ns"),
+        {
+            "badges": [
+                {
+                    "eid": f"sensor.lily_{key}",
+                    "name": name,
+                    "earned": True,
+                    "earned_count": 1,
+                    "last_awarded": last,
+                }
+                for key, name, _, last in names
+            ]
+        },
+        {
+            f"sensor.lily_{key}": _MockState(
+                entity_id=f"sensor.lily_{key}",
+                state="ok",
+                attributes={"target": {"threshold_value": pts}},
+                name=name,
+            )
+            for key, name, pts, _ in names
+        },
+    )
+    order = ["Silver 1", "Bronze 3", "Bronze 2", "Bronze 1", "Beginner", "Old Badge"]
+    positions = [output.index(f">{name}</div>") for name in order]
+    assert positions == sorted(positions)
