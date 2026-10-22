@@ -553,10 +553,13 @@ class FamilyGoalManager(BaseManager):
     def _contribution(self, assignee_id: str, goal: dict[str, Any]) -> float:
         """Return one person's contribution since the goal was last restarted."""
         raw = self._raw_contribution(assignee_id, goal)
-        if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_DAY:
-            # Already scoped to today; a restart baseline would zero tomorrow.
-            return raw
         baseline = goal.get(fg.DATA_BASELINE, {})
+        if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_DAY and (
+            str(goal.get(fg.DATA_STARTED, "")) != dt_today_iso()
+        ):
+            # Already scoped to today; a restart baseline only counts on the
+            # day it was taken, so tomorrow starts from zero.
+            return raw
         return max(0.0, raw - float(baseline.get(assignee_id, 0.0)))
 
     def _lower_snapshots(self, goal: dict[str, Any]) -> bool:
@@ -570,8 +573,7 @@ class FamilyGoalManager(BaseManager):
         Returns:
             True when a snapshot changed.
         """
-        goal_type = goal.get(fg.DATA_TYPE)
-        if goal_type in fg.STREAK_GOAL_TYPES or goal_type == fg.GOAL_TYPE_DAY:
+        if goal.get(fg.DATA_TYPE) in fg.STREAK_GOAL_TYPES:
             return False
         changed = False
         baseline = goal.get(fg.DATA_BASELINE)
@@ -658,6 +660,30 @@ class FamilyGoalManager(BaseManager):
         return {
             assignee_id: max(0.0, value - float(start.get(assignee_id, 0.0)))
             for assignee_id, value in self.get_contributions(goal_id).items()
+        }
+
+    def _next_level_start(
+        self,
+        goal_id: str,
+        goal: dict[str, Any],
+        level_shares: dict[str, float],
+        overshoot: float,
+    ) -> dict[str, float]:
+        """Return the level-start snapshot for a level just begun.
+
+        Points past the finished level's target carry into the new level, so a
+        big jump does not leave everyone at 0. Each person carries the same
+        fraction of what they added during the finished level.
+        """
+        shares = self.get_contributions(goal_id)
+        level_total = sum(level_shares.values())
+        if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_EVERYONE or level_total <= 0:
+            # Only as strong as the smallest share: there is no pooled extra.
+            return shares
+        carry = min(max(overshoot, 0.0), level_total) / level_total
+        return {
+            assignee_id: value - level_shares.get(assignee_id, 0.0) * carry
+            for assignee_id, value in shares.items()
         }
 
     def get_level_info(self, goal_id: str) -> dict[str, Any]:
@@ -954,7 +980,9 @@ class FamilyGoalManager(BaseManager):
         """Restart a goal from zero.
 
         Points and chores goals remember each person's current all-time total
-        as a baseline, so only future activity counts. The streak goals clear
+        as a baseline, so only future activity counts (for the one-day goal,
+        only for the rest of today, so levels already paid today are not paid
+        again). The streak goals clear
         their streak (today is not counted, tomorrow is day one). Everyone's
         award is cleared so the goal can be earned again; reward points already
         paid out are untouched.
@@ -1218,7 +1246,9 @@ class FamilyGoalManager(BaseManager):
                 else set()
             )
             goal[fg.DATA_LEVEL] = reached
-            goal[fg.DATA_LEVEL_START] = self.get_contributions(goal_id)
+            goal[fg.DATA_LEVEL_START] = self._next_level_start(
+                goal_id, goal, level_shares, total - levels[reached - 1][0]
+            )
 
             for assignee_id in self._assigned_ids(goal):
                 entry = progress.get(assignee_id)

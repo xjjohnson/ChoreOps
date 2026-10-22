@@ -633,6 +633,101 @@ async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
     assert gm.get_day_record(goal_id)["family_record"] == 6
 
 
+async def test_resetting_one_day_goal_does_not_pay_todays_levels_again(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A mid-day reset counts from the reset on; tomorrow counts in full."""
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_DAY,
+        target=6.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+    goal = coordinator.challenges_data[goal_id]
+    goal[fg.DATA_LEVELS] = "2, 4, 6"
+    today = {zoe: 3, max_: 3}
+    gm._approved_today = lambda assignee_id: today[assignee_id]
+
+    def balance(a: str) -> float:
+        return float(coordinator.assignees_data[a][const.DATA_USER_POINTS])
+
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert goal[fg.DATA_LEVEL] == 3
+    paid = balance(zoe)
+
+    gm.reset_goal(goal_id)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_total(goal_id) == 0
+    assert goal[fg.DATA_LEVEL] == 0
+    assert balance(zoe) == pytest.approx(paid)
+
+    today[max_] = 5
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_level_contributions(goal_id) == {zoe: 0.0, max_: 2.0}
+    assert goal[fg.DATA_LEVEL] == 1
+
+    # The next day counts every chore again.
+    goal[fg.DATA_STARTED] = "2000-01-01"
+    goal[fg.DATA_STREAK_LAST_DAY] = "2000-01-01"
+    today.update({zoe: 1, max_: 2})
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_total(goal_id) == 3
+
+
+async def test_points_past_a_level_carry_into_the_next_level(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A big jump past a level shows up in the next level's shares."""
+    gm = scenario_full.coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=1.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+    scenario_full.coordinator.challenges_data[goal_id][fg.DATA_LEVELS] = (
+        "100, 200, 1000, 5000"
+    )
+
+    # One chore past two levels at once: 581 - 200 carries into level 3.
+    await _earn_points(scenario_full, zoe, 581.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_level_info(goal_id)["level"] == 2
+    assert gm.get_level_contributions(goal_id) == {
+        zoe: pytest.approx(381.0),
+        max_: pytest.approx(0.0),
+    }
+
+    # Shared overshoot is split by what each person added to the level.
+    await _earn_points(scenario_full, max_, 300.0)
+    await gm.evaluate_assignee(max_)
+    await hass.async_block_till_done()
+    await _earn_points(scenario_full, zoe, 319.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_level_info(goal_id)["level"] == 3
+    # Level 3 took 381 + 300 + 319 = 1000 of 1200 total: 200 carries over.
+    shares = gm.get_level_contributions(goal_id)
+    assert shares[zoe] == pytest.approx(700.0 * 200.0 / 1000.0)
+    assert shares[max_] == pytest.approx(300.0 * 200.0 / 1000.0)
+    assert sum(shares.values()) == pytest.approx(gm.get_total(goal_id) - 1000.0)
+
+
 async def test_active_streak_needs_everyone_every_day(
     hass: HomeAssistant,
     scenario_full: SetupResult,
