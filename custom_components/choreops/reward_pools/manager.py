@@ -663,15 +663,11 @@ class RewardPoolManager(BaseManager):
             for parent_id in reward_info.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
             if match_ratio > 0
         ]
+        assignees = self.coordinator.assignees_data
         match_out = bool(match_names) and not any(
-            float(
-                self.coordinator.assignees_data.get(parent_id, {}).get(
-                    const.DATA_USER_POINTS, 0
-                )
-                or 0
-            )
-            > 0
+            float(assignees[parent_id].get(const.DATA_USER_POINTS) or 0) > 0
             for parent_id in reward_info.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
+            if parent_id in assignees
         )
         attrs.update(
             {
