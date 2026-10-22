@@ -2869,6 +2869,10 @@ class ChoreOpsOptionsFlowHandler(FamilyGoalsOptionsMixin, config_entries.Options
                     const.DATA_BADGE_LABELS, []
                 ),
                 const.CFOF_BADGES_INPUT_ICON: existing_badge.get(const.DATA_BADGE_ICON),
+                const.CFOF_BADGES_INPUT_COLOR: existing_badge.get(
+                    const.DATA_BADGE_COLOR
+                )
+                or const.BADGE_COLOR_DEFAULT,
                 # Target fields
                 const.CFOF_BADGES_INPUT_TARGET_TYPE: target_data.get(
                     const.DATA_BADGE_TARGET_TYPE

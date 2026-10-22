@@ -2192,6 +2192,12 @@ _CHORE_USER_RUNTIME_FIELDS: frozenset[str] = frozenset(
 # The embedded mapping provides type-specific field handling in one place.
 
 
+def _normalize_badge_color(value: Any) -> str:
+    """Store a badge color name, or "" for the default (no color)."""
+    color = str(value or "").strip()
+    return "" if color == const.BADGE_COLOR_DEFAULT else color
+
+
 def build_badge(
     user_input: dict[str, Any],
     existing: BadgeData | None = None,
@@ -2315,6 +2321,13 @@ def build_badge(
             get_field(
                 const.CFOF_BADGES_INPUT_ICON,
                 const.DATA_BADGE_ICON,
+                const.SENTINEL_EMPTY,
+            )
+        ),
+        const.DATA_BADGE_COLOR: _normalize_badge_color(
+            get_field(
+                const.CFOF_BADGES_INPUT_COLOR,
+                const.DATA_BADGE_COLOR,
                 const.SENTINEL_EMPTY,
             )
         ),
@@ -2620,6 +2633,7 @@ _BADGE_DATA_RESET_PRESERVE_FIELDS: frozenset[str] = frozenset(
         const.DATA_BADGE_DESCRIPTION,
         const.DATA_BADGE_LABELS,
         const.DATA_BADGE_ICON,
+        const.DATA_BADGE_COLOR,
         # Type-specific config dicts (entire nested structures are config)
         const.DATA_BADGE_TARGET,  # Threshold/maintenance rules (config)
         const.DATA_BADGE_AWARDS,  # Points/multiplier/items (config)

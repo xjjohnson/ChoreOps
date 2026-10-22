@@ -703,6 +703,7 @@ CFOF_BADGES_INPUT_AWARD_ITEMS: Final = "award_items"
 CFOF_BADGES_INPUT_AWARD_POINTS: Final = "award_points"
 CFOF_BADGES_INPUT_BADGE_COUNT: Final = "badge_count"
 CFOF_BADGES_INPUT_CLEAR_END_DATE: Final = "clear_end_date"
+CFOF_BADGES_INPUT_COLOR: Final = "badge_color"
 CFOF_BADGES_INPUT_CLEAR_START_DATE: Final = "clear_start_date"
 CFOF_BADGES_INPUT_DESCRIPTION: Final = "badge_description"
 CFOF_BADGES_INPUT_END_DATE: Final = "end_date"
@@ -1541,6 +1542,35 @@ DATA_CHORE_STANDBY_CLAIM_MODE: Final = "standby_claim_mode"
 STANDBY_CLAIM_MODE_ANYTIME: Final = "anytime"
 STANDBY_CLAIM_MODE_ON_OVERDUE: Final = "on_overdue"
 STANDBY_CLAIM_MODE_MANUAL_ONLY: Final = "manual_only"
+# Badge colors use the names Home Assistant offers for labels; "default" means
+# no color, so the dashboard falls back to the label color, then the theme.
+BADGE_COLOR_DEFAULT: Final = "default"
+BADGE_COLOR_OPTIONS: Final = [
+    {"value": color, "label": color}
+    for color in (
+        BADGE_COLOR_DEFAULT,
+        "red",
+        "pink",
+        "purple",
+        "deep-purple",
+        "indigo",
+        "blue",
+        "light-blue",
+        "cyan",
+        "teal",
+        "green",
+        "light-green",
+        "lime",
+        "yellow",
+        "amber",
+        "orange",
+        "deep-orange",
+        "brown",
+        "grey",
+        "blue-grey",
+    )
+]
+
 STANDBY_CLAIM_MODE_OPTIONS: Final = [
     {"value": STANDBY_CLAIM_MODE_ANYTIME, "label": "anytime"},
     {"value": STANDBY_CLAIM_MODE_ON_OVERDUE, "label": "on_overdue"},
@@ -1710,6 +1740,7 @@ DATA_BADGE_AWARDS_AWARD_ITEMS: Final = "award_items"
 DATA_BADGE_AWARDS_AWARD_POINTS: Final = "award_points"
 DATA_BADGE_AWARDS_AWARD_REWARD: Final = "award_reward"
 DATA_BADGE_AWARDS_POINT_MULTIPLIER: Final = "points_multiplier"
+DATA_BADGE_COLOR: Final = "color"
 DATA_BADGE_DESCRIPTION: Final = "description"
 DATA_BADGE_EARNED_BY: Final = "earned_by"
 DATA_BADGE_ICON: Final = "icon"
@@ -4024,6 +4055,7 @@ TRANS_KEY_FLOW_HELPERS_NOTIFICATION_PRIORITY: Final = "notification_priority"
 TRANS_KEY_FLOW_HELPERS_NOTIFICATION_IMPORTANCE: Final = "notification_importance"
 TRANS_KEY_FLOW_HELPERS_COMPLETION_CRITERIA: Final = "completion_criteria"
 TRANS_KEY_FLOW_HELPERS_STANDBY_CLAIM_MODE: Final = "standby_claim_mode"
+TRANS_KEY_FLOW_HELPERS_BADGE_COLOR: Final = "badge_color"
 TRANS_KEY_FLOW_HELPERS_ASSOCIATED_USER_IDS: Final = "associated_user_ids"
 TRANS_KEY_FLOW_HELPERS_CUSTOM_INTERVAL_UNIT: Final = "custom_interval_unit"
 TRANS_KEY_FLOW_HELPERS_OVERDUE_HANDLING_TYPE: Final = "overdue_handling_type"
