@@ -733,3 +733,213 @@ async def test_back_to_back_contributions_to_two_pools_cannot_overspend(
     assert _points(scenario_full, zoe) == 0.0
     assert _pool(scenario_full, movie) == {zoe: 30.0}
     assert _pool(scenario_full, outing) == {}
+
+
+# ---------------------------------------------------------------------------
+# Pool settings: share limit, parent match, after delivery
+# ---------------------------------------------------------------------------
+
+
+async def test_share_limit_caps_each_person(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Nobody can pay in more than the share limit, counted over all chip-ins."""
+    pm = scenario_full.coordinator.reward_pool_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    reward_id = _make_pool(scenario_full)
+    scenario_full.coordinator.reward_manager.update_reward(
+        reward_id, {rp.DATA_REWARD_POOL_MAX_SHARE: 40}
+    )
+    _set_points(scenario_full, zoe, 500.0)
+
+    assert await pm.contribute_to_pool(zoe, reward_id, 25.0) == 25.0
+    await hass.async_block_till_done()
+    # Only 15 of her 40 point share is left
+    assert await pm.contribute_to_pool(zoe, reward_id) == 15.0
+    await hass.async_block_till_done()
+    with pytest.raises(HomeAssistantError) as err:
+        await pm.contribute_to_pool(zoe, reward_id, 1.0)
+    assert err.value.translation_key == rp.TRANS_KEY_ERROR_REWARD_POOL_SHARE_REACHED
+    assert _points(scenario_full, zoe) == 460.0
+
+    reward = scenario_full.coordinator.rewards_data[reward_id]
+    attrs = pm.sensor_attributes(reward, zoe)
+    assert attrs[rp.ATTR_REWARD_POOL_MAX_SHARE] == 40.0
+    assert attrs[rp.ATTR_REWARD_POOL_MY_SHARE_LEFT] == 0.0
+
+
+async def test_parent_match_comes_from_the_parents_balance(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """A match is withdrawn from the parent, capped, refunded to them, never granted."""
+    coordinator = scenario_full.coordinator
+    pm = coordinator.reward_pool_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    parent = scenario_full.assignee_ids["Lila"]  # Stands in for a parent with points
+    reward_id = _make_pool(scenario_full)
+    coordinator.reward_manager.update_reward(
+        reward_id,
+        {
+            rp.DATA_REWARD_POOL_MATCH_RATIO: 1,
+            rp.DATA_REWARD_POOL_MATCH_USER_IDS: [parent],
+            const.DATA_REWARD_ASSIGNED_USER_IDS: [zoe, max_],
+        },
+    )
+    _set_points(scenario_full, zoe, 100.0)
+    _set_points(scenario_full, max_, 100.0)
+    _set_points(scenario_full, parent, 30.0)
+
+    assert await pm.contribute_to_pool(zoe, reward_id, 20.0) == 20.0
+    await hass.async_block_till_done()
+    assert _pool(scenario_full, reward_id) == {zoe: 20.0, parent: 20.0}
+    # The parent only has 10 left to match with
+    await pm.contribute_to_pool(max_, reward_id, 25.0)
+    await hass.async_block_till_done()
+    assert _pool(scenario_full, reward_id) == {zoe: 20.0, max_: 25.0, parent: 30.0}
+    assert _points(scenario_full, parent) == 0.0
+
+    # Refunding the pool returns the match to the parent
+    await pm.refund_pool(reward_id)
+    await hass.async_block_till_done()
+    assert _points(scenario_full, parent) == 30.0
+    assert _points(scenario_full, zoe) == 100.0
+
+    # The match never fills the pool past its cost, and the parent is not
+    # recorded as receiving the reward
+    _set_points(scenario_full, parent, 500.0)
+    await pm.contribute_to_pool(zoe, reward_id, 40.0)
+    await hass.async_block_till_done()
+    await pm.contribute_to_pool(max_, reward_id, 15.0)
+    await hass.async_block_till_done()
+    assert _pool(scenario_full, reward_id) == {zoe: 40.0, max_: 15.0, parent: 45.0}
+    await pm.approve_pool("Mom", reward_id)
+    await hass.async_block_till_done()
+    parent_rewards = coordinator.assignees_data[parent].get(
+        const.DATA_USER_REWARD_DATA, {}
+    )
+    assert not parent_rewards.get(reward_id, {}).get(
+        const.DATA_USER_REWARD_DATA_LAST_APPROVED
+    )
+
+
+async def test_closed_pool_refuses_chip_ins_until_reward_saved(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """After delivery a closing pool takes no chip-ins; saving the reward reopens it."""
+    coordinator = scenario_full.coordinator
+    pm = coordinator.reward_pool_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    reward_id = _make_pool(scenario_full)
+    coordinator.reward_manager.update_reward(
+        reward_id, {rp.DATA_REWARD_POOL_AFTER_DELIVERY: rp.AFTER_DELIVERY_CLOSE}
+    )
+    _set_points(scenario_full, zoe, 300.0)
+    await pm.contribute_to_pool(zoe, reward_id, 100.0)
+    await hass.async_block_till_done()
+    await pm.approve_pool("Mom", reward_id)
+    await hass.async_block_till_done()
+
+    reward = coordinator.rewards_data[reward_id]
+    assert pm.sensor_attributes(reward, zoe)[rp.ATTR_REWARD_POOL_CLOSED] is True
+    assert pm.status_override(reward, 100.0, 300.0) == const.REWARD_STATE_LOCKED
+    with pytest.raises(HomeAssistantError) as err:
+        await pm.contribute_to_pool(zoe, reward_id, 10.0)
+    assert err.value.translation_key == rp.TRANS_KEY_ERROR_REWARD_POOL_CLOSED
+
+    coordinator.reward_manager.update_reward(reward_id, {})
+    assert await pm.contribute_to_pool(zoe, reward_id, 10.0) == 10.0
+
+
+def test_pool_settings_validation_and_cleanup() -> None:
+    """Share limit must be 0-100, a match needs a parent; values are cleaned."""
+    from custom_components.choreops.reward_pools.settings import build_settings
+    from custom_components.choreops.reward_pools.validation import (
+        validate_pool_settings,
+    )
+
+    pooled = {const.DATA_REWARD_POOLED: True, const.DATA_REWARD_COST: 100}
+    assert validate_pool_settings({**pooled, rp.DATA_REWARD_POOL_MAX_SHARE: 101}) == {
+        rp.DATA_REWARD_POOL_MAX_SHARE: rp.TRANS_KEY_CFOF_REWARD_POOL_MAX_SHARE_INVALID
+    }
+    assert validate_pool_settings({**pooled, rp.DATA_REWARD_POOL_MATCH_RATIO: 1}) == {
+        rp.DATA_REWARD_POOL_MATCH_USER_IDS: rp.TRANS_KEY_CFOF_REWARD_POOL_MATCH_NO_PARENT
+    }
+    assert (
+        validate_pool_settings(
+            {
+                **pooled,
+                rp.DATA_REWARD_POOL_MATCH_RATIO: 1,
+                rp.DATA_REWARD_POOL_MATCH_USER_IDS: ["parent"],
+            }
+        )
+        == {}
+    )
+    stored = {rp.DATA_REWARD_POOL_AFTER_DELIVERY: "bogus", "pool_max_share": -5}
+    built = build_settings(stored.get)
+    assert built == {
+        rp.DATA_REWARD_POOL_MAX_SHARE: 0.0,
+        rp.DATA_REWARD_POOL_MATCH_RATIO: 0.0,
+        rp.DATA_REWARD_POOL_MATCH_USER_IDS: [],
+        rp.DATA_REWARD_POOL_AFTER_DELIVERY: rp.AFTER_DELIVERY_RESTART,
+    }
+
+
+def test_reward_form_offers_pool_settings_and_lists_only_parents() -> None:
+    """The reward form has the pool settings; the match lists approvers only."""
+    from custom_components.choreops.helpers.flow_helpers import build_reward_schema
+    from custom_components.choreops.reward_pools.form import match_parent_options
+
+    users = {
+        "kid": {const.DATA_USER_NAME: "Kid"},
+        "mom": {const.DATA_USER_NAME: "Mom", const.DATA_USER_CAN_APPROVE: True},
+    }
+    keys = {str(key) for key in build_reward_schema(assignees_dict=users).schema}
+    assert set(rp.POOL_SETTING_KEYS) <= keys
+    values = [option["value"] for option in match_parent_options(users)]
+    assert values == ["mom"]
+
+
+async def test_match_is_split_between_parents_and_covered_when_one_runs_out(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Two parents share the match evenly; one short of points, the other covers."""
+    coordinator = scenario_full.coordinator
+    pm = coordinator.reward_pool_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    mom = scenario_full.assignee_ids["Max!"]  # Stand-ins for parents with points
+    dad = scenario_full.assignee_ids["Lila"]
+    reward_id = _make_pool(scenario_full)
+    coordinator.reward_manager.update_reward(
+        reward_id,
+        {
+            rp.DATA_REWARD_POOL_MATCH_RATIO: 1,
+            rp.DATA_REWARD_POOL_MATCH_USER_IDS: [mom, dad],
+            const.DATA_REWARD_ASSIGNED_USER_IDS: [zoe],
+        },
+    )
+    _set_points(scenario_full, zoe, 100.0)
+    _set_points(scenario_full, mom, 100.0)
+    _set_points(scenario_full, dad, 4.0)
+
+    await pm.contribute_to_pool(zoe, reward_id, 10.0)
+    await hass.async_block_till_done()
+    # 10 to match: Dad can only give 4, Mom covers the other 6
+    assert _pool(scenario_full, reward_id) == {zoe: 10.0, dad: 4.0, mom: 6.0}
+
+    await pm.contribute_to_pool(zoe, reward_id, 10.0)
+    await hass.async_block_till_done()
+    assert _pool(scenario_full, reward_id) == {zoe: 20.0, dad: 4.0, mom: 16.0}
+
+    _set_points(scenario_full, dad, 50.0)
+    await pm.contribute_to_pool(zoe, reward_id, 10.0)
+    await hass.async_block_till_done()
+    assert _pool(scenario_full, reward_id) == {zoe: 30.0, dad: 9.0, mom: 21.0}
+
+    reward = coordinator.rewards_data[reward_id]
+    names = pm.sensor_attributes(reward, zoe)[rp.ATTR_REWARD_POOL_MATCH_NAMES]
+    assert names == ["Max!", "Lila"]

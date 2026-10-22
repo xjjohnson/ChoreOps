@@ -10,7 +10,7 @@ from typing import Any
 
 from .. import const
 from ..utils.math_utils import parse_points_value
-from . import const as rp
+from . import const as rp, settings
 
 
 def _points(value: Any) -> float | None:
@@ -24,10 +24,11 @@ def _points(value: Any) -> float | None:
 def validate_pool_settings(
     data: dict[str, Any], existing: dict[str, Any] | None = None
 ) -> dict[str, str]:
-    """Check a pooled reward's cost and chip-in amount.
+    """Check a pooled reward's cost, chip-in amount and pool settings.
 
-    A pool needs a target above zero, and one chip-in can't be more than the
-    whole target. Fields missing from ``data`` (a partial update) fall back to
+    A pool needs a target above zero, one chip-in can't be more than the
+    whole target, the most one person may pay is 0-100 % and a match needs a
+    parent to pay it. Fields missing from ``data`` (a partial update) fall back to
     the stored reward.
 
     Args:
@@ -59,4 +60,4 @@ def validate_pool_settings(
                 rp.TRANS_KEY_CFOF_REWARD_POOL_CHIP_IN_TOO_HIGH
             )
         }
-    return {}
+    return settings.validate_settings(field)

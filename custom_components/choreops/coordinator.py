@@ -12,10 +12,11 @@ Architecture (v0.5.0+):
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import timedelta
+import functools
 import sys
 import time
 from typing import Any, Literal, cast
@@ -387,7 +388,16 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
         if self._update_batch_depth > 0:
             self._update_batch_pending = True
             return
-        super().async_update_listeners()
+        self._refresh_listeners()
+
+    def _refresh_listeners(self) -> None:
+        """Rewrite every entity, sharing chore status lookups across sensors."""
+        chore_manager = getattr(self, "chore_manager", None)
+        if chore_manager is None:
+            super().async_update_listeners()
+            return
+        with chore_manager.status_cache():
+            super().async_update_listeners()
 
     @asynccontextmanager
     async def batched_updates(self) -> AsyncIterator[None]:
@@ -405,7 +415,7 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
             self._update_batch_depth -= 1
             if self._update_batch_depth == 0 and self._update_batch_pending:
                 self._update_batch_pending = False
-                super().async_update_listeners()
+                self._refresh_listeners()
 
     def _persist_and_update(self, immediate: bool = False) -> None:
         """Persist data AND update entity listeners to reflect state changes.
@@ -790,3 +800,21 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
     def bonuses_data(self) -> BonusesCollection:
         """Return the bonuses data."""
         return self._data.get(const.DATA_BONUSES, {})
+
+
+def batched_press[EntityT: Any, R](
+    press: Callable[[EntityT], Awaitable[R]],
+) -> Callable[[EntityT], Awaitable[R]]:
+    """Run a button press with one entity refresh at its end.
+
+    A single press changes several things (the chore, points, statistics) and
+    each change asked for a full refresh. The refresh still happens before the
+    press returns, so automations reading state afterwards see the new state.
+    """
+
+    @functools.wraps(press)
+    async def wrapper(self: EntityT) -> R:
+        async with self.coordinator.batched_updates():
+            return await press(self)
+
+    return wrapper

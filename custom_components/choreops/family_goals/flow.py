@@ -80,6 +80,10 @@ def build_goal_schema(
                     multiple=False,
                 )
             ),
+            # Total Chores Completed only: also count chores with these labels.
+            vol.Optional(fg.DATA_CHORE_LABELS, default=[]): selector.LabelSelector(
+                selector.LabelSelectorConfig(multiple=True)
+            ),
             vol.Required(
                 fg.DATA_TARGET_VALUE, default=fg.DEFAULT_TARGET
             ): selector.NumberSelector(
@@ -100,6 +104,26 @@ def build_goal_schema(
                     mode=selector.NumberSelectorMode.BOX, min=0, step=0.01
                 )
             ),
+            vol.Optional(
+                fg.DATA_REPEAT, default=fg.REPEAT_NEVER
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(fg.REPEAT_OPTIONS),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key=fg.DATA_REPEAT,
+                )
+            ),
+            # Optional last day progress counts.
+            vol.Optional(fg.DATA_END_DATE): selector.DateSelector(),
+            vol.Optional(
+                fg.DATA_NOTIFY, default=fg.NOTIFY_EVERYONE
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=list(fg.NOTIFY_OPTIONS),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    translation_key=fg.DATA_NOTIFY,
+                )
+            ),
         }
     )
 
@@ -109,10 +133,22 @@ def _clean_goal_input(
 ) -> dict[str, Any]:
     """Return form input ready for the builders."""
     data = dict(user_input)
+    # A cleared date is left out of the form input; store it as no date.
+    if not data.get(fg.DATA_END_DATE):
+        data[fg.DATA_END_DATE] = base.SENTINEL_EMPTY
     data[fg.DATA_ASSIGNED_USER_IDS] = fh.normalize_selected_user_ids(
         data.get(fg.DATA_ASSIGNED_USER_IDS, []), assignees_dict
     )
     return data
+
+
+def _form_values(data: dict[str, Any]) -> dict[str, Any]:
+    """Return values to show in the form: an empty date is left blank."""
+    return {
+        key: value
+        for key, value in data.items()
+        if not (key == fg.DATA_END_DATE and not value)
+    }
 
 
 class FamilyGoalsOptionsMixin(OptionsFlow):
@@ -159,7 +195,7 @@ class FamilyGoalsOptionsMixin(OptionsFlow):
         schema = build_goal_schema(assignees_dict, coordinator.chores_data)
         if user_input:
             schema = self.add_suggested_values_to_schema(
-                schema, _clean_goal_input(user_input, assignees_dict)
+                schema, _form_values(_clean_goal_input(user_input, assignees_dict))
             )
         return self.async_show_form(
             step_id=base.OPTIONS_FLOW_STEP_ADD_CHALLENGE,
@@ -221,7 +257,11 @@ class FamilyGoalsOptionsMixin(OptionsFlow):
             fg.DATA_LEVELS: goal.get(fg.DATA_LEVELS, base.SENTINEL_EMPTY),
             fg.DATA_TOP_MULTIPLIER: goal.get(fg.DATA_TOP_MULTIPLIER, 1),
             fg.DATA_REWARD_POINTS: goal.get(fg.DATA_REWARD_POINTS, 0),
+            fg.DATA_CHORE_LABELS: goal.get(fg.DATA_CHORE_LABELS, []),
+            fg.DATA_REPEAT: goal.get(fg.DATA_REPEAT, fg.REPEAT_NEVER),
+            fg.DATA_NOTIFY: goal.get(fg.DATA_NOTIFY, fg.NOTIFY_EVERYONE),
         }
+        suggested[fg.DATA_END_DATE] = goal.get(fg.DATA_END_DATE, "")
         if user_input:
             suggested.update(_clean_goal_input(user_input, assignees_dict))
         if (
@@ -231,7 +271,7 @@ class FamilyGoalsOptionsMixin(OptionsFlow):
             suggested[fg.DATA_SELECTED_CHORE_ID] = base.SENTINEL_EMPTY
 
         schema = build_goal_schema(assignees_dict, coordinator.chores_data)
-        schema = self.add_suggested_values_to_schema(schema, suggested)
+        schema = self.add_suggested_values_to_schema(schema, _form_values(suggested))
         return self.async_show_form(
             step_id=base.OPTIONS_FLOW_STEP_EDIT_CHALLENGE,
             data_schema=schema,

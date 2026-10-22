@@ -142,6 +142,12 @@ class RewardPoolManager(BaseManager):
         """Internal contribution logic executed under the pool lock."""
         reward_info = self._get_pooled_reward_or_raise(reward_id)
         reward_name = reward_info[const.DATA_REWARD_NAME]
+        if self.is_closed(reward_info):
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=rp.TRANS_KEY_ERROR_REWARD_POOL_CLOSED,
+                translation_placeholders={"reward": reward_name},
+            )
 
         assignee_info: UserData | None = self.coordinator.assignees_data.get(
             assignee_id
@@ -177,10 +183,24 @@ class RewardPoolManager(BaseManager):
                 translation_placeholders={"reward": reward_name},
             )
 
+        # The most one person may pay in (the share limit), if set
+        share_left = self.share_left(reward_info, assignee_id)
+        if share_left is not None and share_left <= 0:
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=rp.TRANS_KEY_ERROR_REWARD_POOL_SHARE_REACHED,
+                translation_placeholders={
+                    "name": assignee_name,
+                    "reward": reward_name,
+                    "limit": str(self.max_share_points(reward_info)),
+                },
+            )
+        limit = remaining if share_left is None else min(remaining, share_left)
+
         balance = round_points(float(assignee_info[const.DATA_USER_POINTS]))
         if amount is None:
-            amount = min(balance, remaining)
-        amount = round_points(min(float(amount), remaining))
+            amount = min(balance, limit)
+        amount = round_points(min(float(amount), limit))
         if amount <= 0:
             raise HomeAssistantError(
                 translation_domain=const.DOMAIN,
@@ -218,6 +238,9 @@ class RewardPoolManager(BaseManager):
             contributions.get(assignee_id, const.DEFAULT_ZERO) + amount
         )
         reward_info[const.DATA_REWARD_POOL_CONTRIBUTIONS] = contributions
+        matched = await self._pay_match(
+            reward_info, reward_id, assignee_id, amount, target
+        )
         pool_total = self.get_pool_total(reward_info)
 
         # Persist → Emit (per DEVELOPMENT_STANDARDS.md § 5.3)
@@ -232,6 +255,15 @@ class RewardPoolManager(BaseManager):
             amount=amount,
             pool_total=pool_total,
         )
+        for parent_id, parent_amount in matched.items():
+            self.emit(
+                rp.SIGNAL_SUFFIX_REWARD_POOL_CONTRIBUTED,
+                user_id=parent_id,
+                reward_id=reward_id,
+                reward_name=reward_name,
+                amount=parent_amount,
+                pool_total=pool_total,
+            )
         if pool_total >= target:
             # NotificationManager asks approvers to confirm delivery
             self.emit(
@@ -250,6 +282,104 @@ class RewardPoolManager(BaseManager):
             target,
         )
         return amount
+
+    async def _pay_match(
+        self,
+        reward_info: RewardData,
+        reward_id: str,
+        assignee_id: str,
+        amount: float,
+        target: float,
+    ) -> dict[str, float]:
+        """Pay the parents' match for a chip-in from their own balances.
+
+        The match (chip-in times the ratio) is split evenly between the
+        chosen parents; when one runs out of points the others cover the
+        rest. Each parent's part is recorded as their contribution, so
+        refunding the pool gives it back to them. It never takes a parent
+        below zero and never fills the pool past its cost; a parent chipping
+        in themselves is not matched.
+
+        Returns:
+            Points matched per parent (empty when none).
+        """
+        ratio = float(reward_info.get(rp.DATA_REWARD_POOL_MATCH_RATIO) or 0)
+        if ratio <= 0 or assignee_id in (
+            reward_info.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
+        ):
+            return {}
+        balances = {
+            parent_id: round_points(
+                float(
+                    self.coordinator.assignees_data[parent_id].get(
+                        const.DATA_USER_POINTS, 0
+                    )
+                    or 0
+                )
+            )
+            for parent_id in reward_info.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
+            if parent_id in self.coordinator.assignees_data
+        }
+        room = round_points(target - self.get_pool_total(reward_info))
+        owed = round_points(min(amount * ratio, room))
+        parts: dict[str, float] = {}
+        # Even split; whatever a parent can't cover goes round the others
+        while owed > 0:
+            able = [pid for pid, bal in balances.items() if bal - parts.get(pid, 0) > 0]
+            if not able:
+                break
+            share = owed / len(able)
+            for parent_id in able:
+                part = round_points(
+                    min(share, balances[parent_id] - parts.get(parent_id, 0), owed)
+                )
+                parts[parent_id] = round_points(parts.get(parent_id, 0) + part)
+                owed = round_points(owed - part)
+            if share < 0.01:
+                break
+
+        matched: dict[str, float] = {}
+        contributions = self.get_pool_contributions(reward_info)
+        for parent_id, part in parts.items():
+            if part <= 0:
+                continue
+            try:
+                await self.coordinator.economy_manager.withdraw(
+                    assignee_id=parent_id,
+                    amount=part,
+                    source=const.POINTS_SOURCE_REWARDS,
+                    reference_id=reward_id,
+                    item_name=reward_info[const.DATA_REWARD_NAME],
+                    allow_negative=False,
+                )
+            except InsufficientFundsError:
+                continue
+            contributions[parent_id] = round_points(
+                contributions.get(parent_id, const.DEFAULT_ZERO) + part
+            )
+            matched[parent_id] = part
+        reward_info[const.DATA_REWARD_POOL_CONTRIBUTIONS] = contributions
+        return matched
+
+    @staticmethod
+    def is_closed(reward_info: RewardData) -> bool:
+        """Return True when the pool closed after delivery."""
+        return bool(reward_info.get(rp.DATA_REWARD_POOL_CLOSED))
+
+    @staticmethod
+    def max_share_points(reward_info: RewardData) -> float:
+        """Return the most one person may pay in, in points (0 = no limit)."""
+        percent = float(reward_info.get(rp.DATA_REWARD_POOL_MAX_SHARE) or 0)
+        cost = float(reward_info.get(const.DATA_REWARD_COST, const.DEFAULT_ZERO))
+        return round_points(cost * percent / 100) if percent > 0 else 0.0
+
+    def share_left(self, reward_info: RewardData, user_id: str) -> float | None:
+        """Return what a person may still pay in, or None when there is no limit."""
+        max_points = self.max_share_points(reward_info)
+        if max_points <= 0:
+            return None
+        paid = self.get_pool_contributions(reward_info).get(user_id, 0.0)
+        return max(round_points(max_points - paid), const.DEFAULT_ZERO)
 
     async def approve_pool(self, approver_name: str, reward_id: str) -> None:
         """Confirm a full pool's reward was delivered and empty the pool.
@@ -287,8 +417,13 @@ class RewardPoolManager(BaseManager):
             refunds = self._split_overfill(
                 contributions, round_points(pool_total - target)
             )
+            assigned = reward_info.get(const.DATA_REWARD_ASSIGNED_USER_IDS, [])
             for contributor_id in contributions:
-                if contributor_id in self.coordinator.assignees_data:
+                # A parent's match is not the parent receiving the reward
+                if (
+                    contributor_id in self.coordinator.assignees_data
+                    and contributor_id in assigned
+                ):
                     self._grant(
                         assignee_id=contributor_id,
                         reward_id=reward_id,
@@ -296,6 +431,11 @@ class RewardPoolManager(BaseManager):
                         - refunds.get(contributor_id, const.DEFAULT_ZERO),
                     )
             reward_info[const.DATA_REWARD_POOL_CONTRIBUTIONS] = {}
+            if (
+                reward_info.get(rp.DATA_REWARD_POOL_AFTER_DELIVERY)
+                == rp.AFTER_DELIVERY_CLOSE
+            ):
+                reward_info[rp.DATA_REWARD_POOL_CLOSED] = True
 
             # Persist → Emit (per DEVELOPMENT_STANDARDS.md § 5.3)
             self.coordinator._persist_and_update()
@@ -311,7 +451,7 @@ class RewardPoolManager(BaseManager):
                 rp.SIGNAL_SUFFIX_REWARD_POOL_APPROVED,
                 reward_id=reward_id,
                 reward_name=reward_name,
-                contributor_ids=list(contributions),
+                contributor_ids=[c for c in contributions if c in assigned],
             )
             const.LOGGER.info(
                 "Pool for reward '%s' approved by '%s' (%s points)",
@@ -491,6 +631,8 @@ class RewardPoolManager(BaseManager):
         """Return the reward state for a pooled reward, or None if not pooled."""
         if not reward_info.get(const.DATA_REWARD_POOLED, False):
             return None
+        if self.is_closed(reward_info):
+            return const.REWARD_STATE_LOCKED
         if self.get_pool_total(reward_info) >= cost:
             return const.REWARD_STATE_REQUESTED
         if assignee_points > 0:
@@ -515,6 +657,12 @@ class RewardPoolManager(BaseManager):
         )
         total = self.get_pool_total(reward_info)
         contributions = self.get_pool_contributions(reward_info)
+        match_ratio = float(reward_info.get(rp.DATA_REWARD_POOL_MATCH_RATIO) or 0)
+        match_names = [
+            get_assignee_name_by_id(self.coordinator, parent_id) or parent_id
+            for parent_id in reward_info.get(rp.DATA_REWARD_POOL_MATCH_USER_IDS) or []
+            if match_ratio > 0
+        ]
         attrs.update(
             {
                 rp.ATTR_REWARD_POOL_TOTAL: total,
@@ -528,6 +676,13 @@ class RewardPoolManager(BaseManager):
                 rp.ATTR_REWARD_POOL_MY_CONTRIBUTION: contributions.get(
                     assignee_id, const.DEFAULT_ZERO
                 ),
+                rp.ATTR_REWARD_POOL_CLOSED: self.is_closed(reward_info),
+                rp.ATTR_REWARD_POOL_MAX_SHARE: self.max_share_points(reward_info),
+                rp.ATTR_REWARD_POOL_MY_SHARE_LEFT: self.share_left(
+                    reward_info, assignee_id
+                ),
+                rp.ATTR_REWARD_POOL_MATCH_RATIO: match_ratio,
+                rp.ATTR_REWARD_POOL_MATCH_NAMES: match_names,
                 rp.ATTR_REWARD_POOL_CONTRIBUTIONS: {
                     get_assignee_name_by_id(self.coordinator, user_id)
                     or user_id: amount

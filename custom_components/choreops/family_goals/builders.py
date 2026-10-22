@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 import re
 from typing import Any
 import uuid
@@ -20,6 +21,18 @@ ERR_INVALID_TARGET = "family_goal_invalid_target"
 ERR_INVALID_LEVELS = "family_goal_invalid_levels"
 ERR_INVALID_MULTIPLIER = "family_goal_invalid_top_multiplier"
 ERR_INVALID_REWARD = "family_goal_invalid_reward_points"
+ERR_INVALID_END_DATE = "family_goal_invalid_end_date"
+
+
+def parse_end_date(raw: Any) -> date | None:
+    """Return a goal's finish date, or None when it has none.
+
+    Raises:
+        ValueError: The value is set but is not a YYYY-MM-DD date.
+    """
+    if raw in (None, "", base.SENTINEL_EMPTY):
+        return None
+    return date.fromisoformat(str(raw)[:10])
 
 
 def parse_levels(raw: Any) -> list[tuple[float, float | None]]:
@@ -110,6 +123,12 @@ def validate_goal(
             errors[fg.DATA_TOP_MULTIPLIER] = ERR_INVALID_MULTIPLIER
             return errors
 
+    try:
+        parse_end_date(data.get(fg.DATA_END_DATE))
+    except ValueError:
+        errors[fg.DATA_END_DATE] = ERR_INVALID_END_DATE
+        return errors
+
     if fg.DATA_REWARD_POINTS in data:
         try:
             parse_points_value(
@@ -129,6 +148,20 @@ def _as_list(value: Any) -> list[str]:
     if isinstance(value, (list, tuple, set)):
         return [str(item) for item in value]
     return [str(value)]
+
+
+def _choice(value: Any, options: tuple[str, ...]) -> str:
+    """Return the value when it is one of the options, else the first option."""
+    return str(value) if value in options else options[0]
+
+
+def _end_date_text(value: Any) -> str:
+    """Return a finish date as YYYY-MM-DD, or "" for none (or unreadable)."""
+    try:
+        end = parse_end_date(value)
+    except ValueError:
+        return ""
+    return end.isoformat() if end else ""
 
 
 def build_goal(
@@ -182,6 +215,14 @@ def build_goal(
             get_field(fg.DATA_REWARD_POINTS, 0.0),
             allow_negative=False,
             allow_zero=True,
+        ),
+        fg.DATA_REPEAT: _choice(
+            get_field(fg.DATA_REPEAT, fg.REPEAT_NEVER), fg.REPEAT_OPTIONS
+        ),
+        fg.DATA_CHORE_LABELS: _as_list(get_field(fg.DATA_CHORE_LABELS, [])),
+        fg.DATA_END_DATE: _end_date_text(get_field(fg.DATA_END_DATE, "")),
+        fg.DATA_NOTIFY: _choice(
+            get_field(fg.DATA_NOTIFY, fg.NOTIFY_EVERYONE), fg.NOTIFY_OPTIONS
         ),
         fg.DATA_PROGRESS: dict(get_field(fg.DATA_PROGRESS, {})),
     }

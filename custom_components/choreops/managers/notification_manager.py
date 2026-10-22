@@ -2227,26 +2227,28 @@ class NotificationManager(BaseManager):
             const.DATA_CHALLENGE_ID: challenge_id,
         }
 
-        # Notify assignee
-        await self.notify_assignee_translated(
-            assignee_id,
-            title_key=const.TRANS_KEY_NOTIF_TITLE_CHALLENGE_COMPLETED_ASSIGNEE,
-            message_key=const.TRANS_KEY_NOTIF_MESSAGE_CHALLENGE_COMPLETED_ASSIGNEE,
-            message_data={"challenge_name": challenge_name},
-            extra_data=extra_data,
-        )
+        # Notify assignee (a family goal can turn either side off)
+        if payload.get("notify_assignee", True):
+            await self.notify_assignee_translated(
+                assignee_id,
+                title_key=const.TRANS_KEY_NOTIF_TITLE_CHALLENGE_COMPLETED_ASSIGNEE,
+                message_key=const.TRANS_KEY_NOTIF_MESSAGE_CHALLENGE_COMPLETED_ASSIGNEE,
+                message_data={"challenge_name": challenge_name},
+                extra_data=extra_data,
+            )
 
         # Notify approvers
-        await self.notify_approvers_translated(
-            assignee_id,
-            title_key=const.TRANS_KEY_NOTIF_TITLE_CHALLENGE_COMPLETED_APPROVER,
-            message_key=const.TRANS_KEY_NOTIF_MESSAGE_CHALLENGE_COMPLETED_APPROVER,
-            message_data={
-                "assignee_name": assignee_name,
-                "challenge_name": challenge_name,
-            },
-            extra_data=extra_data,
-        )
+        if payload.get("notify_approvers", True):
+            await self.notify_approvers_translated(
+                assignee_id,
+                title_key=const.TRANS_KEY_NOTIF_TITLE_CHALLENGE_COMPLETED_APPROVER,
+                message_key=const.TRANS_KEY_NOTIF_MESSAGE_CHALLENGE_COMPLETED_APPROVER,
+                message_data={
+                    "assignee_name": assignee_name,
+                    "challenge_name": challenge_name,
+                },
+                extra_data=extra_data,
+            )
 
         const.LOGGER.debug(
             "NotificationManager: Sent challenge notifications for assignee=%s, challenge=%s",

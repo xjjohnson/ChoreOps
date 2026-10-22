@@ -4237,6 +4237,9 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         self._assignee_id = assignee_id
         self._assignee_name = assignee_name
         self._points_label = points_label
+        # points_summary reads the whole ledger; reuse it until the ledger changes
+        self._points_summary_key: tuple[Any, ...] | None = None
+        self._points_summary: dict[str, float] = {}
         self._attr_unique_id = f"{entry.entry_id}_{assignee_id}{const.SENSOR_KC_UID_SUFFIX_UI_DASHBOARD_HELPER}"
         # Moving to HA native best practice: auto-generate entity_id from unique_id + has_entity_name
         # rather than manually constructing to support HA core change 01309191283 (Jan 14, 2026)
@@ -4651,6 +4654,26 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
                     item[const.DATA_ACHIEVEMENT_NAME]
                 )
         return lookup
+
+    def _points_summary_for(self, assignee_info: Mapping[str, Any]) -> dict[str, float]:
+        """Return the points summary, recomputed only when it can have changed.
+
+        The summary walks the whole point ledger (up to 1000 entries) and the
+        helper refreshes on every change anywhere, so it is reused until the
+        ledger gains an entry, the balance moves or the day changes.
+        """
+        ledger = assignee_info.get(const.DATA_USER_LEDGER, [])
+        last = ledger[-1] if isinstance(ledger, list) and ledger else None
+        key = (
+            len(ledger) if isinstance(ledger, list) else 0,
+            last.get(const.DATA_LEDGER_TIMESTAMP) if isinstance(last, dict) else None,
+            assignee_info.get(const.DATA_USER_POINTS),
+            dt_today_local().isoformat(),
+        )
+        if key != self._points_summary_key:
+            self._points_summary = self._build_points_summary(assignee_info)
+            self._points_summary_key = key
+        return dict(self._points_summary)
 
     @staticmethod
     def _build_points_summary(assignee_info: Mapping[str, Any]) -> dict[str, float]:
@@ -5152,7 +5175,7 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             "recent_activity": self._build_recent_activity(
                 assignee_info, names=self._ledger_name_lookup()
             ),
-            "points_summary": self._build_points_summary(assignee_info),
+            "points_summary": self._points_summary_for(assignee_info),
             "recent_manual_adjustments": self._build_recent_activity(
                 assignee_info, only_source=const.POINTS_SOURCE_MANUAL
             ),

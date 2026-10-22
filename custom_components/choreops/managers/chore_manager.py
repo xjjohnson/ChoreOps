@@ -18,7 +18,7 @@ for cross-domain communication (economy, notifications, achievements).
 from __future__ import annotations
 
 import asyncio
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -142,6 +142,11 @@ class ChoreManager(BaseManager):
     - Achievement/badge tracking (events handled by GamificationManager)
     - Point transactions (handled by EconomyManager via signals)
     """
+
+    # Memo for get_chore_status_context, active only inside status_cache()
+    # (one entity refresh or one family goal evaluation, where nothing
+    # changes chore data)
+    _status_cache: dict[tuple[str, str], dict[str, Any]] | None = None
 
     # =========================================================================
     # §0 LIFECYCLE & INITIALIZATION
@@ -4392,7 +4397,45 @@ class ChoreManager(BaseManager):
 
         return False
 
+    @contextmanager
+    def status_cache(self) -> Iterator[None]:
+        """Reuse chore status lookups for the length of the block.
+
+        One entity refresh asks for the same assignee+chore status from many
+        sensors. Only use this around read-only work; nested blocks share the
+        outer cache.
+        """
+        outer = self._status_cache
+        if outer is None:
+            self._status_cache = {}
+        try:
+            yield
+        finally:
+            if outer is None:
+                self._status_cache = None
+
+    def clear_status_cache(self) -> None:
+        """Forget cached statuses (call before changing chore data in a block)."""
+        if self._status_cache is not None:
+            self._status_cache.clear()
+
     def get_chore_status_context(
+        self, assignee_id: str, chore_id: str
+    ) -> dict[str, Any]:
+        """Return all derived chore states for a assignee+chore in one call.
+
+        Inside status_cache() the result is computed once per pair; see
+        _build_chore_status_context for the keys.
+        """
+        cache = self._status_cache
+        if cache is None:
+            return self._build_chore_status_context(assignee_id, chore_id)
+        key = (assignee_id, chore_id)
+        if key not in cache:
+            cache[key] = self._build_chore_status_context(assignee_id, chore_id)
+        return dict(cache[key])
+
+    def _build_chore_status_context(
         self, assignee_id: str, chore_id: str
     ) -> dict[str, Any]:
         """Return all derived chore states for a assignee+chore in one call.

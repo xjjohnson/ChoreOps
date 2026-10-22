@@ -87,6 +87,41 @@ DATA_RECORD_TOP: Final = "family_record_top"
 DATA_POINTS_BASIS: Final = "family_points_basis"
 POINTS_BASIS_NO_AWARDS: Final = 2
 
+# Restart the goal every week (from Monday) or month, like a reset (points,
+# chores and everyone-contributes goals only).
+DATA_REPEAT: Final = "family_repeat"
+REPEAT_NEVER: Final = "never"
+REPEAT_WEEKLY: Final = "weekly"
+REPEAT_MONTHLY: Final = "monthly"
+REPEAT_OPTIONS: Final = (REPEAT_NEVER, REPEAT_WEEKLY, REPEAT_MONTHLY)
+REPEAT_GOAL_TYPES: Final = frozenset(
+    {GOAL_TYPE_POINTS, GOAL_TYPE_CHORES, GOAL_TYPE_EVERYONE}
+)
+# Total Chores Completed: also count every chore carrying one of these labels.
+DATA_CHORE_LABELS: Final = "family_chore_labels"
+# Optional last day (ISO date) progress counts; frozen after it.
+DATA_END_DATE: Final = "family_end_date"
+# Who is told when a level is reached.
+DATA_NOTIFY: Final = "family_notify"
+NOTIFY_EVERYONE: Final = "everyone"
+NOTIFY_ASSIGNEES: Final = "assignees"
+NOTIFY_APPROVERS: Final = "approvers"
+NOTIFY_OFF: Final = "off"
+NOTIFY_OPTIONS: Final = (
+    NOTIFY_EVERYONE,
+    NOTIFY_ASSIGNEES,
+    NOTIFY_APPROVERS,
+    NOTIFY_OFF,
+)
+
+# Runtime: the day the current run began (creation, reset or repeat), the
+# start of the current repeat period, each share frozen when the finish date
+# passed, and the finish date a reset already moved past.
+DATA_STARTED: Final = "family_started"
+DATA_PERIOD_START: Final = "family_period_start"
+DATA_FROZEN: Final = "family_frozen"
+DATA_END_CLEARED: Final = "family_end_cleared"
+
 # Runtime state that must survive an edit of the goal's settings.
 RUNTIME_KEYS: Final = (
     DATA_BASELINE,
@@ -98,6 +133,10 @@ RUNTIME_KEYS: Final = (
     DATA_RECORD_DAY,
     DATA_RECORD_TOP,
     DATA_POINTS_BASIS,
+    DATA_STARTED,
+    DATA_PERIOD_START,
+    DATA_FROZEN,
+    DATA_END_CLEARED,
     DATA_PROGRESS,
 )
 
@@ -124,6 +163,14 @@ ATTR_TOP_MULTIPLIER: Final = "family_top_multiplier"
 ATTR_RECORD: Final = "family_record"
 ATTR_RECORD_DAY: Final = "family_record_day"
 ATTR_RECORD_TOP: Final = "family_record_top"
+ATTR_REPEAT: Final = "family_repeat"
+ATTR_END_DATE: Final = "family_end_date"  # Finish date or end of the repeat period
+ATTR_DAYS_LEFT: Final = "family_days_left"  # Including today; None without an end
+ATTR_PACE: Final = "family_pace"  # ahead / on_track / behind / "" (no pace)
+ATTR_FINISHED: Final = "family_finished"  # Past the finish date: progress frozen
+PACE_AHEAD: Final = "ahead"
+PACE_ON_TRACK: Final = "on_track"
+PACE_BEHIND: Final = "behind"
 
 # ---------------------------------------------------------------------------
 # Services

@@ -394,6 +394,12 @@ views:
                   {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (94 if pos > 94 else pos) ~ "% - 8px + " ~ lane_off ~ "px);top:" ~ lane_top ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
                 {%- endfor -%}
                 {%- set done_n = q.people | selectattr('e') | list | length -%}
+                {#-- Footer: a chip per person, finished people first as green ticks --#}
+                {%- set ft = namespace(v='') -%}
+                {%- for pp in (q.people | selectattr('e') | list) + (q.people | rejectattr('e') | list) -%}
+                {%- set ft.v = ft.v ~ ("<span style='width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;" ~ ("background:var(--success-color);color:#fff;" if pp.e else "border:1.5px solid var(--divider-color);color:var(--secondary-text-color);") ~ "'>" ~ ('✓' if pp.e else (pp.u[:1] | upper)) ~ "</span>") -%}
+                {%- endfor -%}
+                {%- set foot = "<span style='display:inline-flex;gap:3px;align-items:center;'>" ~ ft.v ~ "</span>" -%}
                 {%- set ticks = namespace(v='') -%}
                 {%- for tk in [25, 50, 75] -%}
                   {%- set ticks.v = ticks.v ~ "<div style='position:absolute;left:" ~ tk ~ "%;top:-2px;width:1.5px;height:10px;background:var(--divider-color);opacity:0.9;'></div>" -%}
@@ -410,7 +416,7 @@ views:
                   ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ fillw ~ "%;border-radius:4px;background:linear-gradient(90deg," ~ acc ~ "," ~ acc2 ~ ");'></div>"
                   ~ ticks.v ~ mk.v
                   ~ "<div style='position:absolute;right:-15px;top:-9px;font-size:12px;line-height:1;'>🏁</div></div></div>"
-                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:6px;'><span style='font-size:10px;font-weight:700;color:var(--secondary-text-color);'>" ~ (('✓ ' if q.alldone else '') ~ done_n ~ ' ' ~ ui.get('of', 'of') ~ ' ' ~ (q.people | length) ~ ' ' ~ ui.get('done', 'done')) ~ "</span>" ~ clock ~ "</div>"
+                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:6px;'>" ~ foot ~ clock ~ "</div>"
                   ~ "</div></div>" -%}
                 {{
                   {

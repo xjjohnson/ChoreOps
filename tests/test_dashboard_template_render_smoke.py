@@ -2104,7 +2104,11 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert len(cards) == 1
     html = cards[0]["custom_fields"]["content"]
     assert "Brush Teeth" in html
-    assert "0 of 2 done" in html
+    # Footer chips: nobody done yet, so both show their initial
+    assert re.findall(
+        r"<span style='width:16px;height:16px;border-radius:50%;[^']*'>([^<]+)</span>",
+        html,
+    ) == ["D", "L"]
     assert "3 days left" in html
     # Milestone notches (no labels, the lanes use that space) and the finish flag
     assert html.count("width:1.5px;height:10px") == 3 and "🏁" in html
@@ -2726,11 +2730,11 @@ def test_family_hub_daily_goals_are_two_column_ring_cards() -> None:
 
     assert "'columns': 2" in output
     # In-progress daily goal: ring filled to its percent, percent pill, reward chip.
-    assert "conic-gradient(var(--primary-color) 40%" in output
+    assert "stroke-dasharray='45.2 113.1'" in output  # 40% of the ring
     assert ">40%</span>" in output
     assert "+25" in output
     # Earned daily goal: solid green ring, check pill and award date.
-    assert "background:var(--success-color)" in output
+    assert "stroke='var(--success-color)' stroke-width='4'" in output
     assert "✓ 2026-10-19" in output
     # Both cards keep their own tap target.
     assert "'entity': 'sensor.lily_d1'" in output
@@ -2841,7 +2845,7 @@ def test_family_hub_chores_a_day_ring_follows_todays_count() -> None:
     helper["badges"][0]["badge_type"] = "daily"
     output = _render_hub_card(tpl, helper, extra, real_dates=True)
     assert ">5/7</span>" in output
-    assert "conic-gradient(var(--primary-color) 71%" in output
+    assert "stroke-dasharray='80.3 113.1'" in output  # 71% of the ring
 
 
 def _long_goal(progress: int, **attrs: object):
@@ -3200,3 +3204,10 @@ def test_family_home_race_track_moves_with_todays_chores() -> None:
     }
     # Olivia is done (sits at the finish, drawn at 94%); the rest by today's count
     assert positions == {"O": 94.0, "L": 80.0, "D": 60.0, "M": 0.0}
+    # Footer: one chip per person, finished people first as green ticks
+    chips = re.findall(
+        r"<span style='width:16px;height:16px;border-radius:50%;[^']*'>([^<]+)</span>",
+        output,
+    )
+    assert chips == ["✓", "L", "M", "D"]
+    assert "of 4" not in output
