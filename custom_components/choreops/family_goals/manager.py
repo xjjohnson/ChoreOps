@@ -95,6 +95,14 @@ class FamilyGoalManager(BaseManager):
             self.listen(suffix, self._on_assignee_event)
         self.listen(base.SIGNAL_SUFFIX_POINTS_CHANGED, self._on_points_changed)
         self.listen(base.SIGNAL_SUFFIX_MIDNIGHT_ROLLOVER, self._on_midnight_rollover)
+        # A points or chore data reset lowers everyone's counts; re-check every
+        # goal so its saved snapshots follow them down.
+        for suffix in (
+            base.SIGNAL_SUFFIX_CHORE_DATA_RESET_COMPLETE,
+            base.SIGNAL_SUFFIX_POINTS_DATA_RESET_COMPLETE,
+            base.SIGNAL_SUFFIX_CHALLENGE_DATA_RESET_COMPLETE,
+        ):
+            self.listen(suffix, self._on_data_reset)
 
         self.coordinator.config_entry.async_on_unload(self._cancel_timer)
         # A streak broken while HA was down is noticed once HA has started.
@@ -174,6 +182,20 @@ class FamilyGoalManager(BaseManager):
         if payload.get("source", "") in _OWN_POINT_SOURCES:
             return
         self._on_assignee_event(payload)
+
+    def _on_data_reset(self, payload: dict[str, Any]) -> None:
+        """Lower every goal's snapshots at once after history was cleared.
+
+        Done before anyone earns again, so new progress is not taken for the
+        old counts; then everyone is re-evaluated.
+        """
+        changed = False
+        for goal in self.goals.values():
+            if isinstance(goal, dict) and not self.is_finished(goal):
+                changed = self._lower_snapshots(goal) or changed
+        if changed:
+            self.coordinator._persist_and_update()
+        self._mark_all_pending()
 
     async def _on_midnight_rollover(self, payload: dict[str, Any]) -> None:
         """Re-evaluate everyone: streaks and one-day goals turn over at midnight."""
@@ -536,6 +558,36 @@ class FamilyGoalManager(BaseManager):
             return raw
         baseline = goal.get(fg.DATA_BASELINE, {})
         return max(0.0, raw - float(baseline.get(assignee_id, 0.0)))
+
+    def _lower_snapshots(self, goal: dict[str, Any]) -> bool:
+        """Lower restart and level-start snapshots above a person's current count.
+
+        Counts only go down when history is cleared (a points or chore data
+        reset). A snapshot left above the new count would hide that person's
+        progress until they caught up with it, so it is lowered to match and
+        new progress counts at once.
+
+        Returns:
+            True when a snapshot changed.
+        """
+        goal_type = goal.get(fg.DATA_TYPE)
+        if goal_type in fg.STREAK_GOAL_TYPES or goal_type == fg.GOAL_TYPE_DAY:
+            return False
+        changed = False
+        baseline = goal.get(fg.DATA_BASELINE)
+        level_start = goal.get(fg.DATA_LEVEL_START)
+        for assignee_id in self._assigned_ids(goal):
+            if isinstance(baseline, dict) and assignee_id in baseline:
+                raw = self._raw_contribution(assignee_id, goal)
+                if float(baseline[assignee_id]) > raw:
+                    baseline[assignee_id] = raw
+                    changed = True
+            if isinstance(level_start, dict) and assignee_id in level_start:
+                share = self._contribution(assignee_id, goal)
+                if float(level_start[assignee_id]) > share:
+                    level_start[assignee_id] = share
+                    changed = True
+        return changed
 
     def get_contributions(self, goal_id: str) -> dict[str, float]:
         """Return each assigned person's contribution (read-only, for sensors)."""
@@ -1129,6 +1181,9 @@ class FamilyGoalManager(BaseManager):
             self.coordinator._persist_and_update()
         if self.is_finished(goal):
             return
+
+        if self._lower_snapshots(goal):
+            self.coordinator._persist_and_update()
 
         goal_type = goal.get(fg.DATA_TYPE)
         if goal_type == fg.GOAL_TYPE_DAY and self._restart_day_goal_if_new_day(goal):
