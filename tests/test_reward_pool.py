@@ -447,6 +447,30 @@ async def test_pool_services_end_to_end(
     await hass.async_block_till_done()
     assert _points(scenario_full, max_) == 10.0
 
+    # Refunding one person by name (the dashboard's name chips)
+    await hass.services.async_call(
+        const.DOMAIN,
+        rp.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
+        {"user_name": "Max!", "reward_name": "Family Pizza Night", "amount": 5},
+        blocking=True,
+    )
+    _set_points(scenario_full, zoe, 8.0)
+    await hass.services.async_call(
+        const.DOMAIN,
+        rp.SERVICE_CONTRIBUTE_TO_REWARD_POOL,
+        {"user_name": "Zoë", "reward_name": "Family Pizza Night", "amount": 8},
+        blocking=True,
+    )
+    await hass.services.async_call(
+        const.DOMAIN,
+        rp.SERVICE_REFUND_REWARD_POOL,
+        {"reward_name": "Family Pizza Night", "user_name": "Max!"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+    assert _points(scenario_full, max_) == 10.0
+    assert _pool(scenario_full, reward_id) == {zoe: 8.0}
+
 
 async def test_reward_status_sensor_shows_pool(
     hass: HomeAssistant,

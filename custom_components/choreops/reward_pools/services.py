@@ -154,7 +154,9 @@ def register_pool_services(hass: HomeAssistant) -> None:
         coordinator, reward_id = resolved
         user_name = call.data.get(const.SERVICE_FIELD_USER_NAME)
         user_id = (
-            get_item_id_or_raise(coordinator, const.ITEM_TYPE_USER, user_name)
+            get_item_id_or_raise(
+                coordinator, const.ITEM_TYPE_USER, user_name, role=const.ROLE_ASSIGNEE
+            )
             if user_name
             else None
         )
