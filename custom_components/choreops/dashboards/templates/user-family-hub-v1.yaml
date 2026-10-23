@@ -3684,6 +3684,12 @@ views:
                                   ~ "<div style='position:relative;display:flex;align-items:center;gap:6px;padding:6px 8px;'><div style='width:20px;height:20px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
                                   ~ "<span style='flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary-text-color);'>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><b style='font-size:12px;color:var(--primary-text-color);'>" ~ p ~ "</b></div></div>" -%}
                               {%- endfor -%}
+                              {#-- Scoreboard header: level and what is left, then the reward and top contributor bonus, then days left (no pace) --#}
+                              {%- set sb_lvl = ((lvl_txt ~ ' · ') if lvl_txt else '') ~ (sub if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ ' ' ~ ui.get('to_go', 'to go') ~ '</b>')) -%}
+                              {%- set sb_rw_bits = (["<span style='white-space:nowrap;'>+" ~ freward ~ ' ⭐ ' ~ ui.get('each', 'each') ~ (' ·' if (fmult > 1) else '') ~ '</span>'] if (freward > 0 and not fdone) else []) + (["<b style='color:var(--warning-color);white-space:nowrap;'>🏆 " ~ ui.get('top_contributor', 'Top contributor') ~ " ×" ~ ('%g' | format(fmult)) ~ "</b>"] if (fmult > 1 and not fdone) else []) -%}
+                              {%- set sb_rw = ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;white-space:nowrap;'>" ~ (sb_rw_bits | join(' ')) ~ "</div>") if sb_rw_bits else '' -%}
+                              {%- set sb_bits = [pace_txt] if ffin else ([days_txt] if days_txt else []) -%}
+                              {%- set sb_meta = ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ (sb_bits | join(' · ')) ~ "</div>") if sb_bits else '' -%}
                               {#-- All levels done: a top-earner banner with ranked chips replaces the rows --#}
                               {%- set win = namespace(names=[], av='', chips='') -%}
                               {%- set win_html = '' -%}
@@ -3707,9 +3713,9 @@ views:
                               {%- endif -%}
                               {%- set fui_v = "<div style='text-align:left;padding:10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                                 ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
-                                ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>" ~ tick_html
+                                ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
                                 ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
-                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div>" ~ pace_html ~ mult_html ~ "</div>"
+                                ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ sb_lvl ~ "</div>" ~ sb_rw ~ sb_meta ~ "</div>"
                                 ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
                                 ~ rec_html ~ (win_html if win_html else ("<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div>")) ~ "</div>" -%}
                             {%- endif -%}
