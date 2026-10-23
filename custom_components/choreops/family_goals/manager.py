@@ -256,15 +256,19 @@ class FamilyGoalManager(BaseManager):
                 words[goal_id] = await self._words_by_assignee(goal)
 
         # Caught-up checks ask for every chore's status for everyone in a
-        # goal; reuse those lookups within one person's evaluation
-        with self.coordinator.chore_manager.status_cache():
-            if self._update_assignee_caught_up_streak(assignee_id):
-                self.coordinator._persist_and_update()
-            for goal_id in goal_ids:
-                # An edit during the await replaces the stored record; use the live one.
-                goal = self.goals.get(goal_id)
-                if goal is not None and goal_id in words:
-                    self._evaluate_goal(goal_id, goal, words[goal_id])
+        # goal; reuse those lookups within one person's evaluation. Each
+        # payout asks for a full entity refresh; several levels crossed at
+        # once (after an Approve all) froze Home Assistant for minutes, so
+        # they share one refresh at the end.
+        async with self.coordinator.batched_updates():
+            with self.coordinator.chore_manager.status_cache():
+                if self._update_assignee_caught_up_streak(assignee_id):
+                    self.coordinator._persist_and_update()
+                for goal_id in goal_ids:
+                    # An edit during the await replaces the stored record; use the live one.
+                    goal = self.goals.get(goal_id)
+                    if goal is not None and goal_id in words:
+                        self._evaluate_goal(goal_id, goal, words[goal_id])
 
     # ------------------------------------------------------------------
     # CRUD

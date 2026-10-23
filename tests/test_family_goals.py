@@ -1498,3 +1498,46 @@ async def test_snapshot_above_current_count_is_lowered(
         zoe: pytest.approx(3.0),
         max_: pytest.approx(2.0),
     }
+
+
+async def test_many_level_ups_at_once_refresh_entities_once(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Crossing many levels pays everyone with one entity refresh, not one each."""
+    from unittest.mock import patch
+
+    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+    coordinator = scenario_full.coordinator
+    gm = coordinator.family_goal_manager
+    ids = list(scenario_full.assignee_ids.values())
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_DAY,
+        target=1.0,
+        reward=5.0,
+        assigned=ids,
+    )
+    coordinator.challenges_data[goal_id][fg.DATA_LEVELS] = ", ".join(
+        f"{level}:{5 * level}" for level in range(1, 21)
+    )
+    today = dict.fromkeys(ids, 0)
+    gm._approved_today = lambda assignee_id: today[assignee_id]
+    await gm.evaluate_assignee(ids[0])
+    await hass.async_block_till_done()
+
+    today[ids[0]] = 6
+    with patch.object(
+        DataUpdateCoordinator,
+        "async_update_listeners",
+        autospec=True,
+        side_effect=DataUpdateCoordinator.async_update_listeners,
+    ) as refresh:
+        gm._pending.update(ids)
+        await gm.drain_pending()
+        await hass.async_block_till_done()
+    assert refresh.call_count == 1
+    assert coordinator.challenges_data[goal_id][fg.DATA_LEVEL] == 6
+    ledger = coordinator.assignees_data[ids[1]][const.DATA_USER_LEDGER]
+    assert sum(1 for e in ledger if e.get("reference_id") == goal_id) == 6
