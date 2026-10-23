@@ -637,7 +637,7 @@ async def test_resetting_one_day_goal_does_not_pay_todays_levels_again(
     hass: HomeAssistant,
     scenario_full: SetupResult,
 ) -> None:
-    """A mid-day reset counts from the reset on; tomorrow counts in full."""
+    """A mid-day reset counts from the reset on and clears the record."""
     coordinator = scenario_full.coordinator
     gm = coordinator.family_goal_manager
     zoe = scenario_full.assignee_ids["Zoë"]
@@ -660,20 +660,30 @@ async def test_resetting_one_day_goal_does_not_pay_todays_levels_again(
     await gm.evaluate_assignee(zoe)
     await hass.async_block_till_done()
     assert goal[fg.DATA_LEVEL] == 3
+    assert gm.get_day_record(goal_id)["family_record"] == 6
     paid = balance(zoe)
 
+    # The reset also clears the best-day record.
     gm.reset_goal(goal_id)
+    assert gm.get_day_record(goal_id) == {
+        "family_record": 0.0,
+        "family_record_day": "",
+        "family_record_top": [],
+    }
     await gm.evaluate_assignee(zoe)
     await hass.async_block_till_done()
     assert gm.get_total(goal_id) == 0
     assert goal[fg.DATA_LEVEL] == 0
     assert balance(zoe) == pytest.approx(paid)
+    assert gm.get_day_record(goal_id)["family_record"] == 0
 
     today[max_] = 5
     await gm.evaluate_assignee(zoe)
     await hass.async_block_till_done()
     assert gm.get_level_contributions(goal_id) == {zoe: 0.0, max_: 2.0}
     assert goal[fg.DATA_LEVEL] == 1
+    # A new record starts from what was done after the reset.
+    assert gm.get_day_record(goal_id)["family_record"] == 2
 
     # The next day counts every chore again.
     goal[fg.DATA_STARTED] = "2000-01-01"
