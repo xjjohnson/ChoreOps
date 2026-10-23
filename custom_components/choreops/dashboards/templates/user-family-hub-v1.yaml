@@ -3584,7 +3584,8 @@ views:
                             {%- set togo = [ftarget - ftotal, 0] | max -%}
                             {%- set ftop = (fshares.values() | map('float', 0) | list | max) if fshares else 0 -%}
                             {%- set ntop = (fshares.values() | map('float', 0) | select('equalto', ftop) | list | length) if fshares else 0 -%}
-                            {%- set accent = 'var(--success-color)' if fdone else '#8b5cf6' -%}
+                            {#-- A hex colour, not a CSS variable: the frame appends alpha digits to it --#}
+                            {%- set accent = '#4caf50' if fdone else '#8b5cf6' -%}
                             {%- set accent2 = '#86efac' if fdone else '#ec4899' -%}
                             {%- set fbanner = "<div style='font-size:10px;font-weight:800;letter-spacing:0.6px;color:var(--warning-color);margin-bottom:3px;'>" ~ ((ui.get('streak_reset', 'Streak reset') if streak_reset else ui.get('new_period', 'New period')) ~ ' · ' ~ ui.get('levels_reset', 'Levels reset')) | upper ~ "</div>" if ((fraw_done and not fdone and not fstreak) or streak_reset) else '' -%}
                             {%- set lvl_txt = (ui.get('level', 'Level') ~ ' ' ~ (elevel + 1) ~ ' ' ~ ui.get('of', 'of') ~ ' ' ~ fcount) if (fcount > 1 and not fdone) else (('✓ ' ~ ui.get('all', 'All') ~ ' ' ~ fcount ~ ' ' ~ ui.get('levels', 'levels')) if (fdone and fcount > 1) else '') -%}
