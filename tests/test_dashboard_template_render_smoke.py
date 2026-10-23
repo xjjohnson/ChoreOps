@@ -1486,7 +1486,12 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
     assert view["max_columns"] == 3
     types = [[c["type"] for c in sec["cards"]] for sec in view["sections"]]
     assert types == [
-        ["heading", "custom:auto-entities", "custom:auto-entities"],
+        [
+            "heading",
+            "custom:auto-entities",
+            "custom:auto-entities",
+            "custom:auto-entities",
+        ],
         ["heading", "custom:auto-entities", "heading", "custom:auto-entities"],
         ["heading", "custom:auto-entities"],
     ]
@@ -1497,7 +1502,7 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
         for c in sec["cards"]
         if c["type"] == "custom:auto-entities"
     ]
-    assert len(autos) == 5
+    assert len(autos) == 6
     for card in autos:
         env.parse(card["filter"]["template"])
         assert (
@@ -2118,6 +2123,110 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert html.count("calc(20% - 8px + 0px)") == 2
     assert "top:-22px" in html and "top:7px" in html
     assert "width:20%" in html
+
+
+def _label_strip_states() -> dict[str, _MockState]:
+    """Two people with a labeled goal badge, an unlabeled one, and labeled chores."""
+    kitchen = {"name": "Kitchen", "color": "var(--orange-color)"}
+    chores = {
+        "Dad": [
+            ("Take out trash", "pending", "today"),
+            ("Unload dishwasher", "approved", "today"),
+            ("Deep clean oven", "pending", "other"),
+        ],
+        "Lily": [
+            ("Unload dishwasher", "approved", "today"),
+            ("Feed Puddin", "overdue", "today"),
+        ],
+    }
+    states: dict[str, _MockState] = {}
+    for name, prog in (("Dad", 60), ("Lily", 20)):
+        slug = name.lower()
+        states[f"sensor.{slug}_helper"] = _MockState(
+            entity_id=f"sensor.{slug}_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "user_name": name,
+                "badges": [
+                    {
+                        "eid": f"sensor.{slug}_cook",
+                        "name": "Puddins Cook",
+                        "badge_type": "periodic",
+                        "labels": [kitchen],
+                    },
+                    {
+                        "eid": f"sensor.{slug}_week",
+                        "name": "Perfect Week",
+                        "badge_type": "periodic",
+                    },
+                ],
+                "chores": [
+                    {
+                        "name": cname,
+                        "state": cstate,
+                        "primary_group": group,
+                        "labels": [{"id": "kitchen", **kitchen}],
+                    }
+                    for cname, cstate, group in chores[name]
+                ]
+                + [{"name": "Homework", "state": "pending", "primary_group": "today"}],
+            },
+            name=name,
+        )
+        for key, bname, icon in (
+            ("cook", "Puddins Cook", "mdi:chef-hat"),
+            ("week", "Perfect Week", "mdi:medal"),
+        ):
+            states[f"sensor.{slug}_{key}"] = _MockState(
+                entity_id=f"sensor.{slug}_{key}",
+                state=str(prog),
+                attributes={
+                    "badge_name": bname,
+                    "status": "in_progress",
+                    "end_date": "2026-10-22T00:00:00",
+                    "icon": icon,
+                },
+                name="b",
+            )
+    return states
+
+
+def test_family_home_label_strip_shows_labeled_badges_and_todays_chores() -> None:
+    """A labeled badge and today's labeled chores share one strip in the label color."""
+    cards = _render_home_card("===== LABEL STRIPS", _label_strip_states())
+    assert len(cards) == 1
+    html = cards[0]["custom_fields"]["content"]
+    assert "Kitchen" in html and "var(--orange-color)" in html
+    assert "Puddins Cook" in html and "mdi:chef-hat" in html and "3 days left" in html
+    # Unlabeled badges and chores stay out of the strip, and so do chores not due today
+    assert "Perfect Week" not in html and "Homework" not in html
+    assert "Deep clean oven" not in html
+    # Unload dishwasher is done by everyone; the other two are still owed
+    assert "1/3 chores done" in html
+    assert "✓ Unload dishwasher" in html
+    assert "line-through" not in html
+    trash = html.split("Take out trash", 1)[1].split("</span></span>", 1)[0]
+    assert "var(--warning-color)" in trash and "'>D" in trash
+    puddin = html.split("Feed Puddin", 1)[1].split("</span></span>", 1)[0]
+    assert "var(--error-color)" in puddin and "'>L" in puddin
+
+
+def test_family_home_goals_skip_labeled_badges() -> None:
+    """Goals keeps unlabeled badges only; labeled ones live in their label strip."""
+    cards = _render_home_card("pref_urgent_days", _label_strip_states())
+    assert len(cards) == 1
+    html = cards[0]["custom_fields"]["content"]
+    assert "Perfect Week" in html and "Puddins Cook" not in html
+
+
+def test_family_home_label_strip_hidden_without_labels() -> None:
+    """No labeled badges or chores means no strip at all."""
+    cards = _render_home_card(
+        "===== LABEL STRIPS",
+        {k: v for k, v in _label_strip_states().items() if "helper" not in k},
+    )
+    assert cards == []
 
 
 def test_family_hub_recent_activity_card_renders_rows() -> None:
@@ -3229,7 +3338,7 @@ def test_family_home_race_track_moves_with_todays_chores() -> None:
         for sec in view["sections"]
         for c in sec["cards"]
         if c["type"] == "custom:auto-entities"
-        and "special_occasion" in c["filter"]["template"]
+        and "pref_urgent_days" in c["filter"]["template"]
     )
     people = {
         "Olivia": (5, "earned"),

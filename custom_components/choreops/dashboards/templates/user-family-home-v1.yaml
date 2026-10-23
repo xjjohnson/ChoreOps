@@ -236,6 +236,149 @@ views:
                   }
                 }},
               {%- endfor -%}
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
+              {#-- ===== LABEL STRIPS: labeled goal badges and today's labeled chores, one strip per label ===== --#}
+              {%- set helpers = integration_entities('choreops')
+                | select('search', '^sensor\\.')
+                | list
+                | expand
+                | selectattr('attributes.purpose', 'defined')
+                | selectattr('attributes.purpose', 'eq', 'purpose_dashboard_helper')
+                | list -%}
+              {%- set pref_users = << home.user_names >> -%}
+              {%- if pref_users | length > 0 -%}
+                {%- set helpers = helpers | selectattr('attributes.user_name', 'in', pref_users) | list -%}
+              {%- endif -%}
+              {%- set tsensor = ((helpers | first).attributes.get('dashboard_helpers') or {}).get('translation_sensor_eid') if helpers else none -%}
+              {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
+              {%- set today = now().strftime('%Y-%m-%d') -%}
+              {%- set ns = namespace(b={}, c={}, colors={}) -%}
+              {%- for h in helpers -%}
+                {%- set uname = (h.attributes.get('user_name') or '') | string -%}
+                {%- if uname == '' -%}{%- continue -%}{%- endif -%}
+                {#-- Badges: the same periodic/daily/special badges as Goals, but only the labeled ones --#}
+                {%- for badge in (h.attributes.get('badges') or []) -%}
+                  {%- set blabel = ((badge.get('labels') or [{}]) | first) if badge is mapping else {} -%}
+                  {%- set blabel = blabel if blabel is mapping else {} -%}
+                  {%- set lname = (blabel.get('name') or '') | string -%}
+                  {%- if lname != '' and badge.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] and (badge.get('badge_type') | string | lower) in ['periodic', 'daily', 'special_occasion'] -%}
+                    {%- set be = badge.get('eid') -%}
+                    {%- set ba = states[be].attributes | default({}, true) -%}
+                    {%- set rs = ba.get('reset_schedule') if ba.get('reset_schedule') is mapping else {} -%}
+                    {%- set bname = (ba.get('badge_name') or badge.get('name') or state_attr(be, 'friendly_name') or '') | string -%}
+                    {%- set status = (ba.get('status') or badge.get('status') or 'in_progress') | string | lower -%}
+                    {%- set prog = states(be) | float(default=0) -%}
+                    {%- set prog = 0 if prog < 0 else (100 if prog > 100 else prog) -%}
+                    {%- set earned = status in ['earned', 'completed'] -%}
+                    {%- set t_req = ba.get('today_chores_required') | int(default=0) -%}
+                    {%- if not earned and t_req > 0 and (ba.get('threshold_value') | float(default=0)) <= 1 -%}
+                      {%- set prog = [100, (ba.get('today_chores_done') | int(default=0)) * 100 / t_req] | min -%}
+                    {%- endif -%}
+                    {%- set b_end = ((ba.get('end_date') or rs.get('end_date') or '') | string) | regex_replace('T.*$', '') -%}
+                    {%- set dl = (((as_timestamp(b_end ~ 'T12:00:00') - as_timestamp(today ~ 'T12:00:00')) / 86400) | round(0) | int) if b_end | length > 0 else 999 -%}
+                    {%- if blabel.get('color') and lname not in ns.colors -%}{%- set ns.colors = ns.colors | combine({lname: blabel.get('color') | string}) -%}{%- endif -%}
+                    {%- set grp = ns.b.get(lname, {}) -%}
+                    {%- set cur = grp.get(bname, {'name': bname, 'icon': (ba.get('icon') or 'mdi:medal-outline') | string, 'own': (badge.get('color') or '') | string, 'left': dl, 'people': []}) -%}
+                    {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'p': prog, 'e': earned}]}) -%}
+                    {%- set ns.b = ns.b | combine({lname: grp | combine({bname: cur})}) -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {#-- Chores: labeled chores that belong to today (due today, overdue, or done today) --#}
+                {%- for ch in (h.attributes.get('chores') or []) -%}
+                  {%- set clabel = ((ch.get('labels') or [{}]) | first) if ch is mapping else {} -%}
+                  {%- set clabel = clabel if clabel is mapping else {} -%}
+                  {%- set lname = (clabel.get('name') or '') | string -%}
+                  {%- set cst = (ch.get('state') or '') | string | lower if ch is mapping else '' -%}
+                  {%- if lname != '' and ch.get('primary_group') == 'today' and cst not in ['not_my_turn', 'standby', 'paused'] -%}
+                    {%- set kind = 'done' if cst in ['approved', 'approved_in_part', 'completed', 'completed_in_part', 'completed_by_other'] else ('claimed' if cst in ['claimed', 'claimed_in_part'] else ('overdue' if cst in ['overdue', 'missed'] else 'due')) -%}
+                    {%- if clabel.get('color') and lname not in ns.colors -%}{%- set ns.colors = ns.colors | combine({lname: clabel.get('color') | string}) -%}{%- endif -%}
+                    {%- set cname = (ch.get('name') or '') | string -%}
+                    {%- set grp = ns.c.get(lname, {}) -%}
+                    {%- set cur = grp.get(cname, {'name': cname, 'people': []}) -%}
+                    {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'k': kind}]}) -%}
+                    {%- set ns.c = ns.c | combine({lname: grp | combine({cname: cur})}) -%}
+                  {%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {%- set kcol = {'done': 'var(--success-color)', 'claimed': 'var(--primary-color)', 'due': 'var(--warning-color)', 'overdue': 'var(--error-color)'} -%}
+              {%- for lname in ((ns.b.keys() | list) + (ns.c.keys() | list)) | unique | sort(case_sensitive=false) -%}
+                {%- set col = ns.colors.get(lname) or 'var(--primary-color)' -%}
+                {%- set esc_l = lname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {#-- Badge chips: soonest ending first, finished last (same order as Goals) --#}
+                {%- set items = namespace(l=[]) -%}
+                {%- for qn, q in ns.b.get(lname, {}).items() -%}
+                  {%- set top = (q.people | map(attribute='p') | list | max) if q.people else 0 -%}
+                  {%- set alldone = q.people | length > 0 and (q.people | selectattr('e') | list | length) == (q.people | length) -%}
+                  {%- set items.l = items.l + [q | combine({'top': top, 'alldone': alldone, 'key': [(1 if alldone else 0), (1 if q.left >= 999 else 0), (q.left if q.left < 999 else 0), (100 - top), qn | lower]})] -%}
+                {%- endfor -%}
+                {%- set bx = namespace(v='') -%}
+                {%- for q in items.l | sort(attribute='key') -%}
+                  {%- set icol = q.own or col -%}
+                  {%- set urgent = (not q.alldone) and q.left >= 0 and q.left <= 3 -%}
+                  {%- set ttxt = (ui.get('ends_today', 'Ends today') if q.left == 0 else (ui.get('one_day_left', '1 day left') if q.left == 1 else (q.left ~ ' ' ~ ui.get('days_left', 'days left')))) if (q.left < 999 and q.left >= 0) else ui.get('no_end', 'no end') -%}
+                  {%- set dots = namespace(v='') -%}
+                  {%- for pp in (q.people | selectattr('e') | list) + (q.people | rejectattr('e') | list) -%}
+                    {%- set dots.v = dots.v ~ "<span style='width:15px;height:15px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;" ~ ("background:var(--success-color);color:#fff;" if pp.e else ("background:var(--primary-color);color:#fff;" if pp.p > 0 else "border:1.5px solid var(--divider-color);color:var(--secondary-text-color);")) ~ "'>" ~ ('✓' if pp.e else (pp.u[:1] | upper)) ~ "</span>" -%}
+                  {%- endfor -%}
+                  {%- set bx.v = bx.v ~ "<div style='flex:0 0 auto;min-width:150px;max-width:220px;border-radius:12px;background:color-mix(in srgb," ~ col ~ " 12%,var(--card-background-color));border:1px solid color-mix(in srgb," ~ col ~ " 30%,transparent);padding:6px 8px;box-sizing:border-box;'>"
+                    ~ "<div style='display:flex;align-items:center;gap:6px;'><div style='width:22px;height:22px;border-radius:7px;background:" ~ icol ~ ";display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:14px;height:14px;--mdc-icon-size:14px;color:#fff;display:block;'></ha-icon></div>"
+                    ~ "<div style='font-size:12px;font-weight:700;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ (q.name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ "</div></div>"
+                    ~ "<div style='height:4px;border-radius:3px;background:var(--divider-color);margin:6px 0;'><div style='height:4px;border-radius:3px;width:" ~ (100 if q.alldone else (q.top | round(0) | int)) ~ "%;background:" ~ ('var(--success-color)' if q.alldone else col) ~ ";'></div></div>"
+                    ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:6px;'><span style='display:inline-flex;gap:3px;'>" ~ dots.v ~ "</span>"
+                    ~ "<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;white-space:nowrap;color:" ~ ('var(--warning-color)' if urgent else 'var(--secondary-text-color)') ~ ";'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span></div></div>" -%}
+                {%- endfor -%}
+                {#-- Chore pills: who still owes it, in its state color; green tick when everyone is done --#}
+                {%- set cx = namespace(v='', done=0, n=0) -%}
+                {%- for cn, c in ns.c.get(lname, {}).items() | sort(attribute='0') -%}
+                  {%- set kinds = c.people | map(attribute='k') | list -%}
+                  {%- set alldone = kinds | reject('eq', 'done') | list | length == 0 -%}
+                  {%- set worst = 'done' if alldone else ('overdue' if 'overdue' in kinds else ('due' if 'due' in kinds else 'claimed')) -%}
+                  {%- set cx.n = cx.n + 1 -%}
+                  {%- set cx.done = cx.done + (1 if alldone else 0) -%}
+                  {%- set owe = namespace(v='') -%}
+                  {%- for pp in c.people | rejectattr('k', 'eq', 'done') -%}
+                    {%- set owe.v = owe.v ~ "<span style='width:15px;height:15px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff;background:" ~ kcol[pp.k] ~ ";'>" ~ (pp.u[:1] | upper) ~ "</span>" -%}
+                  {%- endfor -%}
+                  {%- set cx.v = cx.v ~ "<span style='display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px " ~ ('8px' if alldone else '4px') ~ " 3px 8px;border-radius:999px;white-space:nowrap;background:color-mix(in srgb," ~ kcol[worst] ~ " 14%,transparent);color:" ~ kcol[worst] ~ ";'>" ~ ('✓ ' if alldone else '') ~ (cn | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ owe.v ~ "</span>" -%}
+                {%- endfor -%}
+                {%- set count_txt = (cx.done ~ '/' ~ cx.n ~ ' ' ~ (ui.get('chores', 'Chores') | lower) ~ ' ' ~ (ui.get('done', 'Done') | lower)) if cx.n > 0 else '' -%}
+                {%- set html = "<div style='width:100%;text-align:left;'>"
+                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;'><span style='display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:" ~ col ~ ";'><span style='width:8px;height:8px;border-radius:50%;background:" ~ col ~ ";'></span>" ~ esc_l ~ "</span>"
+                  ~ "<span style='font-size:10.5px;font-weight:700;color:var(--secondary-text-color);white-space:nowrap;'>" ~ count_txt ~ "</span></div>"
+                  ~ (("<div style='display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;'>" ~ bx.v ~ "</div>") if bx.v else '')
+                  ~ (("<div style='display:flex;flex-wrap:wrap;gap:5px;margin-top:" ~ ('7px' if bx.v else '0') ~ ";'>" ~ cx.v ~ "</div>") if cx.v else '')
+                  ~ "</div>" -%}
+                {{
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'none'},
+                    'hold_action': {'action': 'none'},
+                    'custom_fields': {'content': html},
+                    'styles': {
+                      'card': [
+                        {'padding': '8px 10px'},
+                        {'border-radius': '14px'},
+                        {'box-shadow': 'none'},
+                        {'cursor': 'default'},
+                        {'border': '1px solid color-mix(in srgb, ' ~ col ~ ' 45%, transparent)'},
+                        {'background': 'linear-gradient(90deg, color-mix(in srgb, ' ~ col ~ ' 16%, var(--card-background-color)), var(--card-background-color))'}
+                      ],
+                      'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                      'custom_fields': {'content': [{'width': '100%'}, {'overflow': 'hidden'}]}
+                    }
+                  }
+                }},
+              {%- endfor -%}
     - type: grid
       cards:
         - type: heading
@@ -342,7 +485,8 @@ views:
               {%- for h in helpers -%}
                 {%- set uname = (h.attributes.get('user_name') or '') | string -%}
                 {%- for badge in (h.attributes.get('badges') or []) -%}
-                  {%- if badge is mapping and badge.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] and (badge.get('badge_type') | string | lower) in ['periodic', 'daily', 'special_occasion'] -%}
+                  {#-- Labeled badges live in their label strip under the Family cards --#}
+                  {%- if badge is mapping and not badge.get('labels') and badge.get('eid') not in ['', 'None', 'unknown', 'unavailable', none] and (badge.get('badge_type') | string | lower) in ['periodic', 'daily', 'special_occasion'] -%}
                     {%- set be = badge.get('eid') -%}
                     {%- set ba = states[be].attributes | default({}, true) -%}
                     {%- set rs = ba.get('reset_schedule') if ba.get('reset_schedule') is mapping else {} -%}
