@@ -418,6 +418,10 @@ views:
               {%- endif -%}
               {%- set tsensor = ((helpers | first).attributes.get('dashboard_helpers') or {}).get('translation_sensor_eid') if helpers else none -%}
               {%- set ui = (state_attr(tsensor, 'ui_translations') if tsensor else {}) or {} -%}
+              {%- set lb_psensor = ((helpers | first).attributes.get('core_sensors') or {}).get('points_eid') if helpers else none -%}
+              {%- set lb_plabel = ((state_attr(lb_psensor, 'unit_of_measurement') if lb_psensor else none) or '') | string -%}
+              {#-- A custom points name (for example Stars) replaces the word Points --#}
+              {%- set lb_head = (lb_plabel ~ ' ' ~ (ui.get('earned', 'Earned') | lower)) if (lb_plabel and (lb_plabel | lower) != (ui.get('points', 'Points') | lower)) else ui.get('points_earned', 'Points earned') -%}
               {%- set lb = namespace(rows=[], top=0) -%}
               {%- for h in helpers -%}
                 {%- set ha = h.attributes -%}
@@ -436,7 +440,7 @@ views:
                   {%- set crown = '&#128081;' if (loop.first and r.pts > 0) else '' -%}
                   {%- set rows_html.v = rows_html.v ~ "<div style='display:flex;align-items:center;gap:8px;margin-top:8px;'><span style='width:18px;font-size:14px;text-align:center;'>" ~ crown ~ "</span><span style='width:28px;height:28px;border-radius:50%;background:var(--primary-color);color:var(--text-primary-color,#fff);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;'>" ~ (r.name[:1] | upper) ~ "</span><span style='width:64px;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</span><div style='flex:1;height:9px;border-radius:999px;background:var(--divider-color);overflow:hidden;'><div style='height:100%;width:" ~ (pct | string) ~ "%;border-radius:999px;background:" ~ ('var(--warning-color)' if (loop.first and r.pts > 0) else 'var(--primary-color)') ~ ";'></div></div><span style='width:40px;text-align:right;font-size:12px;font-weight:800;'>" ~ ('%g' | format(r.pts | round(1))) ~ "</span></div>" -%}
                 {%- endfor -%}
-                {%- set html = "<div style='width:100%;text-align:left;'><div style='display:flex;align-items:center;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'>" ~ ui.get('points_earned', 'Points earned') ~ "</div></div>" ~ rows_html.v ~ "</div>" -%}
+                {%- set html = "<div style='width:100%;text-align:left;'><div style='display:flex;align-items:center;'><div style='font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;'>" ~ (lb_head | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) ~ "</div></div>" ~ rows_html.v ~ "</div>" -%}
                 {%- set bcol = 'var(--divider-color)' -%}
                 {%- set bg = 'var(--card-background-color)' -%}
                 {{
@@ -837,7 +841,9 @@ views:
                     {%- set win = namespace(names=[], av='', chips='') -%}
                     {%- set win_html = '' -%}
                     {%- if fdone and ftop > 0 -%}
-                      {%- set wunit = ui.get('points_unit', 'points') if ftype == 'family_points_total' else (ui.get('chores_unit', 'chores') if ftype in ['family_chore_total', 'family_chores_in_day'] else '') -%}
+                      {%- set w_psensor = ((helpers | first).attributes.get('core_sensors') or {}).get('points_eid') if helpers else none -%}
+                      {%- set w_plabel = ((state_attr(w_psensor, 'unit_of_measurement') if w_psensor else none) or '') | string -%}
+                      {%- set wunit = (((w_plabel | lower) if (w_plabel and (w_plabel | lower) != (ui.get('points', 'Points') | lower)) else ui.get('points_unit', 'points')) | replace('&', '&amp;') | replace('<', '&lt;')) if ftype == 'family_points_total' else (ui.get('chores_unit', 'chores') if ftype in ['family_chore_total', 'family_chores_in_day'] else '') -%}
                       {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
                         {%- set pv = pts | float(0) -%}
                         {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}

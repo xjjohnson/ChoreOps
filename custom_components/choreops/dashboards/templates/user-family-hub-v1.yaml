@@ -3067,7 +3067,7 @@ views:
                               {#-- how far along the goal is, as a count --#}
                               {%- set count_txt = '' -%}
                               {%- if b.threshold > 0 -%}
-                                {%- set count_txt = "<b style='color:var(--primary-text-color);'>" ~ ('%g' | format(b.current)) ~ " " ~ ui.get('of', 'of') ~ " " ~ ('%g' | format(b.threshold | round(2))) ~ "</b> " ~ {'pts': ui.get('points_short', 'pts'), 'chores': ui.get('chores', 'chores') | lower, 'days': ui.get('days', 'days')}.get(b.unit, b.unit) -%}
+                                {%- set count_txt = "<b style='color:var(--primary-text-color);'>" ~ ('%g' | format(b.current)) ~ " " ~ ui.get('of', 'of') ~ " " ~ ('%g' | format(b.threshold | round(2))) ~ "</b> " ~ {'pts': ((((state_attr(points_sensor, 'unit_of_measurement') or '') | string | lower) | replace('&', '&amp;') | replace('<', '&lt;')) if (points_sensor and state_attr(points_sensor, 'unit_of_measurement') and (state_attr(points_sensor, 'unit_of_measurement') | string | lower) != (ui.get('points', 'Points') | lower)) else ui.get('points_short', 'pts')), 'chores': ui.get('chores', 'chores') | lower, 'days': ui.get('days', 'days')}.get(b.unit, b.unit) -%}
                               {%- endif -%}
                               {#-- day-by-day strip: done / missed / today / still ahead --#}
                               {%- set day_strip = '' -%}
@@ -3694,7 +3694,8 @@ views:
                               {%- set win = namespace(names=[], av='', chips='') -%}
                               {%- set win_html = '' -%}
                               {%- if fdone and ftop > 0 -%}
-                                {%- set wunit = ui.get('points_unit', 'points') if ftype == 'family_points_total' else (ui.get('chores_unit', 'chores') if ftype in ['family_chore_total', 'family_chores_in_day'] else '') -%}
+                                {%- set w_plabel = ((state_attr(points_sensor, 'unit_of_measurement') if points_sensor else none) or '') | string -%}
+                                {%- set wunit = (((w_plabel | lower) if (w_plabel and (w_plabel | lower) != (ui.get('points', 'Points') | lower)) else ui.get('points_unit', 'points')) | replace('&', '&amp;') | replace('<', '&lt;')) if ftype == 'family_points_total' else (ui.get('chores_unit', 'chores') if ftype in ['family_chore_total', 'family_chores_in_day'] else '') -%}
                                 {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
                                   {%- set pv = pts | float(0) -%}
                                   {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}

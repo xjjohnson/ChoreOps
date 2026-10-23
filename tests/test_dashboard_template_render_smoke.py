@@ -2062,6 +2062,19 @@ def test_family_home_summary_leaderboard_and_streak_cards() -> None:
     assert html.index("Lily") < html.index("Dad")
     assert "145" in html and "58" in html
 
+    assert "Points earned" in html
+
+    # A custom points name replaces the word Points in the header
+    for eid in ("sensor.dad_points", "sensor.lily_points"):
+        states[eid].attributes["unit_of_measurement"] = "Stars"
+    stars_html = _render_home_card("WEEKLY LEADERBOARD", states)[0]["custom_fields"][
+        "content"
+    ]
+    assert "Stars earned" in stars_html
+    assert "Points earned" not in stars_html
+    for eid in ("sensor.dad_points", "sensor.lily_points"):
+        states[eid].attributes.pop("unit_of_measurement")
+
     people = _render_home_card("PERSON CARDS", states)
     lily = next(c for c in people if "Lily" in c["custom_fields"]["content"])
     dad = next(c for c in people if "Dad" in c["custom_fields"]["content"])
