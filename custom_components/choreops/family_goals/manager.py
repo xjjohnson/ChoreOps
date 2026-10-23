@@ -603,6 +603,13 @@ class FamilyGoalManager(BaseManager):
         if not goal or goal.get(fg.DATA_TYPE) in fg.STREAK_GOAL_TYPES:
             # Streak goals are a shared day count, not a sum of shares.
             return {}
+        completed = goal.get(fg.DATA_COMPLETED)
+        if isinstance(completed, dict) and self._all_levels_reached(goal):
+            # Every level done: shares stay where they were until a reset
+            return {
+                assignee_id: float(completed.get(assignee_id, 0.0))
+                for assignee_id in self._assigned_ids(goal)
+            }
         frozen = goal.get(fg.DATA_FROZEN)
         if isinstance(frozen, dict) and self.is_finished(goal):
             # Past the finish date: shares stay where they were on the day
@@ -662,8 +669,7 @@ class FamilyGoalManager(BaseManager):
         if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_DAY:
             # One day's effort: today's counts are the level's shares.
             return self.get_contributions(goal_id)
-        levels = self._levels(goal)
-        if levels and int(goal.get(fg.DATA_LEVEL, 0)) >= len(levels):
+        if self._all_levels_reached(goal):
             # Every level done: no level is under way, so show the whole goal.
             return self.get_contributions(goal_id)
         start = goal.get(fg.DATA_LEVEL_START, {})
@@ -671,6 +677,11 @@ class FamilyGoalManager(BaseManager):
             assignee_id: max(0.0, value - float(start.get(assignee_id, 0.0)))
             for assignee_id, value in self.get_contributions(goal_id).items()
         }
+
+    def _all_levels_reached(self, goal: dict[str, Any]) -> bool:
+        """Return True once the goal's last level has been reached."""
+        levels = self._levels(goal)
+        return bool(levels) and int(goal.get(fg.DATA_LEVEL, 0)) >= len(levels)
 
     def _next_level_start(
         self,
@@ -977,6 +988,7 @@ class FamilyGoalManager(BaseManager):
         goal[fg.DATA_STREAK_LAST_DAY] = today_iso
         goal[fg.DATA_LEVEL] = 0
         goal[fg.DATA_LEVEL_START] = {}
+        goal.pop(fg.DATA_COMPLETED, None)
         for entry in goal.setdefault(fg.DATA_PROGRESS, {}).values():
             if isinstance(entry, dict):
                 entry[fg.DATA_AWARDED] = False
@@ -1035,6 +1047,7 @@ class FamilyGoalManager(BaseManager):
         if period_start is not None:
             goal[fg.DATA_PERIOD_START] = period_start.isoformat()
         goal.pop(fg.DATA_FROZEN, None)
+        goal.pop(fg.DATA_COMPLETED, None)
         end = self._end_date(goal)
         if end is not None and end.isoformat() < today:
             goal[fg.DATA_END_CLEARED] = end.isoformat()
@@ -1259,6 +1272,9 @@ class FamilyGoalManager(BaseManager):
             goal[fg.DATA_LEVEL_START] = self._next_level_start(
                 goal_id, goal, level_shares, total - levels[reached - 1][0]
             )
+            if is_final:
+                # Counting pauses at completion until a reset or a new period
+                goal[fg.DATA_COMPLETED] = self.get_contributions(goal_id)
 
             for assignee_id in self._assigned_ids(goal):
                 entry = progress.get(assignee_id)

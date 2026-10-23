@@ -757,6 +757,46 @@ async def test_finished_goal_shows_whole_goal_shares(
     }
 
 
+async def test_completed_goal_pauses_until_reset(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Once every level is done, the total and shares stop counting until a reset."""
+    gm = scenario_full.coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=100.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+
+    await _earn_points(scenario_full, zoe, 70.0)
+    await _earn_points(scenario_full, max_, 40.0)
+    await gm.evaluate_assignee(max_)
+    await hass.async_block_till_done()
+    assert gm.get_total(goal_id) == pytest.approx(110.0)
+
+    # More points after completion do not count
+    await _earn_points(scenario_full, zoe, 50.0)
+    await gm.evaluate_assignee(zoe)
+    await hass.async_block_till_done()
+    assert gm.get_total(goal_id) == pytest.approx(110.0)
+    assert gm.get_contributions(goal_id) == {
+        zoe: pytest.approx(70.0),
+        max_: pytest.approx(40.0),
+    }
+
+    # A reset starts counting again from zero
+    gm.reset_goal(goal_id)
+    assert gm.get_level_info(goal_id)["level"] == 0
+    assert gm.get_total(goal_id) == pytest.approx(0.0)
+    await _earn_points(scenario_full, max_, 10.0)
+    assert gm.get_total(goal_id) == pytest.approx(10.0)
+
+
 async def test_overview_target_is_the_current_level(
     hass: HomeAssistant,
     scenario_full: SetupResult,
