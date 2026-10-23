@@ -728,6 +728,35 @@ async def test_points_past_a_level_carry_into_the_next_level(
     assert sum(shares.values()) == pytest.approx(gm.get_total(goal_id) - 1000.0)
 
 
+async def test_finished_goal_shows_whole_goal_shares(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """Once every level is done, each person's share is their whole-goal total."""
+    gm = scenario_full.coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    goal_id = _create_family_goal(
+        scenario_full,
+        goal_type=fg.GOAL_TYPE_POINTS,
+        target=100.0,
+        reward=5.0,
+        assigned=[zoe, max_],
+    )
+
+    await _earn_points(scenario_full, zoe, 70.0)
+    await _earn_points(scenario_full, max_, 40.0)
+    await gm.evaluate_assignee(max_)
+    await hass.async_block_till_done()
+    assert gm.get_level_info(goal_id)["level"] == 1
+
+    # Not 0 for everyone: the goal is complete, so its full shares show.
+    assert gm.get_level_contributions(goal_id) == {
+        zoe: pytest.approx(70.0),
+        max_: pytest.approx(40.0),
+    }
+
+
 async def test_overview_target_is_the_current_level(
     hass: HomeAssistant,
     scenario_full: SetupResult,
