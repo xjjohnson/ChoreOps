@@ -4301,17 +4301,21 @@ class AssigneeDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
         hass: HomeAssistant,
         stored_labels: Any,
     ) -> list[dict[str, str]]:
-        """Normalize chore labels for dashboard rendering."""
+        """Normalize chore labels (with their CSS color) for dashboard rendering."""
         raw_labels = [
             label
             for label in cast("list", stored_labels)
             if isinstance(label, str) and label.strip()
         ]
         friendly_labels = [get_friendly_label(hass, label) for label in raw_labels]
-        return [
-            {"id": label, "name": friendly_label}
-            for label, friendly_label in zip(raw_labels, friendly_labels, strict=False)
-        ]
+        entries: list[dict[str, str]] = []
+        for label, friendly_label in zip(raw_labels, friendly_labels, strict=False):
+            entry = {"id": label, "name": friendly_label}
+            color = get_label_css_color(hass, label) if hass else ""
+            if color:
+                entry["color"] = color
+            entries.append(entry)
+        return entries
 
     @staticmethod
     def _build_colored_label_entries(
