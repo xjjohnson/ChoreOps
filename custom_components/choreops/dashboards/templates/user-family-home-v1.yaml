@@ -478,7 +478,9 @@ views:
           card_param: cards
           filter:
             template: |-
-              {%- set pref_order = ['Perfect Week', 'Expert Brusher', 'Puddins Cook', 'Pooper Scooper'] -%}  {#-- Optional: goal names, top to bottom. Goals not listed follow, daily goals first. --#}
+              {#-- Goal names, top to bottom. Type them comma-separated in the helper input_text.choreops_goal_order (no regenerate needed); the list below is the fallback. Goals not listed follow, daily goals first. --#}
+              {%- set pref_raw = states('input_text.choreops_goal_order') | string -%}
+              {%- set pref_order = (pref_raw.split(',') | map('trim') | reject('eq', '') | list) if pref_raw not in ['unknown', 'unavailable', 'none', ''] else ['Perfect Week', 'Expert Brusher', 'Puddins Cook', 'Pooper Scooper'] -%}
               {%- set pref_urgent_days = 3 -%}
               {%- set pref_dashboard_path = '' -%}  {#-- Optional: your dashboard URL path (for example 'dashboard-choreops'). Leave empty to use paths relative to this dashboard. --#}
               {%- set helpers = integration_entities('choreops')
@@ -543,12 +545,12 @@ views:
                 {%- set urgent = (not q.alldone) and q.left >= 0 and q.left <= pref_urgent_days -%}
                 {%- set tcol = 'var(--warning-color)' if urgent else 'var(--secondary-text-color)' -%}
                 {%- set ttxt = (ui.get('ends_today', 'Ends today') if q.left == 0 else (ui.get('one_day_left', '1 day left') if q.left == 1 else (q.left ~ ' ' ~ ui.get('days_left', 'days left')))) if (q.left < 999 and q.left >= 0) else ui.get('no_end', 'no end') -%}
-                {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>" ~ ui.get('no_end', 'no end') ~ "</span>") -%}
+                {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;--ha-icon-display:block;margin:0;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>" ~ ui.get('no_end', 'no end') ~ "</span>") -%}
                 {#-- Count goals (chores or points) name the leader and give the top 3 a medal --#}
                 {%- set cgoal = (q.get('tt') or '') in ['chore_count', 'points', 'points_chores', 'points_all_time'] and not (q.people | selectattr('d') | list) -%}
                 {%- set topc = (q.people | map(attribute='c') | max) if q.people else 0 -%}
                 {%- set leaders = (q.people | selectattr('c', 'eq', topc) | map(attribute='u') | map('replace', '&', '&amp;') | map('replace', '<', '&lt;') | map('replace', '>', '&gt;') | list) if topc > 0 else [] -%}
-                {%- set lead_html = ("<div style='font-size:11px;font-weight:800;line-height:1.2;margin-bottom:4px;color:var(--warning-color);'>🏆 " ~ (leaders | join(' &amp; ')) ~ ' ' ~ (ui.get('leader_lead', 'lead') if (leaders | length) > 1 else ui.get('leader_leads', 'leads')) ~ " · " ~ topc ~ "/" ~ q.thr ~ "</div>") if (cgoal and leaders) else '' -%}
+                {%- set lead_html = ("<span style='min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;font-weight:800;color:var(--warning-color);'>🏆 " ~ (leaders | join(' &amp; ')) ~ ' ' ~ (ui.get('leader_lead', 'lead') if (leaders | length) > 1 else ui.get('leader_leads', 'leads')) ~ " · " ~ topc ~ "/" ~ q.thr ~ "</span>") if (cgoal and leaders) else '' -%}
                 {#-- Race track: every person sits where their own progress is --#}
                 {%- set rp = namespace(l=[]) -%}
                 {%- for pp in q.people -%}
@@ -596,13 +598,13 @@ views:
                 {%- set fillw = 100 if q.alldone else (q.top | round(0) | int) -%}
                 {%- set html = "<div style='position:relative;overflow:hidden;border-radius:16px;text-align:left;border:1px solid " ~ (('var(--warning-color)') if urgent else ('color-mix(in srgb,' ~ acc ~ ' 40%,transparent)')) ~ ";background:linear-gradient(90deg,color-mix(in srgb," ~ acc ~ " 16%,transparent),transparent);'>"
                   ~ "<div style='display:flex;flex-direction:column;gap:7px;padding:9px 10px;'>"
-                  ~ "<div style='display:flex;align-items:center;gap:8px;'><div style='width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg," ~ acc ~ "," ~ acc2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#fff;display:block;'></ha-icon></div>"
-                  ~ "<div style='flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.15;color:var(--primary-text-color);'>" ~ qname ~ "</div></div>" ~ lead_html
+                  ~ "<div style='display:flex;align-items:center;gap:8px;'><div style='width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg," ~ acc ~ "," ~ acc2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;--ha-icon-display:block;margin:0;color:#fff;display:block;'></ha-icon></div>"
+                  ~ "<div style='flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.15;color:var(--primary-text-color);'>" ~ qname ~ "</div></div>"
                   ~ "<div style='position:relative;height:48px;'><div style='position:relative;height:6px;border-radius:4px;background:var(--divider-color);margin:22px 16px 0 8px;'>"
                   ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ fillw ~ "%;border-radius:4px;background:linear-gradient(90deg," ~ acc ~ "," ~ acc2 ~ ");'></div>"
                   ~ ticks.v ~ mk.v
                   ~ "<div style='position:absolute;right:-15px;top:-9px;font-size:12px;line-height:1;'>🏁</div></div></div>"
-                  ~ "<div style='display:flex;align-items:center;justify-content:" ~ ('flex-end' if cgoal else 'space-between') ~ ";gap:6px;'>" ~ ('' if cgoal else foot) ~ clock ~ "</div>"
+                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:6px;'>" ~ (lead_html if cgoal else foot) ~ clock ~ "</div>"
                   ~ "</div></div>" -%}
                 {{
                   {
@@ -686,8 +688,9 @@ views:
                 {%- endfor -%}
               {%- endfor -%}
               {%- for fe1 in fsort.top + fsort.rest -%}{%- if fe1 not in ford.v -%}{%- set ford.v = ford.v + [fe1] -%}{%- endif -%}{%- endfor -%}
-              {#-- Optional: goal names, top to bottom. Goals not listed follow in the kind order above. --#}
-              {%- set pref_order = ['This Months Family Stars', 'Total Monthly Chores', 'Most chores completed'] -%}
+              {#-- Goal names, top to bottom. Type them comma-separated in the helper input_text.choreops_family_goal_order (no regenerate needed); the list below is the fallback. Goals not listed follow in the kind order above. --#}
+              {%- set pref_raw = states('input_text.choreops_family_goal_order') | string -%}
+              {%- set pref_order = (pref_raw.split(',') | map('trim') | reject('eq', '') | list) if pref_raw not in ['unknown', 'unavailable', 'none', ''] else ['This Months Family Stars', 'Total Monthly Chores', 'Most chores completed'] -%}
               {%- set pord = namespace(v=[]) -%}
               {%- for pn in pref_order -%}
                 {%- for fe2 in ford.v -%}
