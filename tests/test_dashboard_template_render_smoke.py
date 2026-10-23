@@ -1491,6 +1491,7 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
             "custom:auto-entities",
             "custom:auto-entities",
             "custom:auto-entities",
+            "custom:auto-entities",
         ],
         ["heading", "custom:auto-entities", "heading", "custom:auto-entities"],
         ["heading", "custom:auto-entities"],
@@ -1502,7 +1503,7 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
         for c in sec["cards"]
         if c["type"] == "custom:auto-entities"
     ]
-    assert len(autos) == 6
+    assert len(autos) == 7
     for card in autos:
         env.parse(card["filter"]["template"])
         assert (
@@ -1511,7 +1512,9 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
             or "ACHIEVEMENTS" in str(card["filter"]["template"])
             or "family_total" in card["filter"]["template"]
         )
-    assert "family-hub-" in autos[1]["filter"]["template"]
+    assert "spot = 'top'" in autos[1]["filter"]["template"]
+    assert "family-hub-" in autos[2]["filter"]["template"]
+    assert "spot = 'rest'" in autos[3]["filter"]["template"]
     assert "user-family-home-v1" not in dh.get_assignee_template_ids()
     assert "user-family-home-v1" not in dh.get_admin_template_ids()
     assert dh.get_template_source_path("user-family-home-v1")
@@ -2198,7 +2201,7 @@ def _label_strip_states() -> dict[str, _MockState]:
 
 def test_family_home_label_strip_shows_labeled_badges_and_todays_chores() -> None:
     """A labeled badge and today's labeled chores share one strip in the label color."""
-    cards = _render_home_card("===== LABEL STRIPS", _label_strip_states())
+    cards = _render_home_card("spot = 'rest'", _label_strip_states())
     assert len(cards) == 1
     html = cards[0]["custom_fields"]["content"]
     assert "Kitchen" in html and "var(--orange-color)" in html
@@ -2227,10 +2230,34 @@ def test_family_home_goals_skip_labeled_badges() -> None:
 def test_family_home_label_strip_hidden_without_labels() -> None:
     """No labeled badges or chores means no strip at all."""
     cards = _render_home_card(
-        "===== LABEL STRIPS",
+        "spot = 'rest'",
         {k: v for k, v in _label_strip_states().items() if "helper" not in k},
     )
     assert cards == []
+
+
+def test_family_home_important_label_strip_sits_on_top() -> None:
+    """Only a label named Important (any case) goes in the top strip above the person cards."""
+    states = _label_strip_states()
+    # Without an Important label the top strip stays empty
+    assert _render_home_card("spot = 'top'", states) == []
+    lily = states["sensor.lily_helper"].attributes
+    lily["chores"].append(
+        {
+            "name": "Brush Teeth",
+            "state": "pending",
+            "primary_group": "today",
+            "labels": [{"id": "important", "name": "IMPORTANT"}],
+        }
+    )
+    top = _render_home_card("spot = 'top'", states)
+    assert len(top) == 1
+    html = top[0]["custom_fields"]["content"]
+    assert "IMPORTANT" in html and "Brush Teeth" in html and "Kitchen" not in html
+    rest = _render_home_card("spot = 'rest'", states)
+    assert len(rest) == 1
+    html = rest[0]["custom_fields"]["content"]
+    assert "Kitchen" in html and "Brush Teeth" not in html
 
 
 def test_family_home_goal_chips_show_todays_part() -> None:
