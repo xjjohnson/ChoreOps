@@ -518,7 +518,10 @@ views:
                     {%- set b_days = ba.get('days_done') if (ba.get('days_done') is iterable and ba.get('days_done') is not string) else [] -%}
                     {%- set dly = t_req > 0 or b_tt.startswith(('days_', 'streak_')) or (badge.get('badge_type') | string | lower) == 'daily' -%}
                     {%- set td = earned or (t_req > 0 and (ba.get('today_chores_done') | int(default=0)) >= t_req) or today in b_days -%}
-                    {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'p': prog, 'e': earned, 'd': dly, 't': td}]}) -%}
+                    {#-- Chore and points count goals also get each person's count, for the leader line and medals --#}
+                    {%- set b_thr = ba.get('threshold_value') | float(default=0) -%}
+                    {%- set b_cnt = (b_thr if earned else (prog * b_thr / 100)) | round(0) | int -%}
+                    {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'p': prog, 'e': earned, 'd': dly, 't': td, 'c': b_cnt}], 'tt': b_tt, 'thr': b_thr | round(0) | int}) -%}
                     {%- set ns.q = ns.q | combine({bname: cur}) -%}
                   {%- endif -%}
                 {%- endfor -%}
@@ -536,6 +539,11 @@ views:
                 {%- set tcol = 'var(--warning-color)' if urgent else 'var(--secondary-text-color)' -%}
                 {%- set ttxt = (ui.get('ends_today', 'Ends today') if q.left == 0 else (ui.get('one_day_left', '1 day left') if q.left == 1 else (q.left ~ ' ' ~ ui.get('days_left', 'days left')))) if (q.left < 999 and q.left >= 0) else ui.get('no_end', 'no end') -%}
                 {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>" ~ ui.get('no_end', 'no end') ~ "</span>") -%}
+                {#-- Count goals (chores or points) name the leader and give the top 3 a medal --#}
+                {%- set cgoal = (q.get('tt') or '') in ['chore_count', 'points', 'points_chores', 'points_all_time'] and not (q.people | selectattr('d') | list) -%}
+                {%- set topc = (q.people | map(attribute='c') | max) if q.people else 0 -%}
+                {%- set leaders = (q.people | selectattr('c', 'eq', topc) | map(attribute='u') | map('replace', '&', '&amp;') | map('replace', '<', '&lt;') | map('replace', '>', '&gt;') | list) if topc > 0 else [] -%}
+                {%- set lead_html = ("<div style='font-size:11px;font-weight:800;line-height:1.2;margin-bottom:4px;color:var(--warning-color);'>🏆 " ~ (leaders | join(' &amp; ')) ~ ' ' ~ (ui.get('leader_lead', 'lead') if (leaders | length) > 1 else ui.get('leader_leads', 'leads')) ~ " · " ~ topc ~ "/" ~ q.thr ~ "</div>") if (cgoal and leaders) else '' -%}
                 {#-- Race track: every person sits where their own progress is --#}
                 {%- set rp = namespace(l=[]) -%}
                 {%- for pp in q.people -%}
@@ -555,8 +563,10 @@ views:
                   {%- set pc = 'var(--success-color)' if pp.e else ('var(--warning-color)' if lead else 'var(--primary-color)') -%}
                   {%- set nm = pp.u | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                   {%- set lane_top = -22 if mk.kk % 2 == 0 else 7 -%}
+                  {%- set place = (q.people | selectattr('c', 'gt', pp.c) | list | length) + 1 -%}
+                  {%- set medal = ("<span style='position:absolute;right:-8px;" ~ ('top:-9px' if lane_top < 0 else 'bottom:-9px') ~ ";font-size:10px;line-height:1;'>" ~ {1: '🥇', 2: '🥈', 3: '🥉'}[place] ~ "</span>") if (cgoal and pp.c > 0 and place <= 3) else '' -%}
                   {%- set lane_off = (mk.kk // 2) * 19 * (-1 if mk.anchor > 80 else 1) -%}
-                  {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (94 if mk.anchor > 94 else mk.anchor) ~ "% - 8px + " ~ lane_off ~ "px);top:" ~ lane_top ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
+                  {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (94 if mk.anchor > 94 else mk.anchor) ~ "% - 8px + " ~ lane_off ~ "px);top:" ~ lane_top ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div>" ~ medal ~ "</div>" -%}
                 {%- endfor -%}
                 {%- set done_n = q.people | selectattr('e') | list | length -%}
                 {#-- Footer: a chip per person, finished people first as green ticks; on goals with a daily part
@@ -579,12 +589,12 @@ views:
                 {%- set html = "<div style='position:relative;overflow:hidden;border-radius:16px;text-align:left;border:1px solid " ~ (('var(--warning-color)') if urgent else ('color-mix(in srgb,' ~ acc ~ ' 40%,transparent)')) ~ ";background:linear-gradient(90deg,color-mix(in srgb," ~ acc ~ " 16%,transparent),transparent);'>"
                   ~ "<div style='display:flex;flex-direction:column;gap:7px;padding:9px 10px;'>"
                   ~ "<div style='display:flex;align-items:center;gap:8px;'><div style='width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg," ~ acc ~ "," ~ acc2 ~ ");display:flex;align-items:center;justify-content:center;flex:0 0 auto;'><ha-icon icon='" ~ q.icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:#fff;display:block;'></ha-icon></div>"
-                  ~ "<div style='flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.15;color:var(--primary-text-color);'>" ~ qname ~ "</div></div>"
+                  ~ "<div style='flex:1;min-width:0;font-size:12.5px;font-weight:700;line-height:1.15;color:var(--primary-text-color);'>" ~ qname ~ "</div></div>" ~ lead_html
                   ~ "<div style='position:relative;height:48px;'><div style='position:relative;height:6px;border-radius:4px;background:var(--divider-color);margin:22px 16px 0 8px;'>"
                   ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ fillw ~ "%;border-radius:4px;background:linear-gradient(90deg," ~ acc ~ "," ~ acc2 ~ ");'></div>"
                   ~ ticks.v ~ mk.v
                   ~ "<div style='position:absolute;right:-15px;top:-9px;font-size:12px;line-height:1;'>🏁</div></div></div>"
-                  ~ "<div style='display:flex;align-items:center;justify-content:space-between;gap:6px;'>" ~ foot ~ clock ~ "</div>"
+                  ~ "<div style='display:flex;align-items:center;justify-content:" ~ ('flex-end' if cgoal else 'space-between') ~ ";gap:6px;'>" ~ ('' if cgoal else foot) ~ clock ~ "</div>"
                   ~ "</div></div>" -%}
                 {{
                   {
