@@ -58,6 +58,7 @@ from .dashboard_helpers import (
     normalize_template_id,
     resolve_assignee_template_profile,
 )
+from .dashboard_template_warmup import async_warm_dashboard_templates
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -2226,6 +2227,7 @@ async def _save_dashboard_config(
     try:
         await dashboard.async_save(config)
         const.LOGGER.debug("Dashboard config saved successfully: %s", url_path)
+        await async_warm_dashboard_templates(hass, config, url_path)
     except HomeAssistantError as err:
         const.LOGGER.error("Failed to save dashboard config: %s", err)
         raise DashboardSaveError(f"Failed to save dashboard config: {err}") from err

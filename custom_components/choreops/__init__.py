@@ -17,10 +17,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.exceptions import ConfigEntryNotReady, HomeAssistantError
+from homeassistant.helpers.start import async_at_started
 
 from . import const
 from .coordinator import ChoreOpsConfigEntry, ChoreOpsDataCoordinator
 from .helpers import backup_helpers as bh, dashboard_helpers as dh
+from .helpers.dashboard_template_warmup import async_warm_dashboard_templates
 from .helpers.storage_helpers import get_entry_storage_key_from_entry
 from .notification_action_handler import async_handle_notification_action
 from .services import async_setup_services, async_unload_services
@@ -376,6 +378,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ChoreOpsConfigEntry) -> 
 
     entry.async_on_unload(
         hass.bus.async_listen(const.NOTIFICATION_EVENT, handle_notification_event)
+    )
+
+    # Compile the dashboards' templates in the background so the first page
+    # load after a restart is not the one that pays for it.
+    entry.async_on_unload(
+        async_at_started(
+            hass,
+            lambda _hass: entry.async_create_background_task(
+                hass, async_warm_dashboard_templates(hass), "choreops_warm_templates"
+            ),
+        )
     )
 
     const.LOGGER.info("INFO: ChoreOps setup complete for entry: %s", entry.entry_id)
