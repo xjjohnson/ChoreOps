@@ -848,6 +848,47 @@ class FamilyGoalManager(BaseManager):
             }
         return changed
 
+    def reset_assignee_caught_up_streak(
+        self, assignee_id: str, *, include_best: bool = False
+    ) -> None:
+        """Set one person's "All Caught Up" day streak back to zero.
+
+        Today is marked as counted so a person who is already caught up does
+        not restart the streak at once; tomorrow is day one. The best streak
+        is kept unless ``include_best`` is set. Only the explicit service
+        calls this.
+
+        Raises:
+            HomeAssistantError: The person does not exist.
+        """
+        assignee_info = self.coordinator.assignees_data.get(assignee_id)
+        if assignee_info is None:
+            raise self._not_found(assignee_id)
+        streak: dict[str, Any] = (
+            assignee_info.get(base.DATA_USER_CAUGHT_UP_STREAK) or {}
+        )
+        assignee_info[base.DATA_USER_CAUGHT_UP_STREAK] = {
+            "count": 0,
+            "last_day": dt_today_iso(),
+            "best": 0 if include_best else int(streak.get("best", 0)),
+        }
+        self.coordinator._persist(immediate=True)
+
+    def get_day_streaks(self) -> list[dict[str, Any]]:
+        """Return each person's current and best day streak for the reset card.
+
+        People who have never had a streak are left out.
+        """
+        rows: list[dict[str, Any]] = []
+        for assignee_info in self.coordinator.assignees_data.values():
+            streak = assignee_info.get(base.DATA_USER_CAUGHT_UP_STREAK) or {}
+            count = int(streak.get("count", 0))
+            best = int(streak.get("best", 0))
+            name = str(assignee_info.get(base.DATA_USER_NAME, "")).strip()
+            if name and (count > 0 or best > 0):
+                rows.append({"name": name, "count": count, "best": best})
+        return sorted(rows, key=lambda row: row["name"].lower())
+
     def get_caught_up_status(self, goal_id: str) -> dict[str, dict[str, int | bool]]:
         """Return today's per-person caught-up progress, keyed by display name.
 

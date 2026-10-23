@@ -491,6 +491,15 @@ AWARD_ACHIEVEMENT_SCHEMA = vol.Schema(
     )
 )
 
+RESET_CAUGHT_UP_STREAK_SCHEMA = vol.Schema(
+    _with_service_target_fields(
+        {
+            vol.Required(const.SERVICE_FIELD_USER_NAME): cv.string,
+            vol.Optional(fg.SERVICE_FIELD_RESET_BEST, default=False): cv.boolean,
+        }
+    )
+)
+
 MANUAL_ADJUST_POINTS_SCHEMA = vol.All(
     vol.Schema(
         _with_service_target_fields(
@@ -3572,6 +3581,50 @@ def async_setup_services(hass: HomeAssistant):
         fg.SERVICE_RESET_FAMILY_GOAL,
         handle_reset_family_goal,
         schema=RESET_FAMILY_GOAL_SCHEMA,
+    )
+
+    async def handle_reset_caught_up_streak(call: ServiceCall) -> None:
+        """Handle setting a person's All Caught Up day streak back to zero."""
+        entry_id = _resolve_target_entry_id(hass, dict(call.data))
+        if not entry_id:
+            const.LOGGER.warning(
+                "Reset Day Streak: %s", const.TRANS_KEY_ERROR_MSG_NO_ENTRY_FOUND
+            )
+            return
+
+        coordinator = _get_coordinator_by_entry_id(hass, entry_id)
+
+        user_id = call.context.user_id
+        if user_id and not await is_user_authorized_for_action(
+            hass,
+            user_id,
+            AUTH_ACTION_MANAGEMENT,
+        ):
+            const.LOGGER.warning("Reset Day Streak: User not authorized")
+            raise HomeAssistantError(
+                translation_domain=const.DOMAIN,
+                translation_key=const.TRANS_KEY_ERROR_NOT_AUTHORIZED_ACTION,
+                translation_placeholders={
+                    "action": fg.ERROR_ACTION_RESET_CAUGHT_UP_STREAK
+                },
+            )
+
+        assignee_id = get_item_id_or_raise(
+            coordinator,
+            const.ITEM_TYPE_USER,
+            call.data[const.SERVICE_FIELD_USER_NAME],
+            role=const.ROLE_ASSIGNEE,
+        )
+        coordinator.family_goal_manager.reset_assignee_caught_up_streak(
+            assignee_id, include_best=bool(call.data[fg.SERVICE_FIELD_RESET_BEST])
+        )
+        await coordinator.async_request_refresh()
+
+    hass.services.async_register(
+        const.DOMAIN,
+        fg.SERVICE_RESET_CAUGHT_UP_STREAK,
+        handle_reset_caught_up_streak,
+        schema=RESET_CAUGHT_UP_STREAK_SCHEMA,
     )
 
     # ==========================================================================

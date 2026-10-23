@@ -925,6 +925,53 @@ async def test_assignee_caught_up_streak_counts_breaks_and_tracks_best(
     assert not gm._update_assignee_caught_up_streak(zoe)
 
 
+async def test_reset_day_streak_service_keeps_or_clears_best(
+    hass: HomeAssistant,
+    scenario_full: SetupResult,
+) -> None:
+    """The reset service zeroes the streak, counts today, and keeps best on request."""
+    gm = scenario_full.coordinator.family_goal_manager
+    zoe = scenario_full.assignee_ids["Zoë"]
+    max_ = scenario_full.assignee_ids["Max!"]
+    coord = scenario_full.coordinator
+    coord.assignees_data[zoe][const.DATA_USER_CAUGHT_UP_STREAK] = {
+        "count": 3,
+        "last_day": "2000-01-01",
+        "best": 5,
+    }
+    coord.assignees_data[max_][const.DATA_USER_CAUGHT_UP_STREAK] = {
+        "count": 2,
+        "last_day": "2000-01-01",
+        "best": 4,
+    }
+    rows = {r["name"]: r for r in gm.get_day_streaks()}
+    assert rows["Zoë"] == {"name": "Zoë", "count": 3, "best": 5}
+
+    await hass.services.async_call(
+        const.DOMAIN,
+        fg.SERVICE_RESET_CAUGHT_UP_STREAK,
+        {const.SERVICE_FIELD_USER_NAME: "Zoë"},
+        blocking=True,
+    )
+    streak = coord.assignees_data[zoe][const.DATA_USER_CAUGHT_UP_STREAK]
+    assert streak["count"] == 0
+    assert streak["best"] == 5
+    assert streak["last_day"] != "2000-01-01"
+    # Today is marked counted, so being caught up now does not restart it.
+    assert not gm._update_assignee_caught_up_streak(zoe)
+
+    await hass.services.async_call(
+        const.DOMAIN,
+        fg.SERVICE_RESET_CAUGHT_UP_STREAK,
+        {const.SERVICE_FIELD_USER_NAME: "Max!", fg.SERVICE_FIELD_RESET_BEST: True},
+        blocking=True,
+    )
+    streak = coord.assignees_data[max_][const.DATA_USER_CAUGHT_UP_STREAK]
+    assert (streak["count"], streak["best"]) == (0, 0)
+    # Resetting one person leaves everyone else alone.
+    assert coord.assignees_data[zoe][const.DATA_USER_CAUGHT_UP_STREAK]["best"] == 5
+
+
 async def test_legacy_family_achievement_migrates_to_goal(
     scenario_full: SetupResult,
 ) -> None:
