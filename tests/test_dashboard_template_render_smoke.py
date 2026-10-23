@@ -1556,6 +1556,53 @@ def test_admin_family_goals_card_lists_goals_with_reset_service() -> None:
     assert "4 / 10" in parsed[1]["custom_fields"]["label"]
 
 
+def test_admin_day_streaks_card_lists_people_with_reset_buttons() -> None:
+    """Day streaks card lists each person and wires both reset buttons."""
+
+    template = _get_admin_filter_template(
+        "admin-shared-family-hub-v1", "===== DAY STREAKS (RESET) ====="
+    )
+    mock_states = _base_admin_system_administration_states()
+    helper = mock_states["sensor.shared_admin_dashboard_helper"]
+    helper.attributes["ui_control"] = {
+        "admin-shared": {"day-streaks": {"header-collapse": False}}
+    }
+    helper.attributes["day_streaks"] = [
+        {"name": "Olivia", "count": 3, "best": 3},
+        {"name": "Mom", "count": 0, "best": 2},
+    ]
+    env, integration_entities, states, state_attr = _build_runtime_template_env(
+        mock_states
+    )
+
+    output = env.from_string(template).render(
+        integration_entities=integration_entities,
+        states=states,
+        state_attr=state_attr,
+    )
+    parsed = yaml.safe_load(f"[{output}]")
+
+    assert len(parsed) == 3
+    assert parsed[0]["name"] == "Day streaks"
+    fields = parsed[1]["custom_fields"]
+    keep = fields["reset_streak"]["card"]["tap_action"]
+    assert keep["service"] == "choreops.reset_caught_up_streak"
+    assert keep["data"] == {
+        "user_name": "Olivia",
+        "reset_best": False,
+        "config_entry_id": "entry-123",
+    }
+    assert "confirmation" in keep
+    assert "3 days" in fields["label"]
+    both = fields["reset_best"]["card"]["tap_action"]
+    assert both["data"]["reset_best"] is True
+    assert "confirmation" in both
+    # A person already at 0 has nothing to reset but may still clear their best.
+    mom = parsed[2]["custom_fields"]
+    assert mom["reset_streak"]["card"]["tap_action"] == {"action": "none"}
+    assert mom["reset_best"]["card"]["tap_action"]["data"]["reset_best"] is True
+
+
 def _render_quick_actions(
     tab: str,
     open_state: dict[str, object] | None = None,

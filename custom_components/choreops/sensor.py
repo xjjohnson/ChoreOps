@@ -4180,6 +4180,7 @@ class SystemDashboardHelperSensor(ChoreOpsCoordinatorEntity, SensorEntity):
             ),
             const.ATTR_USER_DASHBOARD_HELPERS: self._get_user_dashboard_helpers(),
             "family_goals": self._build_family_goals(),
+            "day_streaks": self.coordinator.family_goal_manager.get_day_streaks(),
             const.TRANS_KEY_ATTR_LANGUAGE: language_code,
             const.ATTR_TRANSLATION_SENSOR_EID: self._get_translation_sensor_eid(
                 language_code

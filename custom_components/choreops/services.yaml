@@ -1101,6 +1101,42 @@ reset_family_goal:
       selector:
         text:
 
+reset_caught_up_streak:
+  name: "Reset Day Streak"
+  description: >
+    Set a person's "All Caught Up" day streak back to zero. Today is not
+    counted, so tomorrow is day one. Their best streak is kept unless you ask
+    for it to be cleared too. Points and badges are not touched.
+  fields:
+    config_entry_id:
+      name: "Config Entry ID (Optional)"
+      description: "Use this if you have more than one ChoreOps setup. It targets one specific setup."
+      required: false
+      example: "abc123def456"
+      selector:
+        text:
+    config_entry_title:
+      name: "Config Entry Name (Optional)"
+      description: "Use this if you have more than one ChoreOps setup and they each have unique names. If names repeat, use Config Entry ID."
+      required: false
+      example: "Family Chores"
+      selector:
+        text:
+    user_name:
+      name: "User Name"
+      description: "The person whose day streak to reset."
+      example: "Olivia"
+      required: true
+      selector:
+        text:
+    reset_best:
+      name: "Also Clear Best"
+      description: "Also set their best streak back to zero."
+      required: false
+      default: false
+      selector:
+        boolean:
+
 repair_badge_streak:
   name: "Repair Badge Streak"
   description: >

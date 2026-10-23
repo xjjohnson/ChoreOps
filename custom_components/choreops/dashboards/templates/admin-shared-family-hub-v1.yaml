@@ -1076,6 +1076,183 @@ views:
           card_param: cards
           filter:
             template: |-
+              {#-- ===== DAY STREAKS (RESET) ===== --#}
+              << template_snippets.user_override_helper >>
+
+              << template_snippets.admin_setup_shared >>
+              {%- set ui = shared_admin_ui -%}
+
+              {%- set pref_ds_ui_control_key_root = 'admin-shared/day-streaks' -%}
+              {%- set pref_ds_default_collapsed = true -%}
+              {%- set ds_key = pref_ds_ui_control_key_root ~ '/header-collapse' -%}
+              {%- set ds_entry_id = state_attr(shared_admin_helper_eid, 'integration_entry_id') if shared_admin_helper_eid not in ['', none, 'None'] else '' -%}
+              {%- set ds_ui = namespace(current=ui_root.shared_admin if ui_root.shared_admin is mapping else {}) -%}
+              {%- for segment in pref_ds_ui_control_key_root.split('/') -%}
+                {%- if ds_ui.current is mapping -%}
+                  {%- set ds_ui.current = ds_ui.current.get(segment, {}) -%}
+                {%- else -%}
+                  {%- set ds_ui.current = {} -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- set ds_has_override = ds_ui.current is mapping and 'header-collapse' in ds_ui.current -%}
+              {%- set ds_collapsed = ds_ui.current['header-collapse'] if ds_has_override else pref_ds_default_collapsed -%}
+              {%- set ds_collapsed = (ds_collapsed | string | lower) == 'true' -%}
+              {#-- Day streaks come straight from the shared admin helper; people with no streak yet are left out --#}
+              {%- set ds_rows = state_attr(shared_admin_helper_eid, 'day_streaks') or [] -%}
+              {%- if ds_rows | length > 0 -%}
+              {{-
+                {
+                  'type': 'custom:button-card',
+                  'show_name': true,
+                  'show_label': true,
+                  'show_state': false,
+                  'show_icon': true,
+                  'icon': 'mdi:fire',
+                  'name': ui.get('day_streaks', 'Day streaks'),
+                  'label': ((ds_rows | length) ~ ' ' ~ ((ui.get('person', 'Person') if ds_rows | length == 1 else ui.get('people', 'People')) | lower)) if ds_collapsed else ui.get('reset_a_day_streak', "Reset a person's All Caught Up streak"),
+                  'tap_action': ({
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': ds_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'update',
+                      'key': ds_key,
+                      'value': false
+                    }
+                  } if ds_collapsed and ds_entry_id not in ['', none] else {
+                    'action': 'call-service',
+                    'service': 'choreops.manage_ui_control',
+                    'data': {
+                      'config_entry_id': ds_entry_id,
+                      'ui_control_target': 'shared_admin',
+                      'ui_control_action': 'remove',
+                      'key': ds_key
+                    }
+                  } if ds_entry_id not in ['', none] else {
+                    'action': 'none'
+                  }),
+                  'hold_action': {'action': 'none'},
+                  'custom_fields': {
+                    'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if ds_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                  },
+                  'styles': {
+                    'card': [
+                      {'margin-top': '12px'},
+                      {'padding': '10px 14px'},
+                      {'border-radius': '16px'},
+                      {'box-shadow': 'none'},
+                      {'border': '1px solid color-mix(in srgb, var(--primary-color) 14%, var(--divider-color))'},
+                      {'background-color': 'color-mix(in srgb, var(--primary-color) 14%, var(--card-background-color))'}
+                    ],
+                    'grid': [
+                      {'grid-template-areas': '"i n toggle" "i l toggle"'},
+                      {'grid-template-columns': '32px minmax(0, 1fr) min-content'},
+                      {'grid-template-rows': 'min-content min-content'},
+                      {'column-gap': '14px'},
+                      {'row-gap': '2px'},
+                      {'align-items': 'center'}
+                    ],
+                    'icon': [{'width': '24px'}, {'height': '24px'}, {'align-self': 'center'}],
+                    'name': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '14px'}, {'font-weight': '700'}, {'line-height': '1.2'}, {'text-transform': 'uppercase'}],
+                    'label': [{'justify-self': 'start'}, {'text-align': 'left'}, {'font-size': '12px'}, {'opacity': '0.7'}],
+                    'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                  }
+                }
+              }},
+              {%- if not ds_collapsed -%}
+              {%- for r in ds_rows -%}
+                {%- set rname = r.get('name', '') | string -%}
+                {%- set rcount = r.get('count', 0) | int(0) -%}
+                {%- set rbest = r.get('best', 0) | int(0) -%}
+                {%- set rsafe = rname | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                {%- set rsub = rcount ~ ' ' ~ (ui.get('days', 'days') if rcount != 1 else ui.get('day', 'day')) ~ ' · ' ~ (ui.get('best', 'Best') | lower) ~ ' ' ~ rbest -%}
+                {%- set btn_styles = {
+                  'card': [
+                    {'padding': '6px 10px'}, {'border-radius': '12px'}, {'box-shadow': 'none'},
+                    {'background': 'color-mix(in srgb, var(--error-color) 14%, transparent)'},
+                    {'border': '1.5px solid var(--error-color)'}
+                  ],
+                  'grid': [{'grid-template-areas': '"i n"'}, {'grid-template-columns': 'min-content min-content'}, {'column-gap': '4px'}],
+                  'icon': [{'width': '16px'}, {'color': 'var(--error-color)'}],
+                  'name': [{'font-size': '12px'}, {'font-weight': '800'}, {'color': 'var(--error-color)'}, {'white-space': 'nowrap'}]
+                } -%}
+                {{-
+                  {
+                    'type': 'custom:button-card',
+                    'show_name': false,
+                    'show_icon': false,
+                    'tap_action': {'action': 'none'},
+                    'custom_fields': {
+                      'label': "<div style='display:flex;align-items:center;gap:10px;text-align:left;" ~ ('opacity:0.5;' if rcount == 0 else '') ~ "'><div style='width:34px;height:34px;border-radius:11px;background:var(--warning-color, #f59e0b);display:flex;align-items:center;justify-content:center;flex:none;'><ha-icon icon='mdi:fire' style='width:20px;height:20px;--mdc-icon-size:20px;color:#fff;'></ha-icon></div><div style='min-width:0;'><div style='font-size:14px;font-weight:700;color:var(--primary-text-color);white-space:normal;'>" ~ rsafe ~ "</div><div style='font-size:12px;color:var(--secondary-text-color);'>" ~ rsub ~ "</div></div></div>",
+                      'reset_streak': {'card': {
+                        'type': 'custom:button-card',
+                        'name': ui.get('reset_streak', 'Streak'),
+                        'icon': 'mdi:restart',
+                        'show_name': true,
+                        'show_icon': true,
+                        'tap_action': ({
+                          'action': 'call-service',
+                          'service': 'choreops.reset_caught_up_streak',
+                          'data': {
+                            'user_name': rname,
+                            'reset_best': false,
+                            'config_entry_id': ds_entry_id
+                          },
+                          'confirmation': {'text': (ui.get('reset_streak_confirm', "Reset {name}'s day streak? It goes back to 0. Their best ({best}) is kept.") | replace('{name}', rname) | replace('{best}', rbest | string))}
+                        } if rcount > 0 else {'action': 'none'}),
+                        'styles': btn_styles | combine({'card': btn_styles.card + ([{'opacity': '0.35'}] if rcount == 0 else [])})
+                      }},
+                      'reset_best': {'card': {
+                        'type': 'custom:button-card',
+                        'name': ui.get('reset_streak_and_best', '+ Best'),
+                        'icon': 'mdi:restart',
+                        'show_name': true,
+                        'show_icon': true,
+                        'tap_action': {
+                          'action': 'call-service',
+                          'service': 'choreops.reset_caught_up_streak',
+                          'data': {
+                            'user_name': rname,
+                            'reset_best': true,
+                            'config_entry_id': ds_entry_id
+                          },
+                          'confirmation': {'text': (ui.get('reset_streak_best_confirm', "Reset {name}'s day streak AND best? Both go back to 0. This can't be undone.") | replace('{name}', rname))}
+                        },
+                        'styles': btn_styles
+                      }}
+                    },
+                    'styles': {
+                      'card': [
+                        {'background': 'color-mix(in srgb, var(--primary-color) 6%, var(--card-background-color))'},
+                        {'border': '1px solid var(--divider-color)'},
+                        {'border-radius': '16px'},
+                        {'box-shadow': 'none'},
+                        {'padding': '8px 12px'},
+                        {'min-height': 'unset'}
+                      ],
+                      'grid': [
+                        {'grid-template-areas': '"label reset_streak reset_best"'},
+                        {'grid-template-columns': '1fr auto auto'},
+                        {'column-gap': '6px'},
+                        {'align-items': 'center'}
+                      ],
+                      'custom_fields': {'label': [{'justify-self': 'start'}, {'min-width': '0'}]}
+                    }
+                  }
+                }},
+              {%- endfor -%}
+              {%- endif -%}
+              {%- endif -%}
+        - type: custom:auto-entities
+          show_empty: false
+          card:
+            type: grid
+            square: false
+            columns: 1
+          card_param: cards
+          filter:
+            template: |-
               {#-- ===== REWARD POOLS ===== --#}
               << template_snippets.user_override_helper >>
 

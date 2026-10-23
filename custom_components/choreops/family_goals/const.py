@@ -189,6 +189,9 @@ PACE_BEHIND: Final = "behind"
 SERVICE_RESET_FAMILY_GOAL: Final = "reset_family_goal"
 SERVICE_FIELD_GOAL_NAME: Final = "goal_name"
 ERROR_ACTION_RESET_FAMILY_GOAL: Final = "reset_family_goal"
+SERVICE_RESET_CAUGHT_UP_STREAK: Final = "reset_caught_up_streak"
+SERVICE_FIELD_RESET_BEST: Final = "reset_best"
+ERROR_ACTION_RESET_CAUGHT_UP_STREAK: Final = "reset_caught_up_streak"
 
 # ---------------------------------------------------------------------------
 # Wording (translations_custom/<lang>_notifications.json, "family_goal_words")
