@@ -142,6 +142,14 @@ def _clean_goal_input(
     return data
 
 
+def _entity_shape(goal: dict[str, Any]) -> tuple[Any, ...]:
+    """Return what the goal's sensors are built from: its name and people."""
+    return (
+        goal.get(fg.DATA_NAME),
+        frozenset(goal.get(fg.DATA_ASSIGNED_USER_IDS, [])),
+    )
+
+
 def _form_values(data: dict[str, Any]) -> dict[str, Any]:
     """Return values to show in the form: an empty date is left blank."""
     return {
@@ -228,10 +236,14 @@ class FamilyGoalsOptionsMixin(OptionsFlow):
             errors = builders.validate_goal(data, others, current_goal_id=goal_id)
             if not errors:
                 try:
-                    coordinator.family_goal_manager.update_goal(
+                    before = _entity_shape(goal)
+                    updated = coordinator.family_goal_manager.update_goal(
                         goal_id, data, immediate_persist=True
                     )
-                    self._mark_reload_needed()
+                    # The sensors read the goal's settings live, so a full
+                    # reload is only needed when their names or set change.
+                    if _entity_shape(updated) != before:
+                        self._mark_reload_needed()
                     return await self.async_step_init()
                 except EntityValidationError as err:
                     errors[err.field] = err.translation_key

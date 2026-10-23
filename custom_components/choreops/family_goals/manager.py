@@ -331,6 +331,8 @@ class FamilyGoalManager(BaseManager):
         self.coordinator._data[base.DATA_CHALLENGES][goal_id] = goal
         self.coordinator._persist(immediate=immediate_persist)
         self.coordinator.async_update_listeners()
+        # A new target or rule can finish a level now; check everyone.
+        self._mark_all_pending()
         self.emit(
             base.SIGNAL_SUFFIX_CHALLENGE_UPDATED,
             challenge_id=goal_id,
