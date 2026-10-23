@@ -64,7 +64,10 @@ async def test_approve_all_approves_everything_with_one_refresh(
     assert len(claimed) == 4
 
     with patch.object(
-        DataUpdateCoordinator, "async_update_listeners", autospec=True
+        DataUpdateCoordinator,
+        "async_update_listeners",
+        autospec=True,
+        side_effect=DataUpdateCoordinator.async_update_listeners,
     ) as refresh:
         await hass.services.async_call(
             const.DOMAIN,
@@ -73,9 +76,11 @@ async def test_approve_all_approves_everything_with_one_refresh(
             blocking=True,
             context=Context(user_id=mock_hass_users["approver1"].id),
         )
+        assert refresh.call_count == 1
+        # No approval may queue its own refresh to run after the batch
+        await hass.async_block_till_done()
     assert refresh.call_count == 1
 
-    await hass.async_block_till_done()
     for chore_eid, _ in claimed:
         state = hass.states.get(chore_eid)
         assert state is not None
