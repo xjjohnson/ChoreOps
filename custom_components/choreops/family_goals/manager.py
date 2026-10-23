@@ -962,8 +962,8 @@ class FamilyGoalManager(BaseManager):
     def _update_day_record(self, goal_id: str, goal: dict[str, Any]) -> bool:
         """Remember the best one-day total the one-day goal has reached.
 
-        Survives the daily restart and a goal reset. Ties do not replace an
-        older record.
+        Survives the daily restart; a goal reset clears it. Ties do not
+        replace an older record.
         """
         shares = self.get_contributions(goal_id)
         total = sum(shares.values())
@@ -1007,7 +1007,8 @@ class FamilyGoalManager(BaseManager):
         again). The streak goals clear
         their streak (today is not counted, tomorrow is day one). Everyone's
         award is cleared so the goal can be earned again; reward points already
-        paid out are untouched.
+        paid out are untouched. The one-day goal's best-day record is cleared
+        too (only here, not on a repeat or the daily restart).
 
         Raises:
             HomeAssistantError: The goal does not exist.
@@ -1016,6 +1017,8 @@ class FamilyGoalManager(BaseManager):
         if not goal:
             raise self._not_found(goal_id)
         self._restart(goal)
+        for key in (fg.DATA_RECORD, fg.DATA_RECORD_DAY, fg.DATA_RECORD_TOP):
+            goal.pop(key, None)
         base.LOGGER.info("Family goal %s restarted", goal_id)
         self.coordinator._persist_and_update()
 

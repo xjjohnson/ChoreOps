@@ -150,8 +150,8 @@ everything since the goal was created or restarted.
   awards and progress clear) and can be earned and rewarded again. Top
   contributor means most chores that day. The best day is remembered as a
   record (`family_record`, `family_record_day`, `family_record_top` on the
-  goal's sensors); it survives the daily restart and a goal reset, and a tying
-  day does not replace it.
+  goal's sensors); it survives the daily restart, a reset from the Parents tab
+  (`choreops.reset_family_goal`) clears it, and a tying day does not replace it.
 - **Everyone Completes a Chore for X Days** - a day counts once every assigned
   person has had at least one chore approved. A day that ends without that
   voids the streak (noticed on the next evaluation). Easier than "everyone
