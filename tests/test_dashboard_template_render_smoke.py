@@ -2279,7 +2279,7 @@ def test_family_home_goal_chips_show_todays_part() -> None:
                     "target_type": "days_all_chores",
                     "days_done": ["2026-10-18", "2026-10-19"],
                 },
-                "Week Points": {"target_type": "points"},
+                "Week Points": {"target_type": "points", "days_done": ["2026-10-19"]},
                 "Tidy Room": {
                     "target_type": "chore_count",
                     "today_chores_done": 1,
@@ -2302,8 +2302,8 @@ def test_family_home_goal_chips_show_todays_part() -> None:
 
     # Dad did today's part of Perfect Week, Mom has not yet
     assert dots(by_name["Perfect Week"]) == ["error", "success"]
-    # A points goal has no daily part, so no dots
-    assert dots(by_name["Week Points"]) == []
+    # A points goal has no daily part: Dad added to it today (green), Mom gets no red
+    assert dots(by_name["Week Points"]) == ["success"]
     # Mom finished the whole goal (tick, no dot); Dad met today's chore count
     assert dots(by_name["Tidy Room"]) == ["success"]
     assert "✓" in by_name["Tidy Room"]
