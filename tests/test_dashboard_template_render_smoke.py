@@ -2132,6 +2132,67 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert "width:20%" in html
 
 
+def _count_badge_states(people: dict[str, float]) -> dict[str, _MockState]:
+    """Helper and badge sensors for a 10-chore badge, progress in percent."""
+    states: dict[str, _MockState] = {}
+    for name, progress in people.items():
+        slug = name.lower()
+        states[f"sensor.{slug}_helper"] = _MockState(
+            entity_id=f"sensor.{slug}_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "user_name": name,
+                "badges": [
+                    {
+                        "eid": f"sensor.{slug}_badge",
+                        "name": "Pooper Scooper",
+                        "badge_type": "periodic",
+                    }
+                ],
+            },
+            name=name,
+        )
+        states[f"sensor.{slug}_badge"] = _MockState(
+            entity_id=f"sensor.{slug}_badge",
+            state=str(progress),
+            attributes={
+                "badge_name": "Pooper Scooper",
+                "status": "in_progress",
+                "end_date": "2026-10-29T00:00:00",
+                "target_type": "chore_count",
+                "threshold_value": 10,
+            },
+            name="b",
+        )
+    return states
+
+
+def test_family_home_count_goal_names_the_leader() -> None:
+    """Chore count goals name the leader, medal the top 3 and drop the chip row."""
+    names = ["Olivia", "Lily", "Dad", "Mom"]
+    states = _count_badge_states({"Olivia": 60, "Lily": 40, "Dad": 20, "Mom": 0})
+    html = _render_home_card("pref_urgent_days", states, user_names=names)[0][
+        "custom_fields"
+    ]["content"]
+    assert "🏆 Olivia leads · 6/10" in html
+    assert html.count("🥇") == 1 and html.count("🥈") == 1 and html.count("🥉") == 1
+    assert "Lily 4" not in html
+    # No footer chips, only the time left
+    assert "justify-content:flex-end" in html
+    assert not re.findall(
+        r"<span style='width:16px;height:16px;border-radius:50%;[^']*'>([^<]+)</span>",
+        html,
+    )
+
+    tied = _count_badge_states({"Olivia": 50, "Lily": 50, "Dad": 30})
+    html = _render_home_card("pref_urgent_days", tied, user_names=names)[0][
+        "custom_fields"
+    ]["content"]
+    assert "Olivia &amp; Lily lead · 5/10" in html
+    assert html.count("🥇") == 2 and "🥈" not in html and html.count("🥉") == 1
+
+
 def _label_strip_states() -> dict[str, _MockState]:
     """Two people with a labeled goal badge, an unlabeled one, and labeled chores."""
     kitchen = {"name": "Kitchen", "color": "var(--orange-color)"}
@@ -2329,8 +2390,8 @@ def test_family_home_goal_chips_show_todays_part() -> None:
 
     # Dad did today's part of Perfect Week, Mom has not yet
     assert dots(by_name["Perfect Week"]) == ["error", "success"]
-    # A points goal has no daily part: Dad added to it today (green), Mom gets no red
-    assert dots(by_name["Week Points"]) == ["success"]
+    # A points goal names its leader instead of a chip row, so it has no dots
+    assert dots(by_name["Week Points"]) == []
     # Mom finished the whole goal (tick, no dot); Dad met today's chore count
     assert dots(by_name["Tidy Room"]) == ["success"]
     assert "✓" in by_name["Tidy Room"]

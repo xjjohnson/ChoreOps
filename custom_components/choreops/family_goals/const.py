@@ -121,6 +121,7 @@ DATA_STARTED: Final = "family_started"
 DATA_PERIOD_START: Final = "family_period_start"
 DATA_FROZEN: Final = "family_frozen"
 DATA_END_CLEARED: Final = "family_end_cleared"
+DATA_COMPLETED: Final = "family_completed_shares"
 
 # Runtime state that must survive an edit of the goal's settings.
 RUNTIME_KEYS: Final = (
@@ -137,6 +138,7 @@ RUNTIME_KEYS: Final = (
     DATA_PERIOD_START,
     DATA_FROZEN,
     DATA_END_CLEARED,
+    DATA_COMPLETED,
     DATA_PROGRESS,
 )
 
