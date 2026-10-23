@@ -690,7 +690,7 @@ views:
               {%- for fe1 in fsort.top + fsort.rest -%}{%- if fe1 not in ford.v -%}{%- set ford.v = ford.v + [fe1] -%}{%- endif -%}{%- endfor -%}
               {#-- Goal names, top to bottom. Type them comma-separated in the helper input_text.choreops_family_goal_order (no regenerate needed); the list below is the fallback. Goals not listed follow in the kind order above. --#}
               {%- set pref_raw = states('input_text.choreops_family_goal_order') | string -%}
-              {%- set pref_order = (pref_raw.split(',') | map('trim') | reject('eq', '') | list) if pref_raw not in ['unknown', 'unavailable', 'none', ''] else ['This Months Family Stars', 'Total Monthly Chores', 'Most chores completed'] -%}
+              {%- set pref_order = (pref_raw.split(',') | map('trim') | reject('eq', '') | list) if pref_raw not in ['unknown', 'unavailable', 'none', ''] else ['Perfect Week', 'This Months Family Stars', 'Total Monthly Chores', 'Most chores completed'] -%}
               {%- set pord = namespace(v=[]) -%}
               {%- for pn in pref_order -%}
                 {%- for fe2 in ford.v -%}
