@@ -2199,8 +2199,8 @@ def test_family_home_count_goal_names_the_leader() -> None:
     assert "Lily 4" not in html
     # A green tick under the dot of each person who added to it today
     assert html.count("'>✓</span>") == 2
-    # No footer chips, only the time left
-    assert "justify-content:flex-end" in html
+    # No footer chips: the leader line shares the footer row with the time left
+    assert "gap:6px;'><span style='min-width:0;overflow:hidden" in html
     assert not re.findall(
         r"<span style='width:16px;height:16px;border-radius:50%;[^']*'>([^<]+)</span>",
         html,
@@ -2502,6 +2502,83 @@ def test_family_home_goals_follow_the_pref_order_list() -> None:
         "Expert Brusher",
         "Pooper Scooper",
         "Zebra Goal",
+    ]
+
+
+def test_family_home_goals_follow_the_order_helper() -> None:
+    """A text helper overrides the built-in goal order, with no regenerate needed."""
+    names = ["Pooper Scooper", "Zebra Goal", "Expert Brusher", "Perfect Week"]
+    badges = [
+        {"eid": f"sensor.b{i}", "name": n, "badge_type": "periodic"}
+        for i, n in enumerate(names)
+    ]
+    states = {
+        "sensor.mom_helper": _MockState(
+            entity_id="sensor.mom_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "user_name": "Mom",
+                "badges": badges,
+            },
+            name="Mom",
+        ),
+        "input_text.choreops_goal_order": _MockState(
+            entity_id="input_text.choreops_goal_order",
+            state="Zebra Goal,  Perfect Week",
+            attributes={},
+            name="order",
+        ),
+    }
+    for i, n in enumerate(names):
+        states[f"sensor.b{i}"] = _MockState(
+            entity_id=f"sensor.b{i}",
+            state="10",
+            attributes={"badge_name": n, "status": "in_progress"},
+            name="b",
+        )
+    cards = _render_home_card("pref_urgent_days", states, user_names=["Mom"])
+    html = "".join(c["custom_fields"]["content"] for c in cards)
+    assert sorted(names, key=html.index)[:2] == ["Zebra Goal", "Perfect Week"]
+
+
+def test_family_home_family_goals_follow_the_order_helper() -> None:
+    """A text helper overrides the built-in family goal order."""
+    goals = [
+        ("Total Monthly Chores", "family_chore_total"),
+        ("This Months Family Stars", "family_points_total"),
+        ("Zebra Goal", "family_everyone_contributes"),
+    ]
+    states = {
+        "input_text.choreops_family_goal_order": _MockState(
+            entity_id="input_text.choreops_family_goal_order",
+            state="Zebra Goal, Total Monthly Chores",
+            attributes={},
+            name="order",
+        )
+    }
+    for i, (n, ty) in enumerate(goals):
+        states[f"sensor.fg{i}"] = _MockState(
+            entity_id=f"sensor.fg{i}",
+            state="3",
+            attributes={
+                "achievement_name": n,
+                "type": ty,
+                "family_contributions": {"Mom": 3},
+                "family_levels": [10],
+                "family_level_rewards": [5],
+                "family_total": 3,
+            },
+            name=n,
+        )
+    html = _render_home_card(
+        "FAMILY ACHIEVEMENTS", states, user_names=["Mom"], raw=True
+    )
+    order = sorted((g[0] for g in goals), key=html.index)
+    assert order == [
+        "Zebra Goal",
+        "Total Monthly Chores",
+        "This Months Family Stars",
     ]
 
 
