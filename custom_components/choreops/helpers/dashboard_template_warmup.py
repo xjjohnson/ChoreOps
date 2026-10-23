@@ -13,11 +13,16 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.lovelace.const import LOVELACE_DATA
+from homeassistant.core import callback
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.template import Template
 
 from .. import const
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
 _WARM_TEMPLATES_KEY = f"{const.DOMAIN}_warm_dashboard_templates"
@@ -122,3 +127,22 @@ async def async_warm_dashboard_templates(
         time.perf_counter() - started,
     )
     return len(held)
+
+
+def async_start_template_warmup(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> Callable[[], None]:
+    """Run the warm-up in the background once Home Assistant has started.
+
+    Returns the function that cancels the wait. The start handler must be a
+    @callback: a plain function runs in a worker thread, where creating the
+    task fails and the warm-up silently never happens.
+    """
+
+    @callback
+    def _start(_hass: HomeAssistant) -> None:
+        entry.async_create_background_task(
+            hass, async_warm_dashboard_templates(hass), "choreops_warm_templates"
+        )
+
+    return async_at_started(hass, _start)

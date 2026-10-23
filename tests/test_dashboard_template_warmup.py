@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import gc
-from typing import TYPE_CHECKING
+import threading
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock
 
 from homeassistant.helpers.template import Template
 
@@ -49,3 +51,20 @@ async def test_broken_template_does_not_stop_the_rest(hass: HomeAssistant) -> No
     """One bad template is skipped; the others are still held."""
     config = {"a": "{% if %}", "b": _SOURCE}
     assert await warmup.async_warm_dashboard_templates(hass, config) == 1
+
+
+async def test_start_handler_runs_on_the_event_loop(hass: HomeAssistant) -> None:
+    """The startup hook creates its task on the main thread (it once ran in a worker)."""
+    threads: list[str] = []
+
+    def _record(_hass: HomeAssistant, coro: Any, _name: str) -> None:
+        threads.append(threading.current_thread().name)
+        coro.close()
+
+    entry = MagicMock()
+    entry.async_create_background_task.side_effect = _record
+
+    warmup.async_start_template_warmup(hass, entry)
+    await hass.async_block_till_done()
+
+    assert threads == [threading.main_thread().name]
