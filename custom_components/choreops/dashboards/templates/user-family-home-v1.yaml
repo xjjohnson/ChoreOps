@@ -378,20 +378,27 @@ views:
                 {%- set tcol = 'var(--warning-color)' if urgent else 'var(--secondary-text-color)' -%}
                 {%- set ttxt = (ui.get('ends_today', 'Ends today') if q.left == 0 else (ui.get('one_day_left', '1 day left') if q.left == 1 else (q.left ~ ' ' ~ ui.get('days_left', 'days left')))) if (q.left < 999 and q.left >= 0) else ui.get('no_end', 'no end') -%}
                 {%- set clock = ("<span style='display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:" ~ tcol ~ ";white-space:nowrap;'><ha-icon icon='mdi:clock-outline' style='width:12px;height:12px;--mdc-icon-size:12px;display:block;'></ha-icon>" ~ ttxt ~ "</span>") if (q.left < 999 and q.left >= 0) else ("<span style='font-size:10px;color:var(--secondary-text-color);'>" ~ ui.get('no_end', 'no end') ~ "</span>") -%}
-                {#-- Race track: every person sits where their own progress is; ties sit side by side --#}
-                {%- set mk = namespace(v='', seen={}) -%}
+                {#-- Race track: every person sits where their own progress is --#}
+                {%- set rp = namespace(l=[]) -%}
                 {%- for pp in q.people -%}
+                  {%- set rp.l = rp.l + [pp | combine({'pos': 100 if pp.e else (pp.p | round(0) | int)})] -%}
+                {%- endfor -%}
+                {#-- People within a dot's width of each other share one spot (the leftmost); they alternate above
+                     and below the track and step a whole dot apart, so no initial covers another --#}
+                {%- set mk = namespace(v='', anchor=-100, kk=0) -%}
+                {%- for pp in rp.l | sort(attribute='pos') -%}
+                  {%- if pp.pos - mk.anchor >= 14 -%}
+                    {%- set mk.anchor = pp.pos -%}
+                    {%- set mk.kk = 0 -%}
+                  {%- else -%}
+                    {%- set mk.kk = mk.kk + 1 -%}
+                  {%- endif -%}
                   {%- set lead = pp.p > 0 and pp.p == q.top -%}
                   {%- set pc = 'var(--success-color)' if pp.e else ('var(--warning-color)' if lead else 'var(--primary-color)') -%}
                   {%- set nm = pp.u | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                  {%- set pos = 100 if pp.e else (pp.p | round(0) | int) -%}
-                  {%- set pkey = pos | string -%}
-                  {%- set kk = mk.seen.get(pkey, 0) -%}
-                  {%- set mk.seen = mk.seen | combine({pkey: kk + 1}) -%}
-                  {#-- People at the same spot alternate above and below the track so every initial stays readable --#}
-                  {%- set lane_top = -22 if kk % 2 == 0 else 7 -%}
-                  {%- set lane_off = (kk // 2) * 13 -%}
-                  {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (94 if pos > 94 else pos) ~ "% - 8px + " ~ lane_off ~ "px);top:" ~ lane_top ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
+                  {%- set lane_top = -22 if mk.kk % 2 == 0 else 7 -%}
+                  {%- set lane_off = (mk.kk // 2) * 19 * (-1 if mk.anchor > 80 else 1) -%}
+                  {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (94 if mk.anchor > 94 else mk.anchor) ~ "% - 8px + " ~ lane_off ~ "px);top:" ~ lane_top ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
                 {%- endfor -%}
                 {%- set done_n = q.people | selectattr('e') | list | length -%}
                 {#-- Footer: a chip per person, finished people first as green ticks --#}

@@ -1939,7 +1939,11 @@ def test_admin_reward_pools_card_lists_pools_and_refund_actions() -> None:
     }
 
 
-def _render_home_card(marker: str, mock_states: dict[str, _MockState]):
+def _render_home_card(
+    marker: str,
+    mock_states: dict[str, _MockState],
+    user_names: list[str] | None = None,
+):
     template_str = _read_template("user-family-home-v1.yaml")
     view = builder._render_family_home_view(
         template_str,
@@ -1948,7 +1952,7 @@ def _render_home_card(marker: str, mock_states: dict[str, _MockState]):
         release_version=None,
         generated_at="2026-10-19T00:00:00+00:00",
         root_button_card_templates={},
-        user_names=["Dad", "Lily"],
+        user_names=user_names or ["Dad", "Lily"],
     )
     tpl = next(
         c["filter"]["template"]
@@ -2118,6 +2122,56 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert html.count("calc(20% - 8px + 0px)") == 2
     assert "top:-22px" in html and "top:7px" in html
     assert "width:20%" in html
+
+
+def test_family_home_race_track_spreads_people_who_are_close() -> None:
+    """People a few percent apart share one spot and step a whole dot apart."""
+
+    def badge_helper(name, progress):
+        slug = name.lower()
+        return {
+            f"sensor.{slug}_helper": _MockState(
+                entity_id=f"sensor.{slug}_helper",
+                state="ok",
+                attributes={
+                    "purpose": "purpose_dashboard_helper",
+                    "user_name": name,
+                    "badges": [
+                        {
+                            "eid": f"sensor.{slug}_badge",
+                            "name": "Pooper Scooper",
+                            "badge_type": "periodic",
+                        }
+                    ],
+                },
+                name=name,
+            ),
+            f"sensor.{slug}_badge": _MockState(
+                entity_id=f"sensor.{slug}_badge",
+                state=str(progress),
+                attributes={"badge_name": "Pooper Scooper", "status": "in_progress"},
+                name="b",
+            ),
+        }
+
+    states = {}
+    for name, progress in [("Mom", 0), ("Dad", 3), ("Olivia", 0), ("Lily", 25)]:
+        states.update(badge_helper(name, progress))
+    cards = _render_home_card(
+        "pref_urgent_days", states, user_names=["Mom", "Dad", "Olivia", "Lily"]
+    )
+    html = cards[0]["custom_fields"]["content"]
+    dots = re.findall(
+        r"left:calc\((\d+)% - 8px \+ (-?\d+)px\);top:(-?\d+)px;[^>]*><div[^>]*>(\w)<",
+        html,
+    )
+    spots = {initial: (pct, off, top) for pct, off, top, initial in dots}
+    # Mom and Olivia (0%) and Dad (3%) share the start: above, below, then a dot over
+    assert spots["M"] == ("0", "0", "-22")
+    assert spots["O"] == ("0", "0", "7")
+    assert spots["D"] == ("0", "19", "-22")
+    # Lily is far enough ahead to keep her own spot
+    assert spots["L"] == ("25", "0", "-22")
 
 
 def test_family_hub_recent_activity_card_renders_rows() -> None:
