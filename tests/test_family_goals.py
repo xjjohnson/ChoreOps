@@ -611,6 +611,7 @@ async def test_chores_in_one_day_uses_todays_total_and_keeps_levels(
     assert record["family_record_top"] == [
         scenario_full.coordinator.assignees_data[max_][const.DATA_USER_NAME]
     ]
+    assert record["family_record_top_total"] == 4
 
     # A new day starts the goal over: level and awards clear, ready to earn again.
     goal = scenario_full.coordinator.challenges_data[goal_id]
@@ -669,6 +670,7 @@ async def test_resetting_one_day_goal_does_not_pay_todays_levels_again(
         "family_record": 0.0,
         "family_record_day": "",
         "family_record_top": [],
+        "family_record_top_total": 0.0,
     }
     await gm.evaluate_assignee(zoe)
     await hass.async_block_till_done()
