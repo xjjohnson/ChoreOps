@@ -9,6 +9,7 @@ of time and holding on to them makes that first load as fast as the next.
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.lovelace.const import LOVELACE_DATA
@@ -34,13 +35,16 @@ def _collect_templates(node: Any, found: set[str]) -> None:
         found.add(node)
 
 
-def _compile(template: Template) -> bool:
-    """Compile one template into Home Assistant's cache (runs in a worker)."""
+def _compile(template: Template) -> str | None:
+    """Compile one template into Home Assistant's cache (runs in a worker).
+
+    Returns None on success, or the error text.
+    """
     try:
         template.ensure_valid()
-    except Exception:
-        return False
-    return True
+    except Exception as err:
+        return str(err)
+    return None
 
 
 async def async_warm_dashboard_templates(
@@ -54,9 +58,10 @@ async def async_warm_dashboard_templates(
     config of every ChoreOps dashboard is read. Returns how many templates
     are now held.
     """
-    configs: list[dict[str, Any]] = []
+    started = time.perf_counter()
+    configs: dict[str, dict[str, Any]] = {}
     if config is not None:
-        configs.append(config)
+        configs[url_path or "saved dashboard"] = config
     elif LOVELACE_DATA in hass.data:
         for path, dashboard in hass.data[LOVELACE_DATA].dashboards.items():
             if not path or not path.startswith(
@@ -68,24 +73,52 @@ async def async_warm_dashboard_templates(
                 continue
             try:
                 stored = await dashboard.async_load(False)
-            except Exception:
+            except Exception as err:
+                const.LOGGER.warning(
+                    "Template warm-up could not read dashboard %s: %s", path, err
+                )
                 continue
             if isinstance(stored, dict):
-                configs.append(stored)
+                configs[path] = stored
 
     found: set[str] = set()
-    for item in configs:
+    for name, item in configs.items():
+        before = len(found)
         _collect_templates(item, found)
+        const.LOGGER.info(
+            "Template warm-up: dashboard %s has %d templates to compile",
+            name,
+            len(found) - before,
+        )
+    if not configs:
+        const.LOGGER.info("Template warm-up: no ChoreOps dashboards found")
 
     held: dict[str, Template] = hass.data.setdefault(_WARM_TEMPLATES_KEY, {})
+    slowest = 0.0
+    failed = 0
     for source in found:
         if source in held:
             continue
         template = Template(source, hass)
-        if await hass.async_add_executor_job(_compile, template):
+        compile_started = time.perf_counter()
+        error = await hass.async_add_executor_job(_compile, template)
+        slowest = max(slowest, time.perf_counter() - compile_started)
+        if error is None:
             held[source] = template
+        else:
+            failed += 1
+            const.LOGGER.warning(
+                "Template warm-up: a %d-character template failed to compile: %s",
+                len(source),
+                error[:200],
+            )
 
-    const.LOGGER.debug(
-        "Warmed %d dashboard templates (%s)", len(held), url_path or "all dashboards"
+    const.LOGGER.info(
+        "Template warm-up: holding %d compiled templates (%d failed, slowest "
+        "%.2f s), took %.2f s",
+        len(held),
+        failed,
+        slowest,
+        time.perf_counter() - started,
     )
     return len(held)
