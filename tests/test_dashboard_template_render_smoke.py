@@ -1944,7 +1944,11 @@ def test_admin_reward_pools_card_lists_pools_and_refund_actions() -> None:
     }
 
 
-def _render_home_card(marker: str, mock_states: dict[str, _MockState]):
+def _render_home_card(
+    marker: str,
+    mock_states: dict[str, _MockState],
+    user_names: list[str] | None = None,
+):
     template_str = _read_template("user-family-home-v1.yaml")
     view = builder._render_family_home_view(
         template_str,
@@ -1953,7 +1957,7 @@ def _render_home_card(marker: str, mock_states: dict[str, _MockState]):
         release_version=None,
         generated_at="2026-10-19T00:00:00+00:00",
         root_button_card_templates={},
-        user_names=["Dad", "Lily"],
+        user_names=user_names or ["Dad", "Lily"],
     )
     tpl = next(
         c["filter"]["template"]
@@ -2227,6 +2231,132 @@ def test_family_home_label_strip_hidden_without_labels() -> None:
         {k: v for k, v in _label_strip_states().items() if "helper" not in k},
     )
     assert cards == []
+
+
+def test_family_home_goal_chips_show_todays_part() -> None:
+    """Goals with a daily part put a green or red dot under each person's chip."""
+
+    def badge_helper(name, goals):
+        slug = name.lower()
+        badges, states = [], {}
+        for i, (goal, attrs) in enumerate(goals.items()):
+            eid = f"sensor.{slug}_badge{i}"
+            badges.append({"eid": eid, "name": goal, "badge_type": "periodic"})
+            states[eid] = _MockState(
+                entity_id=eid,
+                state=str(attrs.pop("progress", 10)),
+                attributes={"badge_name": goal, "status": "in_progress", **attrs},
+                name="b",
+            )
+        states[f"sensor.{slug}_helper"] = _MockState(
+            entity_id=f"sensor.{slug}_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "user_name": name,
+                "badges": badges,
+            },
+            name=name,
+        )
+        return states
+
+    states = {}
+    states.update(
+        badge_helper(
+            "Mom",
+            {
+                "Perfect Week": {"target_type": "days_all_chores", "days_done": []},
+                "Week Points": {"target_type": "points"},
+                "Tidy Room": {"status": "earned", "progress": 100},
+            },
+        )
+    )
+    states.update(
+        badge_helper(
+            "Dad",
+            {
+                "Perfect Week": {
+                    "target_type": "days_all_chores",
+                    "days_done": ["2026-10-18", "2026-10-19"],
+                },
+                "Week Points": {"target_type": "points"},
+                "Tidy Room": {
+                    "target_type": "chore_count",
+                    "today_chores_done": 1,
+                    "today_chores_required": 1,
+                    "threshold_value": 1,
+                },
+            },
+        )
+    )
+    cards = _render_home_card("pref_urgent_days", states, user_names=["Mom", "Dad"])
+    by_name = {
+        name: c["custom_fields"]["content"]
+        for c in cards
+        for name in ["Perfect Week", "Week Points", "Tidy Room"]
+        if name in c["custom_fields"]["content"]
+    }
+
+    def dots(html):
+        return re.findall(r"bottom:-6px;[^']*background:var\(--(\w+)-color\)", html)
+
+    # Dad did today's part of Perfect Week, Mom has not yet
+    assert dots(by_name["Perfect Week"]) == ["error", "success"]
+    # A points goal has no daily part, so no dots
+    assert dots(by_name["Week Points"]) == []
+    # Mom finished the whole goal (tick, no dot); Dad met today's chore count
+    assert dots(by_name["Tidy Room"]) == ["success"]
+    assert "✓" in by_name["Tidy Room"]
+
+
+def test_family_home_race_track_spreads_people_who_are_close() -> None:
+    """People a few percent apart share one spot and step a whole dot apart."""
+
+    def badge_helper(name, progress):
+        slug = name.lower()
+        return {
+            f"sensor.{slug}_helper": _MockState(
+                entity_id=f"sensor.{slug}_helper",
+                state="ok",
+                attributes={
+                    "purpose": "purpose_dashboard_helper",
+                    "user_name": name,
+                    "badges": [
+                        {
+                            "eid": f"sensor.{slug}_badge",
+                            "name": "Pooper Scooper",
+                            "badge_type": "periodic",
+                        }
+                    ],
+                },
+                name=name,
+            ),
+            f"sensor.{slug}_badge": _MockState(
+                entity_id=f"sensor.{slug}_badge",
+                state=str(progress),
+                attributes={"badge_name": "Pooper Scooper", "status": "in_progress"},
+                name="b",
+            ),
+        }
+
+    states = {}
+    for name, progress in [("Mom", 0), ("Dad", 3), ("Olivia", 0), ("Lily", 25)]:
+        states.update(badge_helper(name, progress))
+    cards = _render_home_card(
+        "pref_urgent_days", states, user_names=["Mom", "Dad", "Olivia", "Lily"]
+    )
+    html = cards[0]["custom_fields"]["content"]
+    dots = re.findall(
+        r"left:calc\((\d+)% - 8px \+ (-?\d+)px\);top:(-?\d+)px;[^>]*><div[^>]*>(\w)<",
+        html,
+    )
+    spots = {initial: (pct, off, top) for pct, off, top, initial in dots}
+    # Mom and Olivia (0%) and Dad (3%) share the start: above, below, then a dot over
+    assert spots["M"] == ("0", "0", "-22")
+    assert spots["O"] == ("0", "0", "7")
+    assert spots["D"] == ("0", "19", "-22")
+    # Lily is far enough ahead to keep her own spot
+    assert spots["L"] == ("25", "0", "-22")
 
 
 def test_family_hub_recent_activity_card_renders_rows() -> None:
