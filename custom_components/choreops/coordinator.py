@@ -440,6 +440,9 @@ class ChoreOpsDataCoordinator(DataUpdateCoordinator):
                 self.emit(SIGNAL_SUFFIX_CHORE_CLAIMED, chore_id=chore_id)
         """
         self._persist(immediate=immediate)
+        if self._update_batch_depth > 0:
+            self._update_batch_pending = True
+            return
         self.hass.loop.call_soon_threadsafe(self.async_update_listeners)
 
     async def async_sync_entities_after_service_create(self) -> None:
