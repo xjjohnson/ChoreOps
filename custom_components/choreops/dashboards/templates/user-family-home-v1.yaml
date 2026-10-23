@@ -564,8 +564,8 @@ views:
                   {%- set nm = pp.u | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                   {%- set lane_top = -22 if mk.kk % 2 == 0 else 7 -%}
                   {%- set place = (q.people | selectattr('c', 'gt', pp.c) | list | length) + 1 -%}
-                  {#-- A numbered disc (not an emoji, which every device draws at its own size) marks the top 3 --#}
-                  {%- set medal = ("<span style='position:absolute;right:-6px;top:-6px;width:10px;height:10px;border-radius:50%;box-sizing:border-box;border:1px solid var(--card-background-color);background:" ~ {1: '#fbbf24', 2: '#cbd5e1', 3: '#d97706'}[place] ~ ";color:#1c1c1c;font-size:7px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center;'>" ~ place ~ "</span>") if (cgoal and pp.c > 0 and place <= 3) else '' -%}
+                  {#-- The top 3 get a medal in a fixed 12px box pinned to the dot's corner, so every device lines it up the same --#}
+                  {%- set medal = ("<span style='position:absolute;right:-7px;top:-8px;width:12px;height:12px;font-size:10px;line-height:12px;text-align:center;'>" ~ {1: '🥇', 2: '🥈', 3: '🥉'}[place] ~ "</span>") if (cgoal and pp.c > 0 and place <= 3) else '' -%}
                   {#-- On count goals a green tick under the dot shows who added to it today --#}
                   {%- set medal = medal ~ (("<span style='position:absolute;left:50%;bottom:-8px;margin-left:-4px;width:8px;height:8px;border-radius:50%;background:var(--success-color);color:#fff;font-size:6px;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center;'>✓</span>") if (cgoal and pp.tod) else '') -%}
                   {%- set lane_off = (mk.kk // 2) * 19 * (-1 if mk.anchor > 80 else 1) -%}
@@ -827,8 +827,11 @@ views:
                         ~ "<div style='position:relative;display:flex;align-items:center;gap:6px;padding:6px 8px;'><div style='width:20px;height:20px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
                         ~ "<span style='flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary-text-color);'>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><b style='font-size:12px;color:var(--primary-text-color);'>" ~ p ~ "</b></div></div>" -%}
                     {%- endfor -%}
-                    {#-- Scoreboards skip the pace wording and marker: days left, then the top contributor bonus --#}
-                    {%- set sb_bits = ([pace_txt] if ffin else ([days_txt] if days_txt else [])) + (["<b style='color:var(--warning-color);white-space:nowrap;'>🏆 " ~ ui.get('top_contributor', 'Top contributor') ~ " ×" ~ ('%g' | format(fmult)) ~ "</b>"] if (fmult > 1 and not fdone) else []) -%}
+                    {#-- Scoreboard header: level and what is left, then the reward and top contributor bonus, then days left (no pace) --#}
+                    {%- set sb_lvl = ((lvl_txt ~ ' · ') if lvl_txt else '') ~ (sub if fdone else ('<b style="color:' ~ accent ~ ';">' ~ togo ~ ' ' ~ ui.get('to_go', 'to go') ~ '</b>')) -%}
+                    {%- set sb_rw_bits = (["<span style='white-space:nowrap;'>+" ~ freward ~ ' ⭐ ' ~ ui.get('each', 'each') ~ (' ·' if (fmult > 1) else '') ~ '</span>'] if (freward > 0 and not fdone) else []) + (["<b style='color:var(--warning-color);white-space:nowrap;'>🏆 " ~ ui.get('top_contributor', 'Top contributor') ~ " ×" ~ ('%g' | format(fmult)) ~ "</b>"] if (fmult > 1 and not fdone) else []) -%}
+                    {%- set sb_rw = ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ (sb_rw_bits | join(' ')) ~ "</div>") if sb_rw_bits else '' -%}
+                    {%- set sb_bits = [pace_txt] if ffin else ([days_txt] if days_txt else []) -%}
                     {%- set sb_meta = ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ (sb_bits | join(' · ')) ~ "</div>") if sb_bits else '' -%}
                     {#-- All levels done: a top-earner banner with ranked chips replaces the rows --#}
                     {%- set win = namespace(names=[], av='', chips='') -%}
@@ -855,7 +858,7 @@ views:
                       ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
                       ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>"
                       ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
-                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div>" ~ sb_meta ~ "</div>"
+                      ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ sb_lvl ~ "</div>" ~ sb_rw ~ sb_meta ~ "</div>"
                       ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
                       ~ rec_html ~ (win_html if win_html else ("<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div>")) ~ "</div>" -%}
                   {%- endif -%}

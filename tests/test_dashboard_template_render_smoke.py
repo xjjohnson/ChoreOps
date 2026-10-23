@@ -2181,8 +2181,7 @@ def test_family_home_count_goal_names_the_leader() -> None:
         "custom_fields"
     ]["content"]
     assert "🏆 Olivia leads · 6/10" in html
-    assert html.count("background:#fbbf24") == 1  # gold disc
-    assert "background:#cbd5e1" in html and "background:#d97706" in html
+    assert html.count("🥇") == 1 and html.count("🥈") == 1 and html.count("🥉") == 1
     assert "Lily 4" not in html
     # A green tick under the dot of each person who added to it today
     assert html.count("'>✓</span>") == 2
@@ -2198,8 +2197,7 @@ def test_family_home_count_goal_names_the_leader() -> None:
         "custom_fields"
     ]["content"]
     assert "Olivia &amp; Lily lead · 5/10" in html
-    assert html.count("background:#fbbf24") == 2 and "background:#cbd5e1" not in html
-    assert html.count("background:#d97706") == 1
+    assert html.count("🥇") == 2 and "🥈" not in html and html.count("🥉") == 1
 
 
 def _label_strip_states() -> dict[str, _MockState]:
@@ -3718,8 +3716,9 @@ def test_family_goal_card_shows_days_left_and_top_contributor(template: str) -> 
     )
     assert "Behind pace" not in html
     assert "border-left:2px dashed" not in html
-    assert "11 days left · <b style=" in html
-    assert "🏆 Top contributor ×2</b>" in html
+    # Level and what is left, then reward with the bonus, then days left
+    assert html.index("190 to go") < html.index("+25 ⭐ each ·</span> <b style=")
+    assert html.index("🏆 Top contributor ×2</b>") < html.index("11 days left")
 
     html = _family_goal_card_html(template, family_days_left=1, family_pace="ahead")
     assert "Ends today</div>" in html
