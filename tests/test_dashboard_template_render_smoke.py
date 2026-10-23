@@ -2384,12 +2384,10 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
                 ):
                     tpl = card["filter"]["template"]
     assert tpl is not None
-    assert (
-        rendered["views"][0]["sections"][-1]["cards"][-1]["cards"][0]["filter"][
-            "template"
-        ]
-        == tpl
-    )
+    # Points history sits right under the Rewards card in the middle column
+    rewards_column = rendered["views"][0]["sections"][1]["cards"]
+    assert "REWARDS CARD" in str(rewards_column[0])
+    assert rewards_column[-1]["cards"][0]["filter"]["template"] == tpl
 
     mock_states = {
         "sensor.lily_helper": _MockState(

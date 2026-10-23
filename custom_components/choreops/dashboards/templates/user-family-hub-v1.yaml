@@ -1702,6 +1702,167 @@ views:
                       {%- endif -%}
                     {%- endif -%}
                   {%- endif -%}
+        - type: grid
+          square: false
+          columns: 1
+          grid_options:
+            columns: full
+          cards:
+            - type: custom:auto-entities
+              show_empty: false
+              card:
+                square: false
+                type: grid
+                columns: 1
+              card_param: cards
+              filter:
+                template: |-
+                  {#-- ===== RECENT ACTIVITY CARD ===== --#}
+
+                  << template_snippets.meta_stamp >>
+
+
+                  {#-- 1. User Configuration --#}
+
+                  << template_snippets.user_override_helper >>
+
+                  {%- set pref_default_header_collapsed = false -%}  {#-- Allowed: true, false --#}
+                  {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- 0-100: percent of var(--primary-color) mixed into the header background. --#}
+                  {%- set pref_activity_count = 5 -%}  {#-- How many recent events to show. Allowed: 1-5. --#}
+
+                  {#-- 2. Dynamic Lookups & Validations --#}
+
+                  {%- set pref_activity_count = [[pref_activity_count | int(default=5), 1] | max, 5] | min -%}
+                  << template_snippets.user_setup >>
+
+                  << template_snippets.user_validation >>
+
+                  {%- if not skip_render -%}
+
+                    {#-- 3. Collect Data --#}
+                    {%- set items = (state_attr(dashboard_helper, 'recent_activity') or [])[:pref_activity_count] -%}
+                    {%- set dashboard_helpers = state_attr(dashboard_helper, 'dashboard_helpers') or {} -%}
+                    {%- set translation_sensor = dashboard_helpers.get('translation_sensor_eid') -%}
+                    {%- set ui = (state_attr(translation_sensor, 'ui_translations') if translation_sensor else {}) or {} -%}
+                    {%- set icons = {'chores': 'mdi:check-circle-outline', 'rewards': 'mdi:gift-outline', 'bonuses': 'mdi:plus-circle-outline', 'penalties': 'mdi:alert-circle-outline', 'badges': 'mdi:medal-outline', 'achievements': 'mdi:trophy-outline', 'challenges': 'mdi:flag-checkered', 'manual': 'mdi:pencil-circle-outline'} -%}
+
+                    {#-- 4. Build Display --#}
+                    {%- if items | length > 0 -%}
+                      {%- set key_root = 'gamification/points_history' -%}
+                      {%- set ui_control = state_attr(dashboard_helper, 'ui_control') | default({}, true) -%}
+                      {%- set ui_root = namespace(current=ui_control if ui_control is mapping else {}) -%}
+                      {%- for segment in key_root.split('/') -%}
+                        {%- set ui_root.current = ui_root.current.get(segment, {}) if ui_root.current is mapping else {} -%}
+                      {%- endfor -%}
+                      {%- set header_collapsed = (ui_root.current.get('header_collapse', pref_default_header_collapsed) if ui_root.current is mapping else pref_default_header_collapsed) in [true, 'true', 'True'] -%}
+                      {%- set integration_entry_id = state_attr(dashboard_helper, 'integration_entry_id') -%}
+                      {%- set dashboard_helper_user_id = state_attr(dashboard_helper, 'user_id') -%}
+                      {%- set can_save = integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] -%}
+                      {{
+                        {
+                          'type': 'custom:button-card',
+                          'name': ui.get('points_history', 'Points history'),
+                          'icon': 'mdi:history',
+                          'show_name': true,
+                          'show_icon': true,
+                          'tap_action': ({
+                            'action': 'call-service',
+                            'service': 'choreops.manage_ui_control',
+                            'data': {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'remove', 'key': key_root ~ '/header_collapse'}
+                          } if header_collapsed and can_save else {
+                            'action': 'call-service',
+                            'service': 'choreops.manage_ui_control',
+                            'data': {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'update', 'key': key_root ~ '/header_collapse', 'value': true}
+                          } if can_save else {'action': 'none'}),
+                          'hold_action': {'action': 'none'},
+                          'custom_fields': {
+                            'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if header_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
+                          },
+                          'styles': {
+                            'card': [
+                              {'background': ('color-mix(in srgb, var(--primary-color) ' ~ pref_primary_tint_mix_pct | string ~ '%, var(--card-background-color))') if header_collapsed else 'transparent'},
+                              {'box-shadow': 'none'},
+                              {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
+                              {'border-left': '3px solid var(--primary-color)'},
+                              {'border-bottom': '3px solid var(--primary-color)'},
+                              {'border-radius': '12px'},
+                              {'padding': '10px 12px'},
+                              {'min-height': 'unset'},
+                              {'margin-top': '5px'},
+                              {'margin-bottom': '0px'}
+                            ],
+                            'grid': [
+                              {'grid-template-areas': '"i n toggle"'},
+                              {'grid-template-columns': 'min-content 1fr min-content'},
+                              {'column-gap': '5px'},
+                              {'align-items': 'center'}
+                            ],
+                            'icon': [{'width': '18px'}, {'transform': 'translateY(-2px)'}, {'color': 'var(--primary-color)'}],
+                            'name': [
+                              {'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '700'},
+                              {'text-transform': 'uppercase'}, {'letter-spacing': '0.4px'}, {'color': 'var(--primary-text-color)'}
+                            ],
+                            'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
+                          }
+                        }
+                      }},
+                      {%- if not header_collapsed -%}
+                      {%- set rows = namespace(v='') -%}
+                      {%- set tag_colors = {'chores': 'var(--success-color)', 'bonuses': 'var(--success-color)', 'penalties': 'var(--error-color)', 'rewards': 'var(--primary-color)', 'badges': 'var(--warning-color)', 'achievements': 'var(--warning-color)', 'challenges': 'var(--warning-color)', 'manual': 'var(--secondary-text-color)'} -%}
+                      {#-- point-source label keys in the dashboard translations --#}
+                      {%- set src_keys = {'chores': 'chore', 'rewards': 'reward', 'bonuses': 'bonus', 'penalties': 'penalty', 'badges': 'badge', 'achievements': 'achievement', 'challenges': 'challenge', 'manual': 'adjustment', 'other': 'activity'} -%}
+                      {%- for it in items -%}
+                        {%- set amt = it.get('amount', 0) | float(0) -%}
+                        {%- set when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
+                        {%- set days = (now().date() - when.date()).days if when else -1 -%}
+                        {%- set when_txt = ('' if when is none else ((ui.get('today', 'Today') ~ ' ' ~ when.strftime('%-I:%M %p')) if days == 0 else ((ui.get('yesterday', 'Yesterday') ~ ' ' ~ when.strftime('%-I:%M %p')) if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
+                        {%- set src_lbl = ui.get(src_keys.get(it.get('source', ''), ''), it.get('source_label') or '') | string -%}
+                        {%- set raw_nm = ((it.get('item_name') or src_lbl or ui.get('activity', 'Activity')) | string) -%}
+                        {%- set level_sep = ' - ' ~ ui.get('level', 'Level') ~ ' ' -%}
+                        {%- set level_txt = (raw_nm.split(level_sep)[1].split(' ')[0]) if level_sep in raw_nm else '' -%}
+                        {%- set nm = (raw_nm.split(level_sep)[0]) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- set lbl = (src_lbl | upper) ~ ((' · ' ~ (ui.get('level', 'Level') | upper) ~ ' ' ~ level_txt) if level_txt else '') -%}
+                        {%- set src = it.get('source', '') -%}
+                        {%- set tcol = tag_colors.get(src, 'var(--secondary-text-color)') -%}
+                        {%- set col = 'var(--success-color)' if amt >= 0 else 'var(--error-color)' -%}
+                        {%- set bal_after = it.get('balance_after') -%}
+                        {%- set bal_txt = ("<div style='font-size:10px;font-weight:500;opacity:.55;'>→ " ~ ('{:,.0f}'.format(bal_after | float(0))) ~ "</div>") if bal_after is not none else '' -%}
+                        {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><div style='width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'><ha-icon icon='" ~ icons.get(src, 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;display:block;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.8;'><span style='font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-right:5px;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'>" ~ lbl ~ "</span><span style='opacity:.65;'>" ~ when_txt ~ "</span></div></div><div style='text-align:right;font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ bal_txt ~ "</div></div>" -%}
+                      {%- endfor -%}
+                      {%- set ps = state_attr(dashboard_helper, 'points_summary') or {} -%}
+                      {%- set today_amt = ps.get('today', 0) | float(0) -%}
+                      {%- set week_amt = ps.get('week', 0) | float(0) -%}
+                      {%- set chip_css = "font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--secondary-background-color);white-space:nowrap;" -%}
+                      {%- set summary = "<div style='display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;'>"
+                        ~ "<span style='" ~ chip_css ~ "color:" ~ ('var(--success-color)' if today_amt > 0 else ('var(--error-color)' if today_amt < 0 else 'inherit')) ~ ";'>" ~ ui.get('today', 'Today') ~ " " ~ ('+' if today_amt > 0 else '') ~ '{:,.0f}'.format(today_amt) ~ "</span>"
+                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('this_week', 'This week') ~ " " ~ ('+' if week_amt > 0 else '') ~ '{:,.0f}'.format(week_amt) ~ "</span>"
+                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('balance', 'Balance') ~ " " ~ '{:,.0f}'.format(ps.get('balance', 0) | float(0)) ~ "</span>"
+                        ~ "</div>" -%}
+                      {%- set html = "<div style='width:100%;text-align:left;'>" ~ summary ~ rows.v ~ "</div>" -%}
+                      {{
+                        {
+                          'type': 'custom:button-card',
+                          'show_name': false,
+                          'show_icon': false,
+                          'tap_action': {'action': 'none'},
+                          'hold_action': {'action': 'none'},
+                          'custom_fields': {'content': html},
+                          'styles': {
+                            'card': [
+                              {'padding': '12px'},
+                              {'border-radius': '16px'},
+                              {'box-shadow': 'none'},
+                              {'border': '1px solid var(--divider-color)'},
+                              {'background': 'var(--card-background-color)'}
+                            ],
+                            'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
+                            'custom_fields': {'content': [{'width': '100%'}]}
+                          }
+                        }
+                      }},
+                      {%- endif -%}
+                    {%- endif -%}
+                  {%- endif -%}
 
     - type: grid
       column_span: 1
@@ -3559,167 +3720,6 @@ views:
                             }},
                           {%- endif -%}
                         {%- endfor -%}
-                      {%- endif -%}
-                    {%- endif -%}
-                  {%- endif -%}
-        - type: grid
-          square: false
-          columns: 1
-          grid_options:
-            columns: full
-          cards:
-            - type: custom:auto-entities
-              show_empty: false
-              card:
-                square: false
-                type: grid
-                columns: 1
-              card_param: cards
-              filter:
-                template: |-
-                  {#-- ===== RECENT ACTIVITY CARD ===== --#}
-
-                  << template_snippets.meta_stamp >>
-
-
-                  {#-- 1. User Configuration --#}
-
-                  << template_snippets.user_override_helper >>
-
-                  {%- set pref_default_header_collapsed = false -%}  {#-- Allowed: true, false --#}
-                  {%- set pref_primary_tint_mix_pct = 14 -%}  {#-- 0-100: percent of var(--primary-color) mixed into the header background. --#}
-                  {%- set pref_activity_count = 5 -%}  {#-- How many recent events to show. Allowed: 1-5. --#}
-
-                  {#-- 2. Dynamic Lookups & Validations --#}
-
-                  {%- set pref_activity_count = [[pref_activity_count | int(default=5), 1] | max, 5] | min -%}
-                  << template_snippets.user_setup >>
-
-                  << template_snippets.user_validation >>
-
-                  {%- if not skip_render -%}
-
-                    {#-- 3. Collect Data --#}
-                    {%- set items = (state_attr(dashboard_helper, 'recent_activity') or [])[:pref_activity_count] -%}
-                    {%- set dashboard_helpers = state_attr(dashboard_helper, 'dashboard_helpers') or {} -%}
-                    {%- set translation_sensor = dashboard_helpers.get('translation_sensor_eid') -%}
-                    {%- set ui = (state_attr(translation_sensor, 'ui_translations') if translation_sensor else {}) or {} -%}
-                    {%- set icons = {'chores': 'mdi:check-circle-outline', 'rewards': 'mdi:gift-outline', 'bonuses': 'mdi:plus-circle-outline', 'penalties': 'mdi:alert-circle-outline', 'badges': 'mdi:medal-outline', 'achievements': 'mdi:trophy-outline', 'challenges': 'mdi:flag-checkered', 'manual': 'mdi:pencil-circle-outline'} -%}
-
-                    {#-- 4. Build Display --#}
-                    {%- if items | length > 0 -%}
-                      {%- set key_root = 'gamification/points_history' -%}
-                      {%- set ui_control = state_attr(dashboard_helper, 'ui_control') | default({}, true) -%}
-                      {%- set ui_root = namespace(current=ui_control if ui_control is mapping else {}) -%}
-                      {%- for segment in key_root.split('/') -%}
-                        {%- set ui_root.current = ui_root.current.get(segment, {}) if ui_root.current is mapping else {} -%}
-                      {%- endfor -%}
-                      {%- set header_collapsed = (ui_root.current.get('header_collapse', pref_default_header_collapsed) if ui_root.current is mapping else pref_default_header_collapsed) in [true, 'true', 'True'] -%}
-                      {%- set integration_entry_id = state_attr(dashboard_helper, 'integration_entry_id') -%}
-                      {%- set dashboard_helper_user_id = state_attr(dashboard_helper, 'user_id') -%}
-                      {%- set can_save = integration_entry_id not in ['', none] and dashboard_helper_user_id not in ['', none] -%}
-                      {{
-                        {
-                          'type': 'custom:button-card',
-                          'name': ui.get('points_history', 'Points history'),
-                          'icon': 'mdi:history',
-                          'show_name': true,
-                          'show_icon': true,
-                          'tap_action': ({
-                            'action': 'call-service',
-                            'service': 'choreops.manage_ui_control',
-                            'data': {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'remove', 'key': key_root ~ '/header_collapse'}
-                          } if header_collapsed and can_save else {
-                            'action': 'call-service',
-                            'service': 'choreops.manage_ui_control',
-                            'data': {'config_entry_id': integration_entry_id, 'user_id': dashboard_helper_user_id, 'ui_control_action': 'update', 'key': key_root ~ '/header_collapse', 'value': true}
-                          } if can_save else {'action': 'none'}),
-                          'hold_action': {'action': 'none'},
-                          'custom_fields': {
-                            'toggle': "<ha-icon icon='" ~ ('mdi:chevron-down' if header_collapsed else 'mdi:chevron-up') ~ "' style='width:18px;height:18px;color: var(--primary-color);'></ha-icon>"
-                          },
-                          'styles': {
-                            'card': [
-                              {'background': ('color-mix(in srgb, var(--primary-color) ' ~ pref_primary_tint_mix_pct | string ~ '%, var(--card-background-color))') if header_collapsed else 'transparent'},
-                              {'box-shadow': 'none'},
-                              {'border': '1px solid var(--divider-color)' if header_collapsed else 'none'},
-                              {'border-left': '3px solid var(--primary-color)'},
-                              {'border-bottom': '3px solid var(--primary-color)'},
-                              {'border-radius': '12px'},
-                              {'padding': '10px 12px'},
-                              {'min-height': 'unset'},
-                              {'margin-top': '5px'},
-                              {'margin-bottom': '0px'}
-                            ],
-                            'grid': [
-                              {'grid-template-areas': '"i n toggle"'},
-                              {'grid-template-columns': 'min-content 1fr min-content'},
-                              {'column-gap': '5px'},
-                              {'align-items': 'center'}
-                            ],
-                            'icon': [{'width': '18px'}, {'transform': 'translateY(-2px)'}, {'color': 'var(--primary-color)'}],
-                            'name': [
-                              {'justify-self': 'start'}, {'font-size': '14px'}, {'font-weight': '700'},
-                              {'text-transform': 'uppercase'}, {'letter-spacing': '0.4px'}, {'color': 'var(--primary-text-color)'}
-                            ],
-                            'custom_fields': {'toggle': [{'justify-self': 'end'}, {'align-self': 'center'}]}
-                          }
-                        }
-                      }},
-                      {%- if not header_collapsed -%}
-                      {%- set rows = namespace(v='') -%}
-                      {%- set tag_colors = {'chores': 'var(--success-color)', 'bonuses': 'var(--success-color)', 'penalties': 'var(--error-color)', 'rewards': 'var(--primary-color)', 'badges': 'var(--warning-color)', 'achievements': 'var(--warning-color)', 'challenges': 'var(--warning-color)', 'manual': 'var(--secondary-text-color)'} -%}
-                      {#-- point-source label keys in the dashboard translations --#}
-                      {%- set src_keys = {'chores': 'chore', 'rewards': 'reward', 'bonuses': 'bonus', 'penalties': 'penalty', 'badges': 'badge', 'achievements': 'achievement', 'challenges': 'challenge', 'manual': 'adjustment', 'other': 'activity'} -%}
-                      {%- for it in items -%}
-                        {%- set amt = it.get('amount', 0) | float(0) -%}
-                        {%- set when = (as_datetime(it.get('timestamp')) | as_local) if it.get('timestamp') else none -%}
-                        {%- set days = (now().date() - when.date()).days if when else -1 -%}
-                        {%- set when_txt = ('' if when is none else ((ui.get('today', 'Today') ~ ' ' ~ when.strftime('%-I:%M %p')) if days == 0 else ((ui.get('yesterday', 'Yesterday') ~ ' ' ~ when.strftime('%-I:%M %p')) if days == 1 else (when.strftime('%a') if days < 7 else when.strftime('%b %-d'))))) -%}
-                        {%- set src_lbl = ui.get(src_keys.get(it.get('source', ''), ''), it.get('source_label') or '') | string -%}
-                        {%- set raw_nm = ((it.get('item_name') or src_lbl or ui.get('activity', 'Activity')) | string) -%}
-                        {%- set level_sep = ' - ' ~ ui.get('level', 'Level') ~ ' ' -%}
-                        {%- set level_txt = (raw_nm.split(level_sep)[1].split(' ')[0]) if level_sep in raw_nm else '' -%}
-                        {%- set nm = (raw_nm.split(level_sep)[0]) | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
-                        {%- set lbl = (src_lbl | upper) ~ ((' · ' ~ (ui.get('level', 'Level') | upper) ~ ' ' ~ level_txt) if level_txt else '') -%}
-                        {%- set src = it.get('source', '') -%}
-                        {%- set tcol = tag_colors.get(src, 'var(--secondary-text-color)') -%}
-                        {%- set col = 'var(--success-color)' if amt >= 0 else 'var(--error-color)' -%}
-                        {%- set bal_after = it.get('balance_after') -%}
-                        {%- set bal_txt = ("<div style='font-size:10px;font-weight:500;opacity:.55;'>→ " ~ ('{:,.0f}'.format(bal_after | float(0))) ~ "</div>") if bal_after is not none else '' -%}
-                        {%- set rows.v = rows.v ~ "<div style='display:flex;align-items:center;gap:10px;padding:8px 0;" ~ ('' if loop.first else 'border-top:1px solid var(--divider-color);') ~ "'><div style='width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'><ha-icon icon='" ~ icons.get(src, 'mdi:circle-outline') ~ "' style='width:20px;height:20px;--mdc-icon-size:20px;display:block;'></ha-icon></div><div style='flex:1;min-width:0;'><div style='font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" ~ nm ~ "</div><div style='font-size:11px;opacity:.8;'><span style='font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-right:5px;color:" ~ tcol ~ ";background:color-mix(in srgb, " ~ tcol ~ " 16%, var(--card-background-color));'>" ~ lbl ~ "</span><span style='opacity:.65;'>" ~ when_txt ~ "</span></div></div><div style='text-align:right;font-size:13px;font-weight:800;color:" ~ col ~ ";white-space:nowrap;'>" ~ (('+' if amt > 0 else '') ~ ('%g' | format(amt | round(2)))) ~ bal_txt ~ "</div></div>" -%}
-                      {%- endfor -%}
-                      {%- set ps = state_attr(dashboard_helper, 'points_summary') or {} -%}
-                      {%- set today_amt = ps.get('today', 0) | float(0) -%}
-                      {%- set week_amt = ps.get('week', 0) | float(0) -%}
-                      {%- set chip_css = "font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--secondary-background-color);white-space:nowrap;" -%}
-                      {%- set summary = "<div style='display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;'>"
-                        ~ "<span style='" ~ chip_css ~ "color:" ~ ('var(--success-color)' if today_amt > 0 else ('var(--error-color)' if today_amt < 0 else 'inherit')) ~ ";'>" ~ ui.get('today', 'Today') ~ " " ~ ('+' if today_amt > 0 else '') ~ '{:,.0f}'.format(today_amt) ~ "</span>"
-                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('this_week', 'This week') ~ " " ~ ('+' if week_amt > 0 else '') ~ '{:,.0f}'.format(week_amt) ~ "</span>"
-                        ~ "<span style='" ~ chip_css ~ "'>" ~ ui.get('balance', 'Balance') ~ " " ~ '{:,.0f}'.format(ps.get('balance', 0) | float(0)) ~ "</span>"
-                        ~ "</div>" -%}
-                      {%- set html = "<div style='width:100%;text-align:left;'>" ~ summary ~ rows.v ~ "</div>" -%}
-                      {{
-                        {
-                          'type': 'custom:button-card',
-                          'show_name': false,
-                          'show_icon': false,
-                          'tap_action': {'action': 'none'},
-                          'hold_action': {'action': 'none'},
-                          'custom_fields': {'content': html},
-                          'styles': {
-                            'card': [
-                              {'padding': '12px'},
-                              {'border-radius': '16px'},
-                              {'box-shadow': 'none'},
-                              {'border': '1px solid var(--divider-color)'},
-                              {'background': 'var(--card-background-color)'}
-                            ],
-                            'grid': [{'grid-template-areas': '"content"'}, {'grid-template-columns': '1fr'}],
-                            'custom_fields': {'content': [{'width': '100%'}]}
-                          }
-                        }
-                      }},
                       {%- endif -%}
                     {%- endif -%}
                   {%- endif -%}
