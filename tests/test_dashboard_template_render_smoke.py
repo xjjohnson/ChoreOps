@@ -1951,6 +1951,7 @@ def _render_home_card(
     marker: str,
     mock_states: dict[str, _MockState],
     user_names: list[str] | None = None,
+    raw: bool = False,
 ):
     template_str = _read_template("user-family-home-v1.yaml")
     view = builder._render_family_home_view(
@@ -1983,7 +1984,7 @@ def _render_home_card(
         states=states,
         state_attr=state_attr,
     )
-    return yaml.safe_load(f"[{output}]")
+    return output if raw else yaml.safe_load(f"[{output}]")
 
 
 def _home_states() -> dict[str, _MockState]:
@@ -2465,6 +2466,78 @@ def test_family_home_race_track_spreads_people_who_are_close() -> None:
     assert spots["D"] == ("0", "19", "-22")
     # Lily is far enough ahead to keep her own spot
     assert spots["L"] == ("25", "0", "-22")
+
+
+def test_family_home_goals_follow_the_pref_order_list() -> None:
+    """Goals named in pref_order come first in that order; the rest follow."""
+    names = ["Pooper Scooper", "Zebra Goal", "Expert Brusher", "Perfect Week"]
+    badges = [
+        {"eid": f"sensor.b{i}", "name": n, "badge_type": "periodic"}
+        for i, n in enumerate(names)
+    ]
+    states = {
+        "sensor.mom_helper": _MockState(
+            entity_id="sensor.mom_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "user_name": "Mom",
+                "badges": badges,
+            },
+            name="Mom",
+        )
+    }
+    for i, n in enumerate(names):
+        states[f"sensor.b{i}"] = _MockState(
+            entity_id=f"sensor.b{i}",
+            state="10",
+            attributes={"badge_name": n, "status": "in_progress"},
+            name="b",
+        )
+    cards = _render_home_card("pref_urgent_days", states, user_names=["Mom"])
+    html = "".join(c["custom_fields"]["content"] for c in cards)
+    order = sorted(names, key=html.index)
+    assert order == [
+        "Perfect Week",
+        "Expert Brusher",
+        "Pooper Scooper",
+        "Zebra Goal",
+    ]
+
+
+def test_family_home_family_goals_follow_the_pref_order_list() -> None:
+    """Family goals named in pref_order come first; the rest keep the kind order."""
+    goals = [
+        ("Most chores completed", "family_chores_in_day"),
+        ("Zebra Goal", "family_everyone_contributes"),
+        ("Total Monthly Chores", "family_chore_total"),
+        ("This Months Family Stars", "family_points_total"),
+    ]
+    states = {}
+    for i, (n, ty) in enumerate(goals):
+        states[f"sensor.fg{i}"] = _MockState(
+            entity_id=f"sensor.fg{i}",
+            state="3",
+            attributes={
+                "achievement_name": n,
+                "type": ty,
+                "family_contributions": {"Mom": 3},
+                "family_levels": [10],
+                "family_level_rewards": [5],
+                "family_total": 3,
+            },
+            name=n,
+        )
+    html = _render_home_card(
+        "FAMILY ACHIEVEMENTS", states, user_names=["Mom"], raw=True
+    )
+    order = sorted((g[0] for g in goals), key=html.index)
+    assert order == [
+        "This Months Family Stars",
+        "Total Monthly Chores",
+        "Most chores completed",
+        "Zebra Goal",
+    ]
 
 
 def test_family_hub_recent_activity_card_renders_rows() -> None:
