@@ -2589,6 +2589,7 @@ def test_family_home_family_goals_follow_the_pref_order_list() -> None:
         ("Zebra Goal", "family_everyone_contributes"),
         ("Total Monthly Chores", "family_chore_total"),
         ("This Months Family Stars", "family_points_total"),
+        ("Perfect Week", "family_caught_up_days"),
     ]
     states = {}
     for i, (n, ty) in enumerate(goals):
@@ -2610,6 +2611,7 @@ def test_family_home_family_goals_follow_the_pref_order_list() -> None:
     )
     order = sorted((g[0] for g in goals), key=html.index)
     assert order == [
+        "Perfect Week",
         "This Months Family Stars",
         "Total Monthly Chores",
         "Most chores completed",
