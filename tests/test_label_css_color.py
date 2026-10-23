@@ -17,3 +17,14 @@ async def test_label_css_color(hass: HomeAssistant) -> None:
     assert get_label_css_color(hass, hexed.label_id) == "#e91e63"
     assert get_label_css_color(hass, plain.label_id) == ""
     assert get_label_css_color(hass, "missing") == ""
+
+
+async def test_chore_label_entries_carry_color(hass: HomeAssistant) -> None:
+    """Chore labels in the dashboard helper include the label's CSS color."""
+    from custom_components.choreops.sensor import AssigneeDashboardHelperSensor
+
+    kitchen = lr.async_get(hass).async_create("Kitchen", color="orange")
+
+    assert AssigneeDashboardHelperSensor._build_label_entries(
+        hass, [kitchen.label_id, ""]
+    ) == [{"id": kitchen.label_id, "name": "Kitchen", "color": "var(--orange-color)"}]
