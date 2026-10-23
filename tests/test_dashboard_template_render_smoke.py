@@ -4099,3 +4099,33 @@ def test_family_hub_rank_icons_skip_the_inline_baseline() -> None:
     icons = re.findall(r"<ha-icon icon='mdi:medal' style='([^']*)'", output)
     assert icons
     assert all("--ha-icon-display:block" in style for style in icons)
+
+
+@pytest.mark.parametrize("template", ["home", "hub"])
+def test_family_goal_finished_shows_top_earner_banner(template: str) -> None:
+    """A goal with every level done swaps the rows for a top-earner banner."""
+    shares = {"Lily": 5, "Dad": 5, "Mom": 3, "Max": 1}
+    done: dict[str, object] = {
+        "type": "family_chore_total",
+        "family_total": 14,
+        "family_levels": [14],
+        "family_level_rewards": [10],
+        "family_level": 1,
+        "family_next_target": 14,
+        "family_top_multiplier": 2,
+        "family_contributions": shares,
+        "family_level_contributions": shares,
+    }
+    html = _family_goal_card_html(template, **done)
+    assert "TOP EARNERS" in html
+    assert "Lily &amp; Dad · 5 chores each" in html
+    assert "🥉 Mom 3" in html
+    assert "Top contributor ×2" in html
+    assert "grid-template-columns:1fr 1fr;gap:4px;" not in html
+
+    # Still under way: the per-person rows stay
+    html = _family_goal_card_html(
+        template, **{**done, "family_level": 0, "family_total": 9}
+    )
+    assert "TOP EARNER" not in html
+    assert "grid-template-columns:1fr 1fr;gap:4px;" in html

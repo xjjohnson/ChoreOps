@@ -658,6 +658,10 @@ class FamilyGoalManager(BaseManager):
         if goal.get(fg.DATA_TYPE) == fg.GOAL_TYPE_DAY:
             # One day's effort: today's counts are the level's shares.
             return self.get_contributions(goal_id)
+        levels = self._levels(goal)
+        if levels and int(goal.get(fg.DATA_LEVEL, 0)) >= len(levels):
+            # Every level done: no level is under way, so show the whole goal.
+            return self.get_contributions(goal_id)
         start = goal.get(fg.DATA_LEVEL_START, {})
         return {
             assignee_id: max(0.0, value - float(start.get(assignee_id, 0.0)))

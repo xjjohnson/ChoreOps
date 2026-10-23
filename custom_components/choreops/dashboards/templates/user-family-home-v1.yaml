@@ -813,13 +813,34 @@ views:
                         ~ "<div style='position:relative;display:flex;align-items:center;gap:6px;padding:6px 8px;'><div style='width:20px;height:20px;border-radius:50%;background:" ~ pcol ~ ";color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:0 0 auto;'>" ~ (pname_safe[:1] | upper) ~ "</div>"
                         ~ "<span style='flex:1;min-width:0;font-size:12px;font-weight:700;color:var(--primary-text-color);'>" ~ pname_safe ~ (' 🏆' if lead else '') ~ "</span><b style='font-size:12px;color:var(--primary-text-color);'>" ~ p ~ "</b></div></div>" -%}
                     {%- endfor -%}
+                    {#-- All levels done: a top-earner banner with ranked chips replaces the rows --#}
+                    {%- set win = namespace(names=[], av='', chips='') -%}
+                    {%- set win_html = '' -%}
+                    {%- if fdone and ftop > 0 -%}
+                      {%- set wunit = ui.get('points_unit', 'points') if ftype == 'family_points_total' else (ui.get('chores_unit', 'chores') if ftype in ['family_chore_total', 'family_chores_in_day'] else '') -%}
+                      {%- for pname, pts in fshares.items() | sort(attribute='1', reverse=true) -%}
+                        {%- set pv = pts | float(0) -%}
+                        {%- set pname_safe = pname | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
+                        {%- if pv == ftop -%}
+                          {%- set win.names = win.names + [pname_safe] -%}
+                          {%- set win.av = win.av ~ "<div style='width:40px;height:40px;border-radius:50%;background:var(--warning-color);color:#fff;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto;" ~ ("margin-left:-14px;border:2px solid var(--card-background-color);" if win.av else '') ~ "'>" ~ (pname_safe[:1] | upper) ~ "</div>" -%}
+                        {%- else -%}
+                          {%- set place = (fshares.values() | map('float', 0) | select('gt', pv) | list | length) + 1 -%}
+                          {%- set medal = {2: '🥈 ', 3: '🥉 '}.get(place, '') -%}
+                          {%- set win.chips = win.chips ~ "<span style='display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:12px;font-weight:700;color:var(--primary-text-color);" ~ ('' if medal else 'opacity:0.7;') ~ "'>" ~ medal ~ pname_safe ~ ' ' ~ (pv | round(0) | int) ~ "</span>" -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- set win_line = (win.names | join(' &amp; ')) ~ ' · ' ~ (ftop | round(0) | int) ~ ((' ' ~ wunit) if wunit else '') ~ ((' ' ~ ui.get('each', 'each')) if (win.names | length) > 1 else '') -%}
+                      {%- set win_bonus = ("<div style='font-size:11px;color:var(--secondary-text-color);'>🏆 " ~ ui.get('top_contributor', 'Top contributor') ~ " ×" ~ ('%g' | format(fmult)) ~ "</div>") if fmult > 1 else '' -%}
+                      {%- set win_html = "<div style='display:flex;align-items:center;gap:10px;padding:10px;border-radius:14px;margin-bottom:8px;background:linear-gradient(90deg,color-mix(in srgb,var(--warning-color) 35%,transparent),color-mix(in srgb,var(--warning-color) 10%,transparent));border:1px solid color-mix(in srgb,var(--warning-color) 50%,transparent);'><div style='display:flex;flex:0 0 auto;'>" ~ win.av ~ "</div><div style='flex:1;min-width:0;'><div style='font-size:11px;font-weight:800;letter-spacing:0.4px;color:var(--warning-color);'>🏆 " ~ ((ui.get('top_earners', 'Top earners') if (win.names | length) > 1 else ui.get('top_earner', 'Top earner')) | upper) ~ "</div><div style='font-size:16px;font-weight:800;line-height:1.2;color:var(--primary-text-color);'>" ~ win_line ~ "</div>" ~ win_bonus ~ "</div></div>" ~ (("<div style='display:flex;flex-wrap:wrap;gap:6px;justify-content:center;'>" ~ win.chips ~ "</div>") if win.chips else '') -%}
+                    {%- endif -%}
                     {%- set fui_v = "<div style='text-align:left;padding:10px;border-radius:18px;margin:2px 0 4px 0;background:linear-gradient(135deg," ~ accent ~ "18," ~ accent2 ~ "10);border:1px solid " ~ accent ~ "66;'>"
                       ~ "<div style='position:relative;overflow:hidden;border-radius:16px;margin-bottom:6px;border:1px solid " ~ accent ~ "88;'>"
                       ~ "<div style='position:absolute;left:0;top:0;bottom:0;width:" ~ bpct ~ "%;background:linear-gradient(90deg," ~ accent ~ "77," ~ accent2 ~ "33);'></div>" ~ tick_html
                       ~ "<div style='position:relative;display:flex;align-items:center;gap:12px;padding:12px;'>" ~ tile
                       ~ "<div style='flex:1;min-width:0;'>" ~ fbanner ~ "<div style='font-size:15px;font-weight:700;line-height:1.2;color:var(--primary-text-color);'>" ~ fname ~ "</div>" ~ ("<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ fdesc ~ "</div>" if fdesc else '') ~ "<div style='font-size:11px;color:var(--secondary-text-color);line-height:1.35;'>" ~ ((lvl_txt ~ ' · ') if lvl_txt else '') ~ sub ~ "</div>" ~ pace_html ~ mult_html ~ "</div>"
                       ~ "<div style='flex:0 0 auto;text-align:right;'><div style='display:inline-block;padding:3px 9px;border-radius:999px;background:rgba(0,0,0,0.25);font-size:13px;font-weight:800;color:var(--primary-text-color);white-space:nowrap;'>" ~ ftotal ~ "<span style='opacity:0.6;font-weight:600;'>/" ~ wtarget ~ "</span></div><br>" ~ time_html ~ "</div></div></div>"
-                      ~ rec_html ~ "<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div></div>" -%}
+                      ~ rec_html ~ (win_html if win_html else ("<div style='display:grid;grid-template-columns:1fr 1fr;gap:4px;'>" ~ rows.v ~ "</div>")) ~ "</div>" -%}
                   {%- endif -%}
 
                   {{
