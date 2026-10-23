@@ -2132,7 +2132,9 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert "width:20%" in html
 
 
-def _count_badge_states(people: dict[str, float]) -> dict[str, _MockState]:
+def _count_badge_states(
+    people: dict[str, float], did_today: tuple[str, ...] = ()
+) -> dict[str, _MockState]:
     """Helper and badge sensors for a 10-chore badge, progress in percent."""
     states: dict[str, _MockState] = {}
     for name, progress in people.items():
@@ -2162,6 +2164,7 @@ def _count_badge_states(people: dict[str, float]) -> dict[str, _MockState]:
                 "end_date": "2026-10-29T00:00:00",
                 "target_type": "chore_count",
                 "threshold_value": 10,
+                "days_done": ["2026-10-19"] if name in did_today else [],
             },
             name="b",
         )
@@ -2171,13 +2174,18 @@ def _count_badge_states(people: dict[str, float]) -> dict[str, _MockState]:
 def test_family_home_count_goal_names_the_leader() -> None:
     """Chore count goals name the leader, medal the top 3 and drop the chip row."""
     names = ["Olivia", "Lily", "Dad", "Mom"]
-    states = _count_badge_states({"Olivia": 60, "Lily": 40, "Dad": 20, "Mom": 0})
+    states = _count_badge_states(
+        {"Olivia": 60, "Lily": 40, "Dad": 20, "Mom": 0}, did_today=("Olivia", "Dad")
+    )
     html = _render_home_card("pref_urgent_days", states, user_names=names)[0][
         "custom_fields"
     ]["content"]
     assert "🏆 Olivia leads · 6/10" in html
-    assert html.count("🥇") == 1 and html.count("🥈") == 1 and html.count("🥉") == 1
+    assert html.count("background:#fbbf24") == 1  # gold disc
+    assert "background:#cbd5e1" in html and "background:#d97706" in html
     assert "Lily 4" not in html
+    # A green tick under the dot of each person who added to it today
+    assert html.count("'>✓</span>") == 2
     # No footer chips, only the time left
     assert "justify-content:flex-end" in html
     assert not re.findall(
@@ -2190,7 +2198,8 @@ def test_family_home_count_goal_names_the_leader() -> None:
         "custom_fields"
     ]["content"]
     assert "Olivia &amp; Lily lead · 5/10" in html
-    assert html.count("🥇") == 2 and "🥈" not in html and html.count("🥉") == 1
+    assert html.count("background:#fbbf24") == 2 and "background:#cbd5e1" not in html
+    assert html.count("background:#d97706") == 1
 
 
 def _label_strip_states() -> dict[str, _MockState]:
@@ -3696,8 +3705,8 @@ def _family_goal_card_html(template: str, **attrs: object) -> str:
 
 
 @pytest.mark.parametrize("template", ["home", "hub"])
-def test_family_goal_card_shows_pace_line_and_days_left(template: str) -> None:
-    """Pace word, days left and a dashed pace line at the even-pace total."""
+def test_family_goal_card_shows_days_left_and_top_contributor(template: str) -> None:
+    """Scoreboards show days left and the top contributor bonus, with no pace."""
     html = _family_goal_card_html(
         template,
         family_pace="behind",
@@ -3705,17 +3714,16 @@ def test_family_goal_card_shows_pace_line_and_days_left(template: str) -> None:
         family_end_date="2026-10-31",
         family_finished=False,
         family_pace_expected=330.0,
+        family_top_multiplier=2,
     )
-    assert "Behind pace</b> · 11 days left" in html
-    # The dashed line stops at the bottom of the bar, clear of the title
-    assert (
-        "bottom:0;height:22px;left:66.0%;border-left:2px dashed var(--warning-color)"
-        in html
-    )
+    assert "Behind pace" not in html
+    assert "border-left:2px dashed" not in html
+    assert "11 days left · <b style=" in html
+    assert "🏆 Top contributor ×2</b>" in html
 
     html = _family_goal_card_html(template, family_days_left=1, family_pace="ahead")
-    assert "Ahead of pace</b> · Ends today" in html
-    assert "border-left:2px dashed" not in html  # no even-pace total sent
+    assert "Ends today</div>" in html
+    assert "Ahead of pace" not in html
 
     html = _family_goal_card_html(
         template,
@@ -3724,13 +3732,12 @@ def test_family_goal_card_shows_pace_line_and_days_left(template: str) -> None:
         family_days_left=0,
     )
     assert "Finished Oct 31</b> · counting stopped" in html
-    assert "border-left:2px dashed" not in html
 
     # Repeating goals count down to the end of the week or month
     html = _family_goal_card_html(
         template, family_days_left=5, family_pace="on_track", family_deadline="week"
     )
-    assert "On track</b> · 5 days left this week" in html
+    assert "5 days left this week" in html and "On track" not in html
     html = _family_goal_card_html(template, family_days_left=9, family_deadline="month")
     assert "9 days left this month" in html
 
