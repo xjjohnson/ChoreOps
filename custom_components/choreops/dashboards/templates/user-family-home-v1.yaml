@@ -478,6 +478,7 @@ views:
           card_param: cards
           filter:
             template: |-
+              {%- set pref_order = ['Perfect Week', 'Expert Brusher', 'Puddins Cook', 'Pooper Scooper'] -%}  {#-- Optional: goal names, top to bottom. Goals not listed follow, daily goals first. --#}
               {%- set pref_urgent_days = 3 -%}
               {%- set pref_dashboard_path = '' -%}  {#-- Optional: your dashboard URL path (for example 'dashboard-choreops'). Leave empty to use paths relative to this dashboard. --#}
               {%- set helpers = integration_entities('choreops')
@@ -534,7 +535,7 @@ views:
               {%- for qn, q in ns.q.items() -%}
                 {%- set top = (q.people | map(attribute='p') | list | max) if q.people else 0 -%}
                 {%- set alldone = q.people | length > 0 and (q.people | selectattr('e') | list | length) == (q.people | length) -%}
-                {%- set items.l = items.l + [q | combine({'top': top, 'alldone': alldone, 'key': [(1 if alldone else 0), (1 if q.left >= 999 else 0), (q.left if q.left < 999 else 0), (100 - top), qn | lower]})] -%}
+                {%- set items.l = items.l + [q | combine({'top': top, 'alldone': alldone, 'key': [(pref_order.index(qn) if qn in pref_order else 99), (0 if (q.people | selectattr('d') | list) else 1), (1 if alldone else 0), (1 if q.left >= 999 else 0), (q.left if q.left < 999 else 0), (100 - top), qn | lower]})] -%}
               {%- endfor -%}
               {%- for q in items.l | sort(attribute='key') -%}
                 {%- set acc = 'var(--success-color)' if q.alldone else '#8b5cf6' -%}
@@ -685,7 +686,16 @@ views:
                 {%- endfor -%}
               {%- endfor -%}
               {%- for fe1 in fsort.top + fsort.rest -%}{%- if fe1 not in ford.v -%}{%- set ford.v = ford.v + [fe1] -%}{%- endif -%}{%- endfor -%}
-              {%- for fe in ford.v -%}
+              {#-- Optional: goal names, top to bottom. Goals not listed follow in the kind order above. --#}
+              {%- set pref_order = ['This Months Family Stars', 'Total Monthly Chores', 'Most chores completed'] -%}
+              {%- set pord = namespace(v=[]) -%}
+              {%- for pn in pref_order -%}
+                {%- for fe2 in ford.v -%}
+                  {%- if ((state_attr(fe2, 'achievement_name') or '') | string) == pn and fe2 not in pord.v -%}{%- set pord.v = pord.v + [fe2] -%}{%- endif -%}
+                {%- endfor -%}
+              {%- endfor -%}
+              {%- for fe2 in ford.v -%}{%- if fe2 not in pord.v -%}{%- set pord.v = pord.v + [fe2] -%}{%- endif -%}{%- endfor -%}
+              {%- for fe in pord.v -%}
                 {%- if states(fe) not in ['unknown', 'unavailable'] -%}
                   {%- set fname = state_attr(fe, 'achievement_name') | default(ui.get('family_goal', 'Family Goal'), true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                   {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
