@@ -957,6 +957,7 @@ class FamilyGoalManager(BaseManager):
             fg.ATTR_RECORD_TOP: [
                 eh.get_assignee_name_by_id(self.coordinator, a) or a for a in top_ids
             ],
+            fg.ATTR_RECORD_TOP_TOTAL: float(goal.get(fg.DATA_RECORD_TOP_TOTAL, 0.0)),
         }
 
     def _update_day_record(self, goal_id: str, goal: dict[str, Any]) -> bool:
@@ -974,6 +975,7 @@ class FamilyGoalManager(BaseManager):
         goal[fg.DATA_RECORD] = total
         goal[fg.DATA_RECORD_DAY] = dt_today_iso()
         goal[fg.DATA_RECORD_TOP] = ",".join(top_ids)
+        goal[fg.DATA_RECORD_TOP_TOTAL] = best
         return True
 
     def _restart_day_goal_if_new_day(self, goal: dict[str, Any]) -> bool:
@@ -1017,7 +1019,12 @@ class FamilyGoalManager(BaseManager):
         if not goal:
             raise self._not_found(goal_id)
         self._restart(goal)
-        for key in (fg.DATA_RECORD, fg.DATA_RECORD_DAY, fg.DATA_RECORD_TOP):
+        for key in (
+            fg.DATA_RECORD,
+            fg.DATA_RECORD_DAY,
+            fg.DATA_RECORD_TOP,
+            fg.DATA_RECORD_TOP_TOTAL,
+        ):
             goal.pop(key, None)
         base.LOGGER.info("Family goal %s restarted", goal_id)
         self.coordinator._persist_and_update()

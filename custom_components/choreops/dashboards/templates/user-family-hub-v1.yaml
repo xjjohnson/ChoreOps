@@ -3530,7 +3530,15 @@ views:
                             {%- set fsort.rest = fsort.rest + [fe0] -%}
                           {%- endif -%}
                         {%- endfor -%}
-                        {%- for fe in fsort.top + fsort.rest -%}
+                        {#-- Same kinds sit together: day streaks, everyone-contributes, then the scoreboards, with the one-day record last --#}
+                        {%- set ford = namespace(v=[]) -%}
+                        {%- for ot in ['family_caught_up_days', 'family_active_days', 'family_everyone_contributes', 'family_points_total', 'family_chore_total', 'family_chores_in_day'] -%}
+                          {%- for fe1 in fsort.top + fsort.rest -%}
+                            {%- if ((state_attr(fe1, 'type') or '') | string | lower) == ot -%}{%- set ford.v = ford.v + [fe1] -%}{%- endif -%}
+                          {%- endfor -%}
+                        {%- endfor -%}
+                        {%- for fe1 in fsort.top + fsort.rest -%}{%- if fe1 not in ford.v -%}{%- set ford.v = ford.v + [fe1] -%}{%- endif -%}{%- endfor -%}
+                        {%- for fe in ford.v -%}
                           {%- if states(fe) not in ['unknown', 'unavailable'] -%}
                             {%- set fname = state_attr(fe, 'achievement_name') | default(ui.get('family_goal', 'Family Goal'), true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
                             {%- set fdesc = state_attr(fe, 'description') | default('', true) | string | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;') -%}
@@ -3612,7 +3620,8 @@ views:
                             {%- set frecord = state_attr(fe, 'family_record') | float(0) | round(0) | int -%}
                             {%- set frecord_day = state_attr(fe, 'family_record_day') or '' -%}
                             {%- set frecord_top = state_attr(fe, 'family_record_top') or [] -%}
-                            {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 " ~ ui.get('record', 'Record') ~ ": <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', '))) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
+                            {%- set frecord_top_total = state_attr(fe, 'family_record_top_total') | float(0) | round(0) | int -%}
+                            {%- set rec_html = ("<div style='text-align:center;font-size:11px;color:var(--secondary-text-color);margin:6px 0 2px 0;'>🏆 " ~ ui.get('record', 'Record') ~ ": <b style='color:var(--primary-text-color);'>" ~ frecord ~ funit ~ "</b>" ~ ((" · " ~ (frecord_top | join(', ')) ~ ((" <b style='color:var(--primary-text-color);'>" ~ frecord_top_total ~ "</b>") if frecord_top_total > 0 else '')) if frecord_top else '') ~ ((" · " ~ frecord_day) if frecord_day else '') ~ "</div>") if frecord > 0 else '' -%}
 
                             {%- if fgrid -%}
                               {#-- Who is in: a check for everyone who has done their part, the count for the rest --#}

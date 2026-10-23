@@ -82,6 +82,7 @@ DATA_LEVEL_START: Final = "family_level_start"
 DATA_RECORD: Final = "family_record"
 DATA_RECORD_DAY: Final = "family_record_day"
 DATA_RECORD_TOP: Final = "family_record_top"
+DATA_RECORD_TOP_TOTAL: Final = "family_record_top_total"
 # Version of what a points goal counts. 2 = award points left out; goals from
 # before carry snapshots that still include them and are converted on start.
 DATA_POINTS_BASIS: Final = "family_points_basis"
@@ -133,6 +134,7 @@ RUNTIME_KEYS: Final = (
     DATA_RECORD,
     DATA_RECORD_DAY,
     DATA_RECORD_TOP,
+    DATA_RECORD_TOP_TOTAL,
     DATA_POINTS_BASIS,
     DATA_STARTED,
     DATA_PERIOD_START,
@@ -165,6 +167,7 @@ ATTR_TOP_MULTIPLIER: Final = "family_top_multiplier"
 ATTR_RECORD: Final = "family_record"
 ATTR_RECORD_DAY: Final = "family_record_day"
 ATTR_RECORD_TOP: Final = "family_record_top"
+ATTR_RECORD_TOP_TOTAL: Final = "family_record_top_total"
 ATTR_REPEAT: Final = "family_repeat"
 ATTR_END_DATE: Final = "family_end_date"  # Finish date or end of the repeat period
 ATTR_DAYS_LEFT: Final = "family_days_left"  # Including today; None without an end
