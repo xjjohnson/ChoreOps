@@ -2124,6 +2124,82 @@ def test_family_home_goal_cards_show_each_person_on_a_track() -> None:
     assert "width:20%" in html
 
 
+def test_family_home_goal_chips_show_todays_part() -> None:
+    """Goals with a daily part put a green or red dot under each person's chip."""
+
+    def badge_helper(name, goals):
+        slug = name.lower()
+        badges, states = [], {}
+        for i, (goal, attrs) in enumerate(goals.items()):
+            eid = f"sensor.{slug}_badge{i}"
+            badges.append({"eid": eid, "name": goal, "badge_type": "periodic"})
+            states[eid] = _MockState(
+                entity_id=eid,
+                state=str(attrs.pop("progress", 10)),
+                attributes={"badge_name": goal, "status": "in_progress", **attrs},
+                name="b",
+            )
+        states[f"sensor.{slug}_helper"] = _MockState(
+            entity_id=f"sensor.{slug}_helper",
+            state="ok",
+            attributes={
+                "purpose": "purpose_dashboard_helper",
+                "user_name": name,
+                "badges": badges,
+            },
+            name=name,
+        )
+        return states
+
+    states = {}
+    states.update(
+        badge_helper(
+            "Mom",
+            {
+                "Perfect Week": {"target_type": "days_all_chores", "days_done": []},
+                "Week Points": {"target_type": "points"},
+                "Tidy Room": {"status": "earned", "progress": 100},
+            },
+        )
+    )
+    states.update(
+        badge_helper(
+            "Dad",
+            {
+                "Perfect Week": {
+                    "target_type": "days_all_chores",
+                    "days_done": ["2026-10-18", "2026-10-19"],
+                },
+                "Week Points": {"target_type": "points"},
+                "Tidy Room": {
+                    "target_type": "chore_count",
+                    "today_chores_done": 1,
+                    "today_chores_required": 1,
+                    "threshold_value": 1,
+                },
+            },
+        )
+    )
+    cards = _render_home_card("pref_urgent_days", states, user_names=["Mom", "Dad"])
+    by_name = {
+        name: c["custom_fields"]["content"]
+        for c in cards
+        for name in ["Perfect Week", "Week Points", "Tidy Room"]
+        if name in c["custom_fields"]["content"]
+    }
+
+    def dots(html):
+        return re.findall(r"bottom:-6px;[^']*background:var\(--(\w+)-color\)", html)
+
+    # Dad did today's part of Perfect Week, Mom has not yet
+    assert dots(by_name["Perfect Week"]) == ["error", "success"]
+    # A points goal has no daily part, so no dots
+    assert dots(by_name["Week Points"]) == []
+    # Mom finished the whole goal (tick, no dot); Dad met today's chore count
+    assert dots(by_name["Tidy Room"]) == ["success"]
+    assert "✓" in by_name["Tidy Room"]
+
+
 def test_family_home_race_track_spreads_people_who_are_close() -> None:
     """People a few percent apart share one spot and step a whole dot apart."""
 

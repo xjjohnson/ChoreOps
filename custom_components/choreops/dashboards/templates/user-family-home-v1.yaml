@@ -360,7 +360,12 @@ views:
                     {%- set b_start = ((ba.get('start_date') or rs.get('start_date') or '') | string) | regex_replace('T.*$', '') -%}
                     {%- set dl = (((as_timestamp(b_end ~ 'T12:00:00') - as_timestamp(today ~ 'T12:00:00')) / 86400) | round(0) | int) if b_end | length > 0 else 999 -%}
                     {%- set cur = ns.q.get(bname, {'name': bname, 'icon': (ba.get('icon') or 'mdi:medal-outline') | string, 'left': dl, 'future': (b_start | length > 0 and b_start > today), 'people': []}) -%}
-                    {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'p': prog, 'e': earned}]}) -%}
+                    {#-- Goals with a daily part (day/streak goals, "N chores a day", daily badges) say whether today's part is done --#}
+                    {%- set b_tt = (ba.get('target_type') or '') | string | lower -%}
+                    {%- set b_days = ba.get('days_done') if (ba.get('days_done') is iterable and ba.get('days_done') is not string) else [] -%}
+                    {%- set dly = t_req > 0 or b_tt.startswith(('days_', 'streak_')) or (badge.get('badge_type') | string | lower) == 'daily' -%}
+                    {%- set td = earned or (t_req > 0 and (ba.get('today_chores_done') | int(default=0)) >= t_req) or today in b_days -%}
+                    {%- set cur = cur | combine({'people': cur.people + [{'u': uname, 'p': prog, 'e': earned, 'd': dly, 't': td}]}) -%}
                     {%- set ns.q = ns.q | combine({bname: cur}) -%}
                   {%- endif -%}
                 {%- endfor -%}
@@ -401,10 +406,12 @@ views:
                   {%- set mk.v = mk.v ~ "<div style='position:absolute;left:calc(" ~ (94 if mk.anchor > 94 else mk.anchor) ~ "% - 8px + " ~ lane_off ~ "px);top:" ~ lane_top ~ "px;border:1.5px solid var(--card-background-color);border-radius:50%;'><div style='width:16px;height:16px;border-radius:50%;background:" ~ pc ~ ";color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;opacity:" ~ (1 if (pp.p > 0 or pp.e) else 0.45) ~ ";'>" ~ (nm[:1] | upper) ~ "</div></div>" -%}
                 {%- endfor -%}
                 {%- set done_n = q.people | selectattr('e') | list | length -%}
-                {#-- Footer: a chip per person, finished people first as green ticks --#}
+                {#-- Footer: a chip per person, finished people first as green ticks; on goals with a daily part
+                     a dot under the chip shows today's part done (green) or not yet (red) --#}
                 {%- set ft = namespace(v='') -%}
                 {%- for pp in (q.people | selectattr('e') | list) + (q.people | rejectattr('e') | list) -%}
-                {%- set ft.v = ft.v ~ ("<span style='width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;" ~ ("background:var(--success-color);color:#fff;" if pp.e else "border:1.5px solid var(--divider-color);color:var(--secondary-text-color);") ~ "'>" ~ ('✓' if pp.e else (pp.u[:1] | upper)) ~ "</span>") -%}
+                {%- set tdot = ("<span style='position:absolute;left:5.5px;bottom:-6px;width:5px;height:5px;border-radius:50%;background:" ~ ('var(--success-color)' if pp.t else 'var(--error-color)') ~ ";'></span>") if (pp.d and not pp.e) else '' -%}
+                {%- set ft.v = ft.v ~ ("<span style='position:relative;display:inline-flex;'><span style='width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;" ~ ("background:var(--success-color);color:#fff;" if pp.e else "border:1.5px solid var(--divider-color);color:var(--secondary-text-color);") ~ "'>" ~ ('✓' if pp.e else (pp.u[:1] | upper)) ~ "</span>" ~ tdot ~ "</span>") -%}
                 {%- endfor -%}
                 {%- set foot = "<span style='display:inline-flex;gap:3px;align-items:center;'>" ~ ft.v ~ "</span>" -%}
                 {%- set ticks = namespace(v='') -%}
