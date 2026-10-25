@@ -1366,6 +1366,51 @@ class TestPeriodicBadgeTargetTypes:
         )
         assert in_scope == [selected_valid]
 
+    async def test_window_total_ignores_chores_when_badge_tracks_only_unassigned(
+        self,
+        setup_minimal: SetupResult,
+    ) -> None:
+        """An empty scope counts all chores only when the badge tracks none."""
+        coordinator = setup_minimal.coordinator
+        manager = coordinator.gamification_manager
+
+        assignee_id = next(iter(coordinator.assignees_data.keys()))
+        chore_id = next(iter(coordinator.chores_data.keys()))
+        coordinator.assignees_data[assignee_id][const.DATA_USER_CHORE_DATA] = {
+            chore_id: {
+                const.DATA_USER_CHORE_DATA_PERIODS: {
+                    const.DATA_USER_CHORE_DATA_PERIODS_DAILY: {
+                        "2026-10-24": {
+                            const.DATA_USER_CHORE_DATA_PERIOD_APPROVED: 1,
+                            const.DATA_USER_CHORE_DATA_PERIOD_POINTS: 10.0,
+                        }
+                    }
+                }
+            }
+        }
+        window = ("2026-10-01", "2026-10-31")
+
+        # Badge with no tracked chores: empty scope means every chore.
+        assert (
+            manager._get_tracked_window_completion_total(assignee_id, [], *window) == 1
+        )
+        assert (
+            manager._get_tracked_window_points_total(assignee_id, [], *window) == 10.0
+        )
+        # Badge tracking chores this assignee lacks: nothing counts.
+        assert (
+            manager._get_tracked_window_completion_total(
+                assignee_id, [], *window, all_if_empty=False
+            )
+            == 0
+        )
+        assert (
+            manager._get_tracked_window_points_total(
+                assignee_id, [], *window, all_if_empty=False
+            )
+            == 0.0
+        )
+
     async def test_scope_filter_without_tracked_chores_includes_all_assigned(
         self,
         setup_minimal: SetupResult,
