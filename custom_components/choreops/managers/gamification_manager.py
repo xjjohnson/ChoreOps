@@ -1560,6 +1560,15 @@ class GamificationManager(BaseManager):
         window_end_iso = end_date_iso or today_iso
         cycle_start_iso = self._resolve_badge_cycle_start(reset_schedule, today_iso)
         target_type = canonical_target.get("source_raw_type")
+        # An empty scope means "all chores" only for a badge with no tracked
+        # chores; one that tracks chores this assignee lacks counts nothing.
+        badge_tracks_chores = bool(
+            badge_data.get(const.DATA_BADGE_TYPE, const.BADGE_TYPE_PERIODIC)
+            in const.INCLUDE_TRACKED_CHORES_BADGE_TYPES
+            and cast(
+                "dict[str, Any]", badge_data.get(const.DATA_BADGE_TRACKED_CHORES, {})
+            ).get(const.DATA_BADGE_TRACKED_CHORES_SELECTED_CHORES)
+        )
 
         if target_type in {
             const.BADGE_TARGET_THRESHOLD_TYPE_POINTS,
@@ -1570,6 +1579,7 @@ class GamificationManager(BaseManager):
                 tracked_chores,
                 window_start_iso,
                 window_end_iso,
+                all_if_empty=not badge_tracks_chores,
             )
         if target_type == const.BADGE_TARGET_THRESHOLD_TYPE_CHORE_COUNT:
             today_stats["window_approved"] = self._get_tracked_window_completion_total(
@@ -1577,6 +1587,7 @@ class GamificationManager(BaseManager):
                 tracked_chores,
                 window_start_iso,
                 window_end_iso,
+                all_if_empty=not badge_tracks_chores,
             )
         today_completion = (
             self.coordinator.statistics_manager.get_badge_scoped_today_completion(
@@ -3129,8 +3140,15 @@ class GamificationManager(BaseManager):
         tracked_chores: list[str],
         start_date_iso: str,
         end_date_iso: str,
+        *,
+        all_if_empty: bool = True,
     ) -> int:
-        """Return approved completion count for tracked chores within date window."""
+        """Return approved completion count for tracked chores within date window.
+
+        An empty `tracked_chores` means "every chore" only when `all_if_empty`;
+        a badge that tracks chores the assignee isn't assigned to passes False
+        so nothing counts.
+        """
         assignee_data = cast(
             "dict[str, Any]",
             self.coordinator.assignees_data.get(assignee_id, {}),
@@ -3140,7 +3158,11 @@ class GamificationManager(BaseManager):
             assignee_data.get(const.DATA_USER_CHORE_DATA, {}),
         )
 
-        chore_ids = tracked_chores or list(assignee_chore_data.keys())
+        chore_ids = (
+            tracked_chores
+            if tracked_chores or not all_if_empty
+            else list(assignee_chore_data.keys())
+        )
         total_approved = 0
 
         for chore_id in chore_ids:
@@ -3173,8 +3195,13 @@ class GamificationManager(BaseManager):
         tracked_chores: list[str],
         start_date_iso: str,
         end_date_iso: str,
+        *,
+        all_if_empty: bool = True,
     ) -> float:
-        """Return chore points total for tracked chores within date window."""
+        """Return chore points total for tracked chores within date window.
+
+        See `_get_tracked_window_completion_total` for `all_if_empty`.
+        """
         assignee_data = cast(
             "dict[str, Any]",
             self.coordinator.assignees_data.get(assignee_id, {}),
@@ -3184,7 +3211,11 @@ class GamificationManager(BaseManager):
             assignee_data.get(const.DATA_USER_CHORE_DATA, {}),
         )
 
-        chore_ids = tracked_chores or list(assignee_chore_data.keys())
+        chore_ids = (
+            tracked_chores
+            if tracked_chores or not all_if_empty
+            else list(assignee_chore_data.keys())
+        )
         total_points = 0.0
 
         for chore_id in chore_ids:
