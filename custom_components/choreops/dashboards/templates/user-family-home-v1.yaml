@@ -465,6 +465,8 @@ views:
                   }
                 }},
               {%- endif -%}
+    - type: grid
+      cards:
         - type: heading
           heading: << t.get('goals_heading', 'Goals') >>
           heading_style: title
