@@ -215,12 +215,24 @@ views:
                           {%- set badge_label = badge_label if badge_label is mapping else {} -%}
                           {%- set badge_target = state_attr(badge_entity, 'target') -%}
                           {%- set badge_pts = (badge_target.get('threshold_value') if badge_target is mapping else state_attr(badge_entity, 'threshold_value')) | float(default=0) -%}
-                          {%- set bdg.items = bdg.items + [{'pts': badge_pts, 'name': badge_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;'), 'icon': state_attr(badge_entity, 'icon') | default('mdi:medal-outline', true), 'count': badge.get('earned_count', 0) | int(default=0), 'last': (badge.get('last_awarded') or '') | string, 'label': (badge_label.get('name') or '') | string, 'color': (badge_label.get('color') or '') | string, 'own': (badge.get('color') or '') | string}] -%}
+                          {%- set bdg.items = bdg.items + [{'pts': badge_pts, 'name': badge_name | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;'), 'icon': state_attr(badge_entity, 'icon') | default('mdi:medal-outline', true), 'count': badge.get('earned_count', 0) | int(default=0), 'last': (badge.get('last_awarded') or '') | string, 'label': (badge_label.get('name') or '') | string, 'color': (badge_label.get('color') or '') | string, 'own': (badge.get('color') or '') | string, 'cum': (badge.get('badge_type') | string | lower) == 'cumulative', 'cur': badge_entity == current_rank_eid}] -%}
                         {%- endif -%}
                       {%- endif -%}
                     {%- endfor -%}
                     {#-- Award dates are often just a day, so ranks earned the same day put the higher rank first --#}
                     {%- set bdg.items = bdg.items | sort(attribute='last,pts', reverse=true) -%}
+                    {#-- LEVELS: earned cumulative badges leave the Badges strip and show as one small icon line, lowest first, ring on the current one --#}
+                    {%- set lvl_items = bdg.items | selectattr('cum') | sort(attribute='pts') | list -%}
+                    {%- set bdg.items = bdg.items | rejectattr('cum') | list -%}
+                    {%- set levels_html = '' -%}
+                    {%- if lvl_items | length > 0 -%}
+                      {%- set lvl_tiles = namespace(v='') -%}
+                      {%- for lv in lvl_items -%}
+                        {%- set lc = lv.own or lv.color or 'var(--primary-color)' -%}
+                        {%- set lvl_tiles.v = lvl_tiles.v ~ "<div title='" ~ lv.name ~ "' style='position:relative;width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--card-background-color);box-shadow:0 2px 5px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;" ~ ("outline:2px solid " ~ lc ~ ";outline-offset:2px;" if lv.cur else '') ~ "'><ha-icon icon='" ~ lv.icon ~ "' style='width:16px;height:16px;--mdc-icon-size:16px;color:" ~ lc ~ ";display:block;'></ha-icon></div>" -%}
+                      {%- endfor -%}
+                      {%- set levels_html = "<div style='margin-top:16px;display:flex;align-items:center;gap:10px;'><span style='flex:0 0 auto;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ui.get('levels', 'Levels') ~ "</span><div style='display:flex;gap:10px;overflow-x:auto;padding:4px;scrollbar-width:none;'>" ~ lvl_tiles.v ~ "</div></div>" -%}
+                    {%- endif -%}
                     {%- for b in bdg.items -%}
                       {%- if b.label not in bdg.groups -%}{%- set bdg.groups = bdg.groups + [b.label] -%}{%- endif -%}
                     {%- endfor -%}
@@ -234,7 +246,7 @@ views:
                       {%- endfor -%}
                       {%- set bdg.html = bdg.html ~ "<div style='margin-top:16px;display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:0.6px;text-transform:uppercase;color:var(--secondary-text-color);'>" ~ ("<span style='width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:" ~ c ~ ";'></span>" ~ (g | replace('&', '&amp;') | replace('<', '&lt;') | replace('>', '&gt;')) if g else ui.get('badges', 'Badges')) ~ "</div><div style='margin-top:8px;display:flex;gap:12px;overflow-x:auto;padding:12px 6px;border-radius:14px;background:linear-gradient(180deg, color-mix(in srgb, " ~ c ~ " 6%, var(--card-background-color)), color-mix(in srgb, " ~ c ~ " 14%, var(--card-background-color)));border-bottom:4px solid color-mix(in srgb, " ~ c ~ " 35%, var(--divider-color));scrollbar-width:none;'>" ~ tiles.v ~ "</div>" -%}
                     {%- endfor -%}
-                    {%- set earned_badges_section = bdg.html -%}
+                    {%- set earned_badges_section = levels_html ~ bdg.html -%}
 
                     {%- set compact_row_base = "display:grid;grid-template-columns:18px minmax(0,max-content) minmax(0,1fr);align-items:center;column-gap:8px;padding:5px 0;" -%}
                     {%- set compact_section_base = "margin-top:12px;padding-top:10px;border-top:1px solid var(--divider-color);" -%}
