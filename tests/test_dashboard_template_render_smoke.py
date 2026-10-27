@@ -1493,7 +1493,8 @@ def test_family_home_view_renders_first_tab_and_is_not_selectable() -> None:
             "custom:auto-entities",
             "custom:auto-entities",
         ],
-        ["heading", "custom:auto-entities", "heading", "custom:auto-entities"],
+        ["heading", "custom:auto-entities"],
+        ["heading", "custom:auto-entities"],
         ["heading", "custom:auto-entities"],
     ]
     env = jinja2.Environment(extensions=["jinja2.ext.loopcontrols"])
@@ -2681,7 +2682,8 @@ def test_family_hub_recent_activity_card_renders_rows() -> None:
     )
     rendered = builder.render_dashboard_template(template_str, context)
     assert rendered["views"][0]["max_columns"] == 3
-    assert len(rendered["views"][0]["sections"]) == 3
+    # Goals and Family Goals each get their own section after the three columns
+    assert len(rendered["views"][0]["sections"]) == 5
     tpl = None
     for section in rendered["views"][0]["sections"]:
         for outer in section["cards"]:

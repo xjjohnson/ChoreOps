@@ -2748,6 +2748,9 @@ views:
                     {%- endif -%}
                   {%- endif -%}
 
+    - type: grid
+      column_span: 1
+      cards:
         - type: grid
           square: false
           columns: 1
@@ -3361,6 +3364,9 @@ views:
                     {%- endif -%}
                   {%- endif -%}
 
+    - type: grid
+      column_span: 1
+      cards:
         - type: grid
           square: false
           columns: 1
