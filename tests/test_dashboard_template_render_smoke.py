@@ -3072,6 +3072,67 @@ def test_family_hub_showcase_sorts_newest_first_with_label_strips() -> None:
     assert "Oct 18" in output
 
 
+def test_family_hub_levels_leave_badges_and_show_one_line() -> None:
+    """Earned cumulative badges show as a small Levels line, lowest first, ring on current."""
+    tpl = _hub_card_template("ach_ns")
+
+    def level(eid: str, name: str) -> dict[str, object]:
+        return {
+            "eid": eid,
+            "name": name,
+            "badge_type": "cumulative",
+            "earned": True,
+            "earned_count": 1,
+            "last_awarded": "2026-10-01",
+        }
+
+    def level_state(eid: str, threshold: int) -> _MockState:
+        return _MockState(
+            entity_id=eid,
+            state="ok",
+            attributes={"icon": "mdi:medal", "threshold_value": threshold},
+            name=eid,
+        )
+
+    helper = {
+        "badges": [
+            level("sensor.l2", "Level 2"),
+            level("sensor.l1", "level 1"),
+            {
+                "eid": "sensor.brusher",
+                "name": "Expert Brusher",
+                "badge_type": "periodic",
+                "earned": True,
+                "earned_count": 1,
+                "last_awarded": "2026-10-02",
+            },
+        ],
+        "core_sensors": {"badges_eid": "sensor.lily_highest"},
+    }
+    extra = {
+        "sensor.l1": level_state("sensor.l1", 1000),
+        "sensor.l2": level_state("sensor.l2", 2000),
+        "sensor.brusher": level_state("sensor.brusher", 0),
+        "sensor.lily_highest": _MockState(
+            entity_id="sensor.lily_highest",
+            state="ok",
+            attributes={"current_badge_eid": "sensor.l2"},
+            name="highest",
+        ),
+    }
+    output = _render_hub_card(tpl, helper, extra)
+    levels = output[output.index("Levels") : output.index("Badges")]
+    assert levels.index("title='level 1'") < levels.index("title='Level 2'")
+    assert "outline:2px solid" in levels[levels.index("title='Level 2'") :]
+    assert "outline:2px solid" not in levels[: levels.index("title='Level 2'")]
+    badges = output[output.index("Badges") :]
+    assert "Expert Brusher" in badges
+    assert "level 1" not in badges
+    # No levels earned: the line is not shown.
+    helper["badges"] = helper["badges"][2:]
+    assert "Levels" not in _render_hub_card(tpl, helper, extra)
+
+
 _SHOWCASE_UI = {
     "good_afternoon": "Good afternoon",
     "total_earned": "Total earned",
