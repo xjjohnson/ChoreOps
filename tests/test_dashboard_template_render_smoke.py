@@ -3123,8 +3123,8 @@ def test_family_hub_levels_leave_badges_and_show_one_line() -> None:
     output = _render_hub_card(tpl, helper, extra)
     levels = output[output.index("Levels") : output.index("Badges")]
     assert levels.index("title='level 1'") < levels.index("title='Level 2'")
-    assert "outline:2px solid" in levels[levels.index("title='Level 2'") :]
-    assert "outline:2px solid" not in levels[: levels.index("title='Level 2'")]
+    assert "outline:3px solid" in levels[levels.index("title='Level 2'") :]
+    assert "outline:3px solid" not in levels[: levels.index("title='Level 2'")]
     badges = output[output.index("Badges") :]
     assert "Expert Brusher" in badges
     assert "level 1" not in badges
